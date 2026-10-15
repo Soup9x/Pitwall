@@ -14,10 +14,22 @@
 <div class="card"><p class="muted">No standings stored yet.</p></div>
 {% else %}
 {% if spoiler_hidden %}<details class="spoiler"><summary>Hidden by spoiler mode — click to show anyway</summary>{% endif %}
+{% if title %}
+<div class="grid" style="margin-bottom:16px;">
+{% for tm in title %}
+  <div class="card">
+    <h2>{{ "Drivers'" if tm.kind == "driver" else "Constructors'" }} title fight</h2>
+    {% for line in tm.summary() %}<div class="{{ 'small' if line.startswith('  ') else '' }}" style="{{ 'padding-left:14px;' if line.startswith('  ') else '' }}margin:2px 0;">{{ line.strip() }}</div>{% endfor %}
+    {% if tm.eliminated and not tm.champion %}<p class="muted small" style="margin-top:8px;">Mathematically out: {{ tm.eliminated|map(attribute='name')|join(', ') }}.</p>{% endif %}
+  </div>
+{% endfor %}
+</div>
+{% endif %}
 <div class="grid">
   <div class="card"><h2>Drivers</h2>{{ standings_table(drivers) }}</div>
   {% if constructors %}<div class="card"><h2>Constructors</h2>{{ standings_table(constructors, None, "Team") }}</div>{% endif %}
 </div>
 {% if spoiler_hidden %}</details>{% endif %}
+<p class="small"><a href="/head-to-head?season={{ season }}">Teammate head-to-head →</a></p>
 {% endif %}
 {% endblock %}

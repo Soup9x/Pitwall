@@ -44,10 +44,22 @@
 {% endfor %}
 {% endif %}
 
+{% for tm in ctx.title %}
+<h3 style="margin:16px 0 8px;">{{ "Drivers'" if tm.kind == "driver" else "Constructors'" }} title</h3>
+{% for line in tm.summary() %}<p style="margin:2px 0;{% if line.startswith('  ') %}padding-left:14px;{% endif %}">{{ line.strip() }}</p>{% endfor %}
+{% endfor %}
+
 {% if ctx.form %}
 <h3 style="margin:16px 0 8px;">Followed drivers — last 3 races</h3>
 {% for f in ctx.form %}
 <p style="margin:2px 0;"><strong>{{ f.driver }}</strong>: {% if f.results %}{% for ev, pos in f.results %}{{ pos }} <span style="color:#6b7280;">({{ ev }})</span>{% if not loop.last %} · {% endif %}{% endfor %}{% else %}no results yet{% endif %}</p>
 {% endfor %}
+{% endif %}
+
+{% if ctx.facts %}
+<h3 style="margin:16px 0 8px;">Did you know?</h3>
+<ul style="margin:0;padding-left:18px;">
+{% for f in ctx.facts %}<li style="margin:3px 0;">{{ f.text }}</li>{% endfor %}
+</ul>
 {% endif %}
 {% endblock %}

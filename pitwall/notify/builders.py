@@ -13,7 +13,7 @@ from pitwall.db import utcnow
 from pitwall.models import SESSION_EMOJI, SESSION_LABELS, Event, FollowedDriver, Result, Session
 from pitwall.notify.message import Message
 from pitwall.services import standings as standings_svc
-from pitwall.services import track_stats
+from pitwall.services import title_math, track_stats, trivia
 from pitwall.services.presenters import (
     SessionView,
     event_sessions,
@@ -286,6 +286,8 @@ class PreviewContext:
     form: list[FormLine]
     link: str
     countdown: str | None
+    title: list[title_math.TitleMath] = field(default_factory=list)
+    facts: list[trivia.Fact] = field(default_factory=list)
 
 
 def _form(db: DB, settings: AppSettings, before: datetime) -> list[FormLine]:
@@ -314,8 +316,23 @@ def _form(db: DB, settings: AppSettings, before: datetime) -> list[FormLine]:
     return out
 
 
+def preview_title_math(db: DB, event: Event) -> list[title_math.TitleMath]:
+    out = []
+    for kind in ("driver", "constructor"):
+        tm = title_math.for_season(db, event.season, kind)
+        # Only when the standings lead into this event (or the title is decided) and it matters.
+        if tm and tm.relevant and (tm.champion or tm.next_event == event.name):
+            out.append(tm)
+    return out
+
+
 def preview_context(
-    db: DB, event: Event, settings: AppSettings, now: datetime | None = None
+    db: DB,
+    event: Event,
+    settings: AppSettings,
+    now: datetime | None = None,
+    *,
+    avoid_recent: bool = True,
 ) -> PreviewContext:
     now = now or utcnow()
     sessions = event_sessions(event, settings, now)
@@ -338,11 +355,21 @@ def preview_context(
         form=_form(db, settings, race.start_utc if race and race.start_utc else now),
         link=event_url(event),
         countdown=humanize_delta((first - now).total_seconds()) if first and first > now else None,
+        title=preview_title_math(db, event),
+        facts=trivia.for_preview(db, event, avoid_recent=avoid_recent),
     )
 
 
-def preview(db: DB, event: Event, settings: AppSettings, now: datetime | None = None) -> Message:
-    ctx = preview_context(db, event, settings, now)
+def preview(
+    db: DB,
+    event: Event,
+    settings: AppSettings,
+    now: datetime | None = None,
+    *,
+    avoid_recent: bool = True,
+) -> Message:
+    """`data["facts"]` lists the trivia used, so the caller can remember them (no repeats)."""
+    ctx = preview_context(db, event, settings, now, avoid_recent=avoid_recent)
     badge = " ⚡ Sprint weekend" if event.is_sprint_weekend else ""
     title = f"🏎️ Race week: {event.name}{badge}"
     text = render("email/preview.txt", ctx=ctx, title=title).strip()
@@ -363,6 +390,8 @@ def preview(db: DB, event: Event, settings: AppSettings, now: datetime | None = 
             }
             for v in ctx.sessions
         ],
+        "title_math": [{"kind": tm.kind, "lines": tm.summary()} for tm in ctx.title],
+        "facts": [{"type": f.type, "text": f.text, "key": f.key} for f in ctx.facts],
     }
     return Message(
         type="preview",

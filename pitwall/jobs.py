@@ -16,7 +16,7 @@ from pitwall import scheduler as sched_mod
 from pitwall.db import session_scope, utcnow
 from pitwall.models import Event, Season, Session
 from pitwall.notify import builders, outbox
-from pitwall.services import reminders
+from pitwall.services import openf1_sync, reminders, trivia
 from pitwall.services.sync import (
     apply_results,
     apply_schedule,
@@ -25,6 +25,8 @@ from pitwall.services.sync import (
 from pitwall.settings_store import get_kv, load_settings, set_kv
 from pitwall.sources.http import SourceUnavailable
 from pitwall.sources.jolpica import JolpicaClient, make_client
+from pitwall.sources.openf1 import OpenF1Client
+from pitwall.sources.openf1 import make_client as make_openf1_client
 
 log = logging.getLogger(__name__)
 
@@ -261,8 +263,45 @@ def preview_job(now: datetime | None = None) -> None:
         event = db.get(Event, event_id)
         assert event is not None
         settings = load_settings(db)
-        outbox.enqueue(db, builders.preview(db, event, settings, now), settings=settings, now=now)
+        send_preview(db, event, settings, now)
     flush_job()
+
+
+def send_preview(
+    db: Any, event: Event, settings: Any, now: datetime, dedup_content: str | None = None
+) -> bool:
+    """Queue the race-week preview and remember its trivia so later previews don't repeat it."""
+    msg = builders.preview(db, event, settings, now)
+    if dedup_content:
+        msg.dedup_content = dedup_content
+    row = outbox.enqueue(db, msg, settings=settings, now=now)
+    if row is not None:
+        trivia.remember_keys(db, [f["key"] for f in msg.data.get("facts", [])])
+    return row is not None
+
+
+# ---------------------------------------------------------------------------- OpenF1
+
+
+_openf1_factory: Callable[[], OpenF1Client] = make_openf1_client
+
+
+def set_openf1_factory(factory: Callable[[], OpenF1Client]) -> None:
+    global _openf1_factory
+    _openf1_factory = factory
+
+
+@safe_job
+def openf1_sync_job(now: datetime | None = None) -> None:
+    """Best lap / stints / pit stops for followed drivers (cheap no-op when nothing is due)."""
+    now = now or utcnow()
+    if not openf1_sync.pending_targets(now):
+        return
+    client = _openf1_factory()
+    try:
+        openf1_sync.sync(client, now)
+    finally:
+        client.close()
 
 
 # ---------------------------------------------------------------------------- reminders

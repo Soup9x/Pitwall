@@ -157,7 +157,7 @@
     <h2>Followed drivers</h2>
     <table>
     {% for f in followed %}
-      <tr><td>{{ f.driver.full_name }}</td><td class="num">
+      <tr><td><a href="/drivers/{{ f.driver_id }}">{{ f.driver.full_name }}</a></td><td class="num">
         <form class="inline" method="post" action="/settings/followed"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="action" value="remove"><input type="hidden" name="driver_id" value="{{ f.driver_id }}"><button class="secondary small">Remove</button></form>
       </td></tr>
     {% else %}<tr><td class="muted">None yet.</td></tr>{% endfor %}

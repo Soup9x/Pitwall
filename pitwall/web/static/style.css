@@ -61,3 +61,14 @@ code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-si
 .login { max-width: 360px; margin: 10vh auto; }
 footer { color: var(--muted); font-size: 12px; text-align: center; padding: 24px 0; }
 @media (max-width: 640px) { nav a { padding: 8px 4px; } .countdown { font-size: 1.7rem; } }
+
+/* Phase 2 */
+svg.chart { width: 100%; height: auto; }
+svg.chart text { fill: var(--muted); font-size: 11px; }
+svg.chart line.grid { stroke: var(--border); stroke-width: 1; }
+.tyre { display: inline-block; width: 18px; height: 18px; border-radius: 50%; color: #111;
+  font-size: 11px; font-weight: 800; text-align: center; line-height: 18px; margin-right: 2px; }
+table.h2h td.lead { color: #fff; font-weight: 800; }
+.split { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin: 10px 0 4px; }
+.split > div { height: 100%; background: var(--accent); }
+ul.facts-list { margin: 0; padding-left: 18px; } ul.facts-list li { margin: 4px 0; }

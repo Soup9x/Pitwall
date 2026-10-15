@@ -15,6 +15,15 @@
     {{ track_facts(event.circuit, stats) }}
   </div>
 
+  {% if facts %}
+  <div class="card wide">
+    <h2>Did you know?</h2>
+    <ul class="facts-list">
+    {% for f in facts %}<li>{{ f.text }} <span class="muted small" title="Source: {{ f.source }}">ⓘ</span></li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
   <div class="card wide">
     <div class="row" style="justify-content:space-between;align-items:center;">
       <h2 style="margin:0;">Results</h2>

@@ -11,7 +11,7 @@
 <header class="top"><div class="wrap">
   <div class="brand">Pit<span>wall</span></div>
   <nav>
-    {% for href, label in [("/", "Dashboard"), ("/events", "Calendar"), ("/standings", "Standings"), ("/history", "Notifications"), ("/settings", "Settings")] %}
+    {% for href, label in [("/", "Dashboard"), ("/events", "Calendar"), ("/standings", "Standings"), ("/head-to-head", "Head-to-head"), ("/history", "Notifications"), ("/settings", "Settings")] %}
     <a href="{{ href }}" class="{{ 'active' if (path == href or (href != '/' and path.startswith(href))) else '' }}">{{ label }}</a>
     {% endfor %}
   </nav>

@@ -4,8 +4,8 @@ A self-hosted Formula 1 notifier for the homelab. Pitwall tracks the F1 calendar
 about it by email, webhook (Discord, ntfy, generic JSON, and anything else
 [Apprise](https://github.com/caronc/apprise) supports) and a Google Calendar feed.
 
-**Status: Phase 1 (core) is done.** Phase 2 (title math, head-to-head, trivia) and Phase 3
-(weather, digest, CSV export) come next. See `PITWALL_BUILD_SPEC.md` for the full plan.
+**Status: Phases 1 (core) and 2 (stats and trivia) are done.** Phase 3 (weather, digest, CSV
+export) comes next. See `PITWALL_BUILD_SPEC.md` for the full plan.
 
 ## What it does (Phase 1)
 
@@ -28,6 +28,31 @@ about it by email, webhook (Discord, ntfy, generic JSON, and anything else
 - **ICS calendar feed** for Google Calendar, with stable event IDs, so a moved session
   updates the existing entry instead of creating a duplicate.
 - **Web UI** with a dashboard, calendar, event pages, standings, notification history and settings.
+
+## Stats and trivia (Phase 2)
+
+- **Title math** on the Standings page and in race-week previews, when it matters. It shows who
+  is mathematically out and what the leader needs to clinch at the next race, e.g. "Clinches
+  with P3 or better if Piastri doesn't win" (sprint weekends and the constructors' title use
+  points margins instead). Conditions are always safe: the leader's own fastest-lap point is
+  never assumed, and a tie only counts for the leader when the rival can't match their wins.
+- **Teammate head-to-head** (Head-to-head page): qualifying record, race record (races where
+  both retired don't count) and points split, including sprints.
+- **Driver pages** (click any driver name): race-by-race results, average grid and finish,
+  positions gained, DNFs and a points-trend chart. For drivers you follow, best lap, tyre stints
+  and pit stops come from [OpenF1](https://openf1.org) (2023 onwards), fetched in the
+  background after each race.
+- **"Did you know?" facts** on event pages and in previews, computed only from stored results:
+  - milestones (50th/100th… start, first win or podium in reach, circuit records)
+  - streaks (points, podiums, front rows, DNFs)
+  - "N years ago" winners at this race
+  - home races for drivers and teams
+  - youngest/oldest driver and rookies
+
+  Each fact records the query it came from (hover the ⓘ on the event page). Career totals are
+  only stated when Pitwall has the driver's whole career loaded; the default history (since
+  2000) covers the current grid's careers. Previews show the 3–5 highest-scoring facts and
+  skip ones used in the last three previews.
 
 Data comes from the [Jolpica F1 API](https://github.com/jolpica/jolpica-f1) (the
 Ergast successor) plus curated circuit facts in `data/circuits.yaml`.

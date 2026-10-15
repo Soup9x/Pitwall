@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ driver.full_name }}{% endblock %}
+{% block content %}
+<div class="row" style="justify-content:space-between;">
+  <div>
+    <h1>{{ driver.full_name }}{% if followed %} <span class="badge sprint">FOLLOWING</span>{% endif %}</h1>
+    <p class="sub">{% if driver.code %}{{ driver.code }} · {% endif %}{% if driver.number %}#{{ driver.number }} · {% endif %}{{ driver.nationality or '' }}{% if data and data.rows %} · {{ data.rows[-1].team }}{% endif %}</p>
+  </div>
+  {% if seasons|length > 1 %}
+  <form method="get"><select name="season" onchange="this.form.submit()">
+    {% for y in seasons %}<option value="{{ y }}" {{ 'selected' if y == season else '' }}>{{ y }}</option>{% endfor %}
+  </select></form>
+  {% endif %}
+</div>
+{% if not data or not data.rows %}
+<div class="card"><p class="muted">No race results stored for {{ season or 'this driver' }}.</p></div>
+{% else %}
+{% if spoiler_hidden %}<details class="spoiler"><summary>Hidden by spoiler mode — click to show anyway</summary>{% endif %}
+<div class="grid">
+  <div class="card">
+    <h2>{{ season }} season</h2>
+    <dl class="facts">
+      <dt>Points</dt><dd>{{ data.points|pts }}</dd>
+      <dt>Races</dt><dd>{{ data.rows|length }}</dd>
+      <dt>Average grid</dt><dd>{{ data.avg_grid if data.avg_grid is not none else '—' }}</dd>
+      <dt>Average finish</dt><dd>{{ data.avg_finish if data.avg_finish is not none else '—' }} <span class="muted small">(classified finishes)</span></dd>
+      <dt>Positions gained</dt><dd>{{ '%+d'|format(data.positions_gained) }}</dd>
+      <dt>DNFs</dt><dd>{{ data.dnfs }}</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h2>Points trend</h2>
+    {{ chart|safe }}
+  </div>
+</div>
+<div class="card table-scroll" style="margin-top:16px;">
+  <h2>Race by race</h2>
+  <table>
+    <tr><th class="num">Rd</th><th>Grand Prix</th><th class="num">Grid</th><th>Finish</th><th class="num">±</th><th>Sprint</th><th class="num">Pts</th>
+      {% if data.has_openf1 %}<th>Best lap</th><th class="num">Stops</th><th>Tyres</th>{% endif %}</tr>
+    {% for r in data.rows %}
+    <tr>
+      <td class="num">{{ r.event.round }}</td>
+      <td><a href="/events/{{ r.event.id }}">{{ r.event.short_name }}</a></td>
+      <td class="num">{{ r.grid or 'PL' }}</td>
+      <td>{{ r.finish }}{% if r.dnf %} <span class="muted small">{{ r.status }}</span>{% endif %}</td>
+      <td class="num {{ 'up' if r.gained and r.gained > 0 else ('down' if r.gained and r.gained < 0 else 'same') }}">{% if r.gained is not none %}{{ '%+d'|format(r.gained) }}{% else %}–{% endif %}</td>
+      <td>{{ r.sprint or '' }}</td>
+      <td class="num">{{ r.points|pts }}</td>
+      {% if data.has_openf1 %}
+      <td>{{ r.best_lap or '—' }}</td>
+      <td class="num">{{ r.pit_count if r.pit_count is not none else '—' }}</td>
+      <td>{% for s in r.stints %}<span class="tyre" style="background: {{ compounds.get(s.compound, '#6b7280') }}" title="{{ s.compound|title }}{% if s.laps %}, {{ s.laps }} laps{% endif %}">{{ s.compound[:1] }}</span>{% endfor %}</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </table>
+  {% if not data.has_openf1 %}<p class="muted small">Best laps, tyre stints and pit stops come from OpenF1 (2023 onwards) for drivers you follow; they're fetched in the background after each race.</p>{% endif %}
+</div>
+{% if spoiler_hidden %}</details>{% endif %}
+{% endif %}
+{% endblock %}

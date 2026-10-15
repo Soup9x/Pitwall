@@ -29,6 +29,7 @@ from pitwall.models import (
     NotificationTarget,
     Outbox,
     Result,
+    Session,
     SourceStatus,
     StandingsSnapshot,
 )
@@ -36,7 +37,16 @@ from pitwall.notify import builders, outbox
 from pitwall.notify import targets as targets_svc
 from pitwall.notify.dispatch import mask_url
 from pitwall.notify.dispatch import notify as dispatch_notify
-from pitwall.services import ics, reminders, standings, track_stats
+from pitwall.services import (
+    driver_stats,
+    head_to_head,
+    ics,
+    reminders,
+    standings,
+    title_math,
+    track_stats,
+    trivia,
+)
 from pitwall.services.presenters import (
     current_or_next_event,
     event_sessions,
@@ -303,6 +313,7 @@ def event_page(request: Request, event_id: int, db: DB = Depends(get_db)) -> HTM
         event=event,
         sessions=event_sessions(event, settings),
         stats=track_stats.compute(db, event),
+        facts=trivia.for_preview(db, event, avoid_recent=False),
         results=results,
         followed=followed,
         watched=outbox.is_watched(db, event.id),
@@ -340,9 +351,8 @@ async def send_preview(request: Request, event_id: int, db: DB = Depends(get_db)
     if event is None:
         raise HTTPException(404)
     settings = load_settings(db)
-    msg = builders.preview(db, event, settings)
-    msg.dedup_content = f"manual-preview:{event.slug}:{utcnow().isoformat()}"
-    row = outbox.enqueue(db, msg, settings=settings)
+    now = utcnow()
+    row = jobs.send_preview(db, event, settings, now, f"manual-preview:{event.slug}:{now}")
     db.commit()
     await run_in_threadpool(jobs.flush_job)
     flash(
@@ -377,8 +387,80 @@ def standings_page(
         seasons=seasons,
         drivers=drivers,
         constructors=constructors,
+        title=[
+            tm
+            for k in ("driver", "constructor")
+            if season and (tm := title_math.for_season(db, season, k))
+        ],
         spoiler_hidden=_spoiler_hidden(db, last_completed_event(db)),
     )
+
+
+@private.get("/head-to-head", response_class=HTMLResponse)
+def head_to_head_page(
+    request: Request, season: int | None = None, db: DB = Depends(get_db)
+) -> HTMLResponse:
+    seasons = list(
+        db.scalars(
+            select(Event.season)
+            .join(Session)
+            .join(Result, Result.session_id == Session.id)
+            .distinct()
+            .order_by(Event.season.desc())
+        )
+    )
+    season = season or (seasons[0] if seasons else None)
+    return page(
+        request,
+        "head_to_head.html",
+        db,
+        season=season,
+        seasons=seasons,
+        pairs=head_to_head.season(db, season) if season else [],
+        spoiler_hidden=_spoiler_hidden(db, last_completed_event(db)),
+    )
+
+
+@private.get("/drivers/{driver_id}", response_class=HTMLResponse)
+def driver_page(
+    request: Request, driver_id: str, season: int | None = None, db: DB = Depends(get_db)
+) -> HTMLResponse:
+    driver = db.get(Driver, driver_id)
+    if driver is None:
+        raise HTTPException(404)
+    seasons = driver_stats.seasons_for(db, driver_id)
+    season = season or (seasons[0] if seasons else None)
+    if season and season not in seasons:
+        seasons = sorted({*seasons, season}, reverse=True)
+    data = driver_stats.season(db, driver_id, season) if season else None
+    chart = ""
+    if data and data.rows:
+        chart = driver_stats.trend_svg(
+            [(driver.full_name, [r.cumulative for r in data.rows])],
+            [r.event.circuit.locality or r.event.short_name for r in data.rows],
+        )
+    return page(
+        request,
+        "driver.html",
+        db,
+        driver=driver,
+        season=season,
+        seasons=seasons,
+        data=data,
+        chart=chart,
+        compounds=COMPOUND_COLORS,
+        followed=db.get(FollowedDriver, driver_id) is not None,
+        spoiler_hidden=_spoiler_hidden(db, last_completed_event(db)),
+    )
+
+
+COMPOUND_COLORS = {
+    "SOFT": "#ef4444",
+    "MEDIUM": "#facc15",
+    "HARD": "#e5e7eb",
+    "INTERMEDIATE": "#22c55e",
+    "WET": "#3b82f6",
+}
 
 
 # ---------------------------------------------------------------------------- history
@@ -535,6 +617,7 @@ async def followed_drivers(request: Request, db: DB = Depends(get_db)) -> Respon
     driver_id = str(form.get("driver_id", ""))
     if action == "add" and db.get(Driver, driver_id) and not db.get(FollowedDriver, driver_id):
         db.add(FollowedDriver(driver_id=driver_id))
+        scheduler.run_now("openf1_sync")  # fetch their OpenF1 race detail in the background
     elif action == "remove":
         row = db.get(FollowedDriver, driver_id)
         if row:

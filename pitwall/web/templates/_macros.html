@@ -18,7 +18,7 @@
 {% for r in (table.rows[:limit] if limit else table.rows) %}
 <tr class="{{ 'followed' if r.followed else '' }}">
   <td class="num">{{ r.position }}</td>
-  <td>{{ r.name }}{% if r.team %} <span class="muted small">{{ r.team }}</span>{% endif %}</td>
+  <td>{% if heading == "Driver" %}<a href="/drivers/{{ r.entity_id }}">{{ r.name }}</a>{% else %}{{ r.name }}{% endif %}{% if r.team %} <span class="muted small">{{ r.team }}</span>{% endif %}</td>
   <td class="num">{{ r.points|pts }}</td>
   <td class="num">{{ r.wins }}</td>
   <td class="num muted">{% if r.gap_leader is not none %}-{{ r.gap_leader|pts }}{% else %}—{% endif %}</td>

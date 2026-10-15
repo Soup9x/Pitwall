@@ -284,3 +284,21 @@ class NotificationTarget(Base):
     url: Mapped[str] = mapped_column(Text)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class DriverSessionDetail(Base):
+    """Per-driver post-session detail from OpenF1 (2023+): best lap, tyre stints, pit stops."""
+
+    __tablename__ = "driver_session_detail"
+    __table_args__ = (UniqueConstraint("session_id", "driver_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("session.id", ondelete="CASCADE"), index=True
+    )
+    driver_id: Mapped[str] = mapped_column(ForeignKey("driver.id"), index=True)
+    openf1_session_key: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    best_lap_s: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pit_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    stints_json: Mapped[str] = mapped_column(Text, default="[]")
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
