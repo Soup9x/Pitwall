@@ -1,4 +1,9 @@
-"""Security headers for running on the public internet (e.g. behind a Cloudflare Tunnel)."""
+"""Security headers for running on the public internet (e.g. behind a Cloudflare Tunnel).
+
+Cookies are marked Secure on HTTPS requests only (as seen through a trusted proxy's
+X-Forwarded-Proto), so the same install works at https://pitwall.example.com through the tunnel
+and at http://server:8080 on the LAN. No HSTS header is sent: it would make browsers refuse the
+plain-HTTP LAN address for that hostname."""
 
 from __future__ import annotations
 
@@ -14,7 +19,7 @@ CSP = (
 
 
 class SecurityHeadersMiddleware:
-    def __init__(self, app: ASGIApp, *, hsts: bool = False) -> None:
+    def __init__(self, app: ASGIApp) -> None:
         self.app = app
         self.headers = [
             (b"content-security-policy", CSP.encode()),
@@ -24,8 +29,6 @@ class SecurityHeadersMiddleware:
             (b"permissions-policy", b"camera=(), microphone=(), geolocation=(), payment=()"),
             (b"cross-origin-opener-policy", b"same-origin"),
         ]
-        if hsts:
-            self.headers.append((b"strict-transport-security", b"max-age=31536000"))
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -39,7 +42,16 @@ class SecurityHeadersMiddleware:
                 path = scope.get("path", "")
                 if not path.startswith(("/static/", "/circuit-maps/", "/calendar.ics")):
                     extra.append((b"cache-control", b"no-store"))  # pages hold personal data
-                message["headers"] = [*message.get("headers", []), *extra]
+                headers = list(message.get("headers", []))
+                if scope.get("scheme") == "https":
+                    headers = [_secure_cookie(k, v) for k, v in headers]
+                message["headers"] = [*headers, *extra]
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
+
+
+def _secure_cookie(name: bytes, value: bytes) -> tuple[bytes, bytes]:
+    if name.lower() == b"set-cookie" and b"; secure" not in value.lower():
+        value += b"; secure"
+    return name, value

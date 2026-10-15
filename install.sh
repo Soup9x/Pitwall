@@ -316,7 +316,6 @@ if ((configure)); then
 
   host_name="$(hostname -s 2>/dev/null || hostname)"
   BIND="0.0.0.0"
-  SECURE="false"
   FWD="127.0.0.1"
   access_default=1
   [[ "$(env_get PITWALL_BASE_URL)" == https://* ]] && access_default=2
@@ -339,30 +338,20 @@ if ((configure)); then
         warn "Please enter a full URL starting with https:// (or http://)."
       done
       BASE_URL="${BASE_URL%/}"
-      if [[ "$BASE_URL" == https://* ]]; then
-        SECURE="true"
-        hint "Logins only work over https from now on, so use $BASE_URL (not the LAN address)."
-      fi
-      if ask_yn "Does the tunnel connector (cloudflared) or proxy run directly on this machine (not in Docker)?" n; then
-        BIND="127.0.0.1"
-        FWD="*"   # only this machine can reach 127.0.0.1, so trusting its forwarded IPs is safe
-        hint "Pitwall will only listen on 127.0.0.1:$PORT. In Cloudflare, set the published"
-        hint "application's service to  HTTP  127.0.0.1:$PORT"
-      else
-        lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
-        hint "In Cloudflare (Zero Trust → Networks → Tunnels → your tunnel → Published application"
-        hint "routes), set the service to  HTTP  ${lan_ip:-$host_name}:$PORT"
-        hint "Pitwall needs the IP address of the machine running cloudflared (or your proxy) so it"
-        hint "can see visitors' real IPs for login rate limiting, without letting anyone fake them."
-        prev="$(env_get FORWARDED_ALLOW_IPS)"
-        [[ "$prev" == 127.0.0.1 || "$prev" == "*" ]] && prev=""
-        while :; do
-          FWD="$(ask_required "IP address of the cloudflared/proxy machine (e.g. 192.168.1.20)" "$prev")"
-          FWD="${FWD//[[:space:]]/}"
-          [[ "$FWD" =~ ^[0-9A-Fa-f:./]+(,[0-9A-Fa-f:./]+)*$ ]] && break
-          warn "Please enter an IP address (several can be separated with commas)."
-        done
-      fi
+      lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+      hint "In Cloudflare (Zero Trust → Networks → Tunnels → your tunnel → Published application"
+      hint "routes), set the service to  HTTP  ${lan_ip:-$host_name}:$PORT"
+      hint "On your LAN you can also keep using http://${lan_ip:-$host_name}:$PORT"
+      hint "Pitwall needs the IP address of the machine running cloudflared (or your proxy) so it"
+      hint "can see visitors' real IPs for login rate limiting, without letting anyone fake them."
+      prev="$(env_get FORWARDED_ALLOW_IPS)"
+      [[ "$prev" == 127.0.0.1 || "$prev" == "*" ]] && prev=""
+      while :; do
+        FWD="$(ask_required "IP address of the cloudflared/proxy machine (e.g. 192.168.1.20)" "$prev")"
+        FWD="${FWD//[[:space:]]/}"
+        [[ "$FWD" =~ ^[0-9A-Fa-f:./]+(,[0-9A-Fa-f:./]+)*$ ]] && break
+        warn "Please enter an IP address (several can be separated with commas)."
+      done
       ;;
   esac
 
@@ -458,7 +447,6 @@ APPRISE_URLS_WEBHOOK=$(q "$HOOK_URLS")
 PITWALL_BACKFILL_START_YEAR=$START_YEAR
 PITWALL_LOG_LEVEL=$LOG_LEVEL
 
-PITWALL_SECURE_COOKIES=$SECURE
 FORWARDED_ALLOW_IPS=$(q "$FWD")
 
 PUID=$APP_UID

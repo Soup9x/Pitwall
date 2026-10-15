@@ -26,7 +26,6 @@ class EnvSettings(BaseSettings):
     data_dir: Path = Field(default=Path("data"), alias="PITWALL_DATA_DIR")
     database_url: str = Field(default="", alias="PITWALL_DATABASE_URL")
     scheduler_enabled: bool = Field(default=True, alias="PITWALL_SCHEDULER_ENABLED")
-    secure_cookies: bool = Field(default=False, alias="PITWALL_SECURE_COOKIES")
 
     jolpica_base_url: str = Field(
         default="https://api.jolpi.ca/ergast/f1", alias="PITWALL_JOLPICA_URL"

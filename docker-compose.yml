@@ -8,9 +8,8 @@ services:
     environment:
       PITWALL_DATA_DIR: /app/data
     ports:
-      # Host port: PITWALL_PORT in .env (default 8080). Keep PITWALL_BIND=0.0.0.0 when a
-      # Cloudflare Tunnel (cloudflared) or reverse proxy on another LAN machine forwards to it;
-      # use 127.0.0.1 only if that proxy runs on this same host.
+      # Host port: PITWALL_PORT in .env (default 8080), reachable on your LAN and by your
+      # Cloudflare Tunnel connector (cloudflared) or reverse proxy.
       - "${PITWALL_BIND:-0.0.0.0}:${PITWALL_PORT:-8080}:8080"
     volumes:
       - ./data:/app/data # SQLite database, cache and circuits.yaml
