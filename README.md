@@ -36,6 +36,37 @@ Ergast successor) plus curated circuit facts in `data/circuits.yaml`.
 
 ## 1. Install on the server
 
+### Quick install (recommended)
+
+Run this on `mh-flex-01`. The installer asks you a few questions and does the rest:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/soup9x/pitwall/main/install.sh | sudo bash
+```
+
+If you already have a copy of the code, run `sudo ./install.sh` from inside the folder instead.
+This also works if the repository is private (clone it first, logging in when git asks).
+
+The installer:
+
+1. checks for Docker and offers to install it if it's missing,
+2. downloads Pitwall to `/opt/pitwall`,
+3. asks for:
+   - your timezone and port
+   - whether Pitwall sits behind a reverse proxy
+   - a web UI password (or generates one)
+   - how to send email: Gmail, Microsoft 365, another SMTP server, or none
+   - webhooks: ntfy, Discord, or generic JSON
+   - how far back to download history
+4. builds the Apprise URLs for you, writes `.env` (readable only by root), and starts Pitwall,
+5. sends a test notification on each channel and prints your web address and calendar-feed URL.
+
+Run it again at any time to update Pitwall or change settings. Your current answers are the
+defaults, and the old `.env` is backed up first. Options: `--dir` (install location),
+`--branch` (git branch, default `main`) and `--repo`.
+
+### Manual install
+
 These commands assume Ubuntu with Docker and Docker Compose already installed. Run them on
 `mh-flex-01`.
 
@@ -175,6 +206,9 @@ address. Only `/calendar.ics` needs to be reachable, and it only answers with th
 
 ## 4. Updating
 
+Run `sudo ./install.sh` in `/opt/pitwall` and choose **Keep my current settings**. Or do it
+by hand:
+
 ```bash
 cd /opt/pitwall
 sudo git pull
@@ -211,8 +245,8 @@ PITWALL_SECURE_COOKIES=true
 FORWARDED_ALLOW_IPS=<your proxy's IP>   # so Pitwall sees real client IPs (login rate limiting)
 ```
 
-If the proxy runs on the same machine, you can stop exposing the port to the network. In
-`docker-compose.yml`, change the port line to `"127.0.0.1:${PITWALL_PORT:-8080}:8080"`.
+If the proxy runs on the same machine, you can stop exposing the port to the network. Set
+`PITWALL_BIND=127.0.0.1` in `.env`; the installer does this when you say the proxy is local.
 
 Caddy example:
 

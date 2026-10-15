@@ -1,13 +1,26 @@
-"""CLI: `python -m pitwall serve|migrate|sync|backfill`."""
+"""CLI: `python -m pitwall serve|migrate|sync|backfill|test`."""
 
 from __future__ import annotations
 
 import argparse
 import os
+import sys
 
 from pitwall.config import get_env
 from pitwall.db import init_engine
 from pitwall.logging_setup import configure_logging
+
+
+def send_test(channel: str) -> int:
+    from pitwall.notify.builders import test_message
+    from pitwall.notify.dispatch import channel_urls, notify
+
+    if not channel_urls(channel):
+        print(f"No {channel} URLs configured.")
+        return 1
+    ok, detail = notify(channel, test_message(channel))
+    print(f"Test {channel}: {'sent' if ok else 'FAILED'}" + ("" if ok else f" ({detail})"))
+    return 0 if ok else 1
 
 
 def main() -> None:
@@ -19,7 +32,12 @@ def main() -> None:
     sub.add_parser("migrate", help="apply database migrations")
     sub.add_parser("sync", help="sync the schedule and results once (no scheduler)")
     sub.add_parser("backfill", help="run the historical backfill once")
+    test = sub.add_parser("test", help="send a test notification (exit code 1 on failure)")
+    test.add_argument("channel", choices=["email", "webhook"])
     args = parser.parse_args()
+
+    if args.cmd == "test":
+        sys.exit(send_test(args.channel))
 
     env = get_env()
     configure_logging(env.log_level, env.secret_values())

@@ -8,10 +8,9 @@ services:
     environment:
       PITWALL_DATA_DIR: /app/data
     ports:
-      # Host port is configurable with PITWALL_PORT in .env (default 8080).
-      # Behind a reverse proxy on the same host you can bind to localhost only:
-      #   - "127.0.0.1:${PITWALL_PORT:-8080}:8080"
-      - "${PITWALL_PORT:-8080}:8080"
+      # Host port: PITWALL_PORT in .env (default 8080). Set PITWALL_BIND=127.0.0.1 to accept
+      # connections only from this machine (e.g. when a reverse proxy runs on the same host).
+      - "${PITWALL_BIND:-0.0.0.0}:${PITWALL_PORT:-8080}:8080"
     volumes:
       - ./data:/app/data # SQLite database, cache and circuits.yaml
     # Run as this UID:GID (must own ./data). Defaults to 1000:1000.

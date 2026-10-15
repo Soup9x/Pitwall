@@ -72,3 +72,17 @@ def test_log_redaction_covers_message_and_extras(capsys):
     line = _json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert line["msg"] == "password is ***" and line["url"] == "***"
     logging.getLogger().handlers.clear()
+
+
+def test_cli_test_command(monkeypatch, capsys):
+    from pitwall.__main__ import send_test
+
+    with respx.mock() as mock:
+        mock.post("https://hooks.example.com/pitwall").mock(return_value=httpx.Response(200))
+        assert send_test("webhook") == 0
+    assert "Test webhook: sent" in capsys.readouterr().out
+    monkeypatch.setenv("APPRISE_URLS_EMAIL", "")
+    from pitwall.config import get_env
+
+    get_env.cache_clear()
+    assert send_test("email") == 1
