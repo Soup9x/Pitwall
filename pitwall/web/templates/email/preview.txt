@@ -4,7 +4,7 @@
 
 SESSIONS (your time / track time)
 {% for s in ctx.sessions %}
-- {{ s.label }}: {{ s.owner_time }} {{ s.owner_tz }}{% if s.local_time %} / {{ s.local_time }} {{ s.local_tz }}{% endif %}{% if s.odd %} [odd hours]{% endif %}{% if s.status == "cancelled" %} [cancelled]{% endif %}
+- {{ s.label }}: {{ s.owner_time }} {{ s.owner_tz }}{% if s.local_time %} / {{ s.local_time }} {{ s.local_tz }}{% endif %}{% if s.odd %} [odd hours]{% endif %}{% if s.status == "cancelled" %} [cancelled]{% endif %}{% if ctx.weather.get(s.id) %} — {{ ctx.weather[s.id].short }}{% endif %}
 
 {% endfor %}
 {% for n in ctx.odd_notes %}
@@ -43,6 +43,13 @@ FOLLOWED DRIVERS (last 3)
 {% for f in ctx.form %}
 - {{ f.driver }}: {% for ev, pos in f.results %}{{ pos }} ({{ ev }}){% if not loop.last %}, {% endif %}{% endfor %}
 
+{% endfor %}
+{% endif %}
+{% if ctx.rain %}
+
+WEATHER
+{% for w in ctx.rain %}
+! {{ w }}
 {% endfor %}
 {% endif %}
 {% if ctx.facts %}

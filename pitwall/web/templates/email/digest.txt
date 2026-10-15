@@ -1,0 +1,28 @@
+{{ ctx.title }}
+{% for heading, items in ctx.sections %}
+
+{{ heading|upper }}
+{% for item in items %}
+* {{ item.title }}
+{% for line in item.text.splitlines() %}
+  {{ line }}
+{% endfor %}
+{% endfor %}
+{% endfor %}
+
+COMING UP THIS WEEK
+{% for ev, s, wx in ctx.upcoming %}
+- {{ s.label }}, {{ ev.short_name }}: {{ s.owner_time }} {{ s.owner_tz }}{% if wx %} ({{ wx.short }}{% if wx.risk %}, rain risk{% endif %}){% endif %}
+
+{% else %}
+No sessions in the next 7 days.
+{% endfor %}
+{% if ctx.drivers %}
+
+STANDINGS (after round {{ ctx.drivers.round }})
+{% for r in ctx.drivers.rows[:5] %}
+{{ r.position }}. {{ r.name }} {{ r.points|pts }} pts {{ r.arrow }}
+{% endfor %}
+{% endif %}
+
+{{ ctx.link }}

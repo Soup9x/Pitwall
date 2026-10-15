@@ -72,3 +72,6 @@ table.h2h td.lead { color: #fff; font-weight: 800; }
 .split { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin: 10px 0 4px; }
 .split > div { height: 100%; background: var(--accent); }
 ul.facts-list { margin: 0; padding-left: 18px; } ul.facts-list li { margin: 4px 0; }
+
+/* Phase 3 */
+img.track-map { width: 100%; max-width: 420px; height: auto; display: block; margin: 0 auto 12px; }

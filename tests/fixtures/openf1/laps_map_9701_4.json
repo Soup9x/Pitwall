@@ -1,0 +1,18 @@
+[
+ {
+  "session_key": 9701,
+  "driver_number": 4,
+  "lap_number": 5,
+  "lap_duration": 80.0,
+  "date_start": "2025-03-08T14:10:00+00:00",
+  "is_pit_out_lap": false
+ },
+ {
+  "session_key": 9701,
+  "driver_number": 4,
+  "lap_number": 6,
+  "lap_duration": 85.0,
+  "date_start": "2025-03-08T14:11:20+00:00",
+  "is_pit_out_lap": false
+ }
+]

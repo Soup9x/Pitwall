@@ -5,6 +5,7 @@ enqueueing) decides for each pending alert whether to send, hold or drop it:
 
 * expired (e.g. a reminder whose session already started) -> dropped
 * results/standings while spoiler mode is on and the event isn't marked watched -> held
+* a type folded into the weekly digest (when digest mode is on) -> held for the digest
 * inside quiet hours -> held until the window ends
 * otherwise -> delivered to each routed channel, once per channel (never twice)."""
 
@@ -141,6 +142,10 @@ def flush(db: DB, *, now: datetime | None = None, sender: Sender | None = None) 
             continue
         if not spoiler_released(db, row, settings, now):
             row.hold_reason = "spoiler"
+            stats["held"] += 1
+            continue
+        if settings.digest_enabled and row.type in settings.digest_types:
+            row.hold_reason = "digest"  # collected by the weekly digest job
             stats["held"] += 1
             continue
         if quiet:

@@ -53,6 +53,19 @@
   </div>
 
   <div class="card">
+    <h2>Weekly digest</h2>
+    <label><input type="checkbox" name="digest_enabled" {{ 'checked' if settings.digest_enabled else '' }}> Send a weekly summary instead of individual alerts for:</label>
+    {% for t in digestible %}
+    <label><input type="checkbox" name="digest_type_{{ t }}" {{ 'checked' if t in settings.digest_types else '' }}> {{ alert_labels[t] }}</label>
+    {% endfor %}
+    <div class="row">
+      <div><label>Day</label><select name="digest_day">{% for d in weekdays %}<option value="{{ d }}" {{ 'selected' if d == settings.digest_day else '' }}>{{ d|title }}</option>{% endfor %}</select></div>
+      <div><label>Time</label><input type="time" name="digest_time" value="{{ settings.digest_time }}"></div>
+    </div>
+    <p class="muted small">Reminders and race-week previews are always sent on time. The digest also lists the coming week's sessions and the standings; route it under <em>Routing</em> ("Weekly digest").</p>
+  </div>
+
+  <div class="card">
     <h2>History</h2>
     <label for="bsy">Backfill seasons from</label>
     <input id="bsy" type="number" min="1950" name="backfill_start_year" value="{{ settings.backfill_start_year }}">

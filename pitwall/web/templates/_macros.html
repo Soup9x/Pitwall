@@ -1,12 +1,13 @@
-{% macro session_table(sessions, show_status=True) %}
+{% macro session_table(sessions, weather={}) %}
 <div class="table-scroll"><table>
-<tr><th>Session</th><th>Your time</th><th>Track time</th></tr>
+<tr><th>Session</th><th>Your time</th><th>Track time</th>{% if weather %}<th>Weather</th>{% endif %}</tr>
 {% for s in sessions %}
 <tr class="{{ 'cancelled' if s.status == 'cancelled' else ('past' if s.is_past else '') }}">
   <td>{{ s.emoji }} {{ s.label }}{% if s.status == 'cancelled' %} <span class="badge cancelled">cancelled</span>{% endif %}</td>
   <td>{{ s.owner_time }} <span class="muted small">{{ s.owner_tz }}</span>
     {% if s.odd %}<div class="odd">🌙 {{ s.label }} starts at {{ s.owner_clock }} your time</div>{% endif %}</td>
   <td>{% if s.local_time %}{{ s.local_time }} <span class="muted small">{{ s.local_tz }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+  {% if weather %}{% set wx = weather.get(s.id) %}<td>{% if wx %}<span title="{{ wx.summary }}{% if wx.wind %}, {{ wx.wind }}{% endif %}">{{ wx.icon }} {{ wx.temp }}</span>{% if wx.rain %}<div class="small {{ 'odd' if wx.risk else 'muted' }}">{% if wx.risk %}☔ {% endif %}{{ wx.rain }}</div>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>{% endif %}
 </tr>
 {% endfor %}
 </table></div>
@@ -29,7 +30,8 @@
 </table></div>
 {% endmacro %}
 
-{% macro track_facts(c, st) %}
+{% macro track_facts(c, st, map_url=None) %}
+{% if map_url %}<img class="track-map" src="{{ map_url }}" alt="{{ c.name }} layout" loading="lazy">{% endif %}
 <dl class="facts">
   <dt>Circuit</dt><dd>{{ c.name }}</dd>
   <dt>Location</dt><dd>{{ c.locality }}{% if c.country %}, {{ c.country }}{% endif %}</dd>

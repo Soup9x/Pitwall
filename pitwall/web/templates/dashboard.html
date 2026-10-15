@@ -20,7 +20,7 @@
   <div class="card">
     <h2><a href="/events/{{ event.id }}">{{ event.name }}</a> {% if event.is_sprint_weekend %}<span class="badge sprint">SPRINT</span>{% endif %}</h2>
     <p class="sub">{{ event.circuit.name }} · {{ event.circuit.locality }}, {{ event.circuit.country }} · Round {{ event.round }}</p>
-    {{ session_table(sessions) }}
+    {{ session_table(sessions, weather) }}
   </div>
   {% endif %}
 

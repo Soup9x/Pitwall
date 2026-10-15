@@ -10,7 +10,7 @@
   <tr><th>Queued</th><th>Type</th><th>Title</th><th>Status</th></tr>
   {% for h in held %}
   <tr><td class="small">{{ h.created_at.astimezone(settings.tz).strftime('%d %b %H:%M') }}</td><td>{{ h.type }}</td><td>{{ h.title }}</td>
-  <td>{% if h.hold_reason == 'spoiler' %}<span class="badge held">held: spoiler</span>{% elif h.hold_reason == 'quiet' %}<span class="badge held">held: quiet hours</span>{% elif h.attempts %}<span class="badge fail">retrying</span>{% else %}<span class="badge muted">queued</span>{% endif %}</td></tr>
+  <td>{% if h.hold_reason == 'spoiler' %}<span class="badge held">held: spoiler</span>{% elif h.hold_reason == 'quiet' %}<span class="badge held">held: quiet hours</span>{% elif h.hold_reason == 'digest' %}<span class="badge held">waiting for digest</span>{% elif h.attempts %}<span class="badge fail">retrying</span>{% else %}<span class="badge muted">queued</span>{% endif %}</td></tr>
   {% endfor %}
   </table></div>
 </div>
@@ -22,7 +22,7 @@
 <tr>
   <td class="small">{{ l.sent_at.astimezone(settings.tz).strftime('%d %b %H:%M') }}</td>
   <td>{{ l.type }}</td><td>{{ l.channel }}</td><td>{{ l.title }}</td>
-  <td>{% if l.status == 'sent' %}<span class="badge ok">sent</span>{% elif l.status == 'dropped' %}<span class="badge muted" title="{{ l.detail }}">dropped</span>{% else %}<span class="badge fail" title="{{ l.detail }}">{{ l.status }}</span>{% endif %}</td>
+  <td>{% if l.status == 'sent' %}<span class="badge ok">sent</span>{% elif l.status == 'dropped' %}<span class="badge muted" title="{{ l.detail }}">dropped</span>{% elif l.status == 'digested' %}<span class="badge muted" title="{{ l.detail }}">in digest</span>{% else %}<span class="badge fail" title="{{ l.detail }}">{{ l.status }}</span>{% endif %}</td>
 </tr>
 {% else %}
 <tr><td colspan="5" class="muted">Nothing sent yet. Try a test notification from Settings.</td></tr>

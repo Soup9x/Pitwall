@@ -30,6 +30,9 @@
   {% if constructors %}<div class="card"><h2>Constructors</h2>{{ standings_table(constructors, None, "Team") }}</div>{% endif %}
 </div>
 {% if spoiler_hidden %}</details>{% endif %}
-<p class="small"><a href="/head-to-head?season={{ season }}">Teammate head-to-head →</a></p>
+<p class="small"><a href="/head-to-head?season={{ season }}">Teammate head-to-head →</a>
+  · Download CSV: <a href="/export/standings.csv?season={{ season }}&amp;kind=driver">drivers</a>,
+  <a href="/export/standings.csv?season={{ season }}&amp;kind=constructor">constructors</a>,
+  <a href="/export/drivers.csv?season={{ season }}">followed drivers' races</a></p>
 {% endif %}
 {% endblock %}

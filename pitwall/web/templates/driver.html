@@ -55,6 +55,7 @@
     </tr>
     {% endfor %}
   </table>
+  <p class="small"><a href="/export/drivers.csv?season={{ season }}&amp;driver={{ driver.id }}">Download as CSV</a></p>
   {% if not data.has_openf1 %}<p class="muted small">Best laps, tyre stints and pit stops come from OpenF1 (2023 onwards) for drivers you follow; they're fetched in the background after each race.</p>{% endif %}
 </div>
 {% if spoiler_hidden %}</details>{% endif %}

@@ -13,14 +13,18 @@ from sqlalchemy.orm import Session as DB
 from pitwall.config import get_env
 from pitwall.models import Setting
 
-ALERT_TYPES = ("reminder", "schedule_change", "preview", "results", "standings")
+ALERT_TYPES = ("reminder", "schedule_change", "preview", "results", "standings", "digest")
 ALERT_LABELS = {
     "reminder": "Session reminders",
     "schedule_change": "Schedule changes",
     "preview": "Race-week preview",
     "results": "Session results",
     "standings": "Standings updates",
+    "digest": "Weekly digest",
 }
+# Alert types that can be folded into the weekly digest instead of being sent one by one.
+DIGESTIBLE = ("schedule_change", "results", "standings")
+WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 CHANNELS = ("email", "webhook")
 SPOILER_TYPES = frozenset({"results", "standings"})
 
@@ -32,6 +36,7 @@ def _default_routing() -> dict[str, list[str]]:
         "preview": ["email"],
         "results": ["webhook"],
         "standings": ["webhook"],
+        "digest": ["email"],
     }
 
 
@@ -61,6 +66,10 @@ class AppSettings:
     odd_start: str = "00:00"
     odd_end: str = "07:00"
     backfill_start_year: int = 2000
+    digest_enabled: bool = False
+    digest_day: str = "mon"
+    digest_time: str = "08:00"
+    digest_types: list[str] = field(default_factory=lambda: list(DIGESTIBLE))
 
     @property
     def tz(self) -> ZoneInfo:
@@ -108,7 +117,7 @@ def load_settings(db: DB) -> AppSettings:
             merged.update({k: [int(x) for x in v] for k, v in value.items()})
             value = merged
         if key == "routing" and isinstance(value, dict):
-            merged_r = {k: [] for k in ALERT_TYPES}
+            merged_r = _default_routing()  # alert types added later get their defaults
             merged_r.update(value)
             value = merged_r
         setattr(s, key, value)

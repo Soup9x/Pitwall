@@ -58,6 +58,18 @@ class OpenF1Client(CachedClient):
             or []
         )
 
+    def location(self, session_key: int, driver_number: int) -> list[dict[str, Any]]:
+        """Car positions (x/y/z, ~3.7 Hz) for a whole session. Large, so not cached."""
+        return (
+            self.get_json(
+                "location",
+                {"session_key": session_key, "driver_number": driver_number},
+                empty_on_404=True,
+                store=False,
+            )
+            or []
+        )
+
     def pits(self, session_key: int, driver_number: int) -> list[dict[str, Any]]:
         return (
             self.get_json(

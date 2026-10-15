@@ -4,8 +4,8 @@ A self-hosted Formula 1 notifier for the homelab. Pitwall tracks the F1 calendar
 about it by email, webhook (Discord, ntfy, generic JSON, and anything else
 [Apprise](https://github.com/caronc/apprise) supports) and a Google Calendar feed.
 
-**Status: Phases 1 (core) and 2 (stats and trivia) are done.** Phase 3 (weather, digest, CSV
-export) comes next. See `PITWALL_BUILD_SPEC.md` for the full plan.
+**Status: all three phases of `PITWALL_BUILD_SPEC.md` are built**: the core notifier, stats
+and trivia, and weather, maps, digest and CSV export.
 
 ## What it does (Phase 1)
 
@@ -53,6 +53,35 @@ export) comes next. See `PITWALL_BUILD_SPEC.md` for the full plan.
   only stated when Pitwall has the driver's whole career loaded; the default history (since
   2000) covers the current grid's careers. Previews show the 3–5 highest-scoring facts and
   skip ones used in the last three previews.
+
+## Weather, maps, digest and exports (Phase 3)
+
+- **Weather per session** from [Open-Meteo](https://open-meteo.com):
+  - covers sessions up to 16 days ahead, refreshed every 3 hours and just before the Monday
+    preview;
+  - shown on the dashboard, event pages and in previews (temperature in °C/°F, chance of
+    rain);
+  - a **rain risk** of 40% or more for qualifying or the race is flagged with ☔.
+- **Circuit maps** on event pages and in previews. Pitwall uses, in order:
+  1. the `map_image` URL or file from `data/circuits.yaml`;
+  2. an image you put in `data/maps/<circuitId>.png` (or `.jpg`, `.webp`, `.svg`);
+  3. otherwise, a map it draws itself from OpenF1 car-position data for the fastest lap of
+     the most recent race at that circuit (2023 onwards).
+
+  Maps are served at `/circuit-maps/<circuitId>` without login so email clients can load
+  them. As with the calendar feed, that only works in email if Pitwall is reachable from the
+  internet.
+- **Weekly digest** (Settings → Weekly digest):
+  - When it's on, the alert types you pick (schedule changes, results, standings) are held
+    and sent as one summary at your chosen day and time.
+  - The summary also covers the coming week's sessions (with rain risk) and the top of the
+    standings.
+  - Reminders and previews always go out on time.
+  - Choose where the digest goes under Routing ("Weekly digest").
+- **CSV export** (links under the Standings tables and on driver pages):
+  - driver and constructor standings;
+  - race-by-race stats for your followed drivers, including OpenF1 best lap, pit stops and
+    tyres.
 
 Data comes from the [Jolpica F1 API](https://github.com/jolpica/jolpica-f1) (the
 Ergast successor) plus curated circuit facts in `data/circuits.yaml`.
