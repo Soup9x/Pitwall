@@ -62,6 +62,96 @@
 <p><button type="submit">Save settings</button></p>
 </form>
 
+<div class="card" id="channels" style="margin-bottom:16px;">
+  <h2>Notification channels</h2>
+  <p class="muted small">Where alerts go. Choose which alert types use email and which use webhooks under <em>Routing</em> above. Passwords and tokens are stored in Pitwall's database and are never shown again after you save them.</p>
+  <div class="grid">
+  {% for c in channels %}
+    <div>
+      <h3>{{ "Email" if c == "email" else "Webhooks" }}</h3>
+      {% if targets[c] or env_targets[c] %}
+      <table>
+        {% for t in targets[c] %}
+        <tr class="{{ '' if t.enabled else 'past' }}">
+          <td>{{ t.label }}<div class="muted small"><code>{{ mask_url(t.url) }}</code>{% if not t.enabled %} · disabled{% endif %}</div></td>
+          <td class="num" style="white-space:nowrap;">
+            {% for action, text in [("test", "Test"), ("toggle", "Disable" if t.enabled else "Enable"), ("delete", "Remove")] %}
+            <form class="inline" method="post" action="/settings/targets/{{ t.id }}/{{ action }}"{% if action == "delete" %} onsubmit="return confirm('Remove {{ t.label|e }}?')"{% endif %}><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">{{ text }}</button></form>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% for u in env_targets[c] %}
+        <tr><td><code>{{ u }}</code><div class="muted small">from .env (edit the file to change)</div></td><td></td></tr>
+        {% endfor %}
+      </table>
+      {% if (targets[c]|length) + (env_targets[c]|length) > 1 %}
+      <form class="inline" method="post" action="/settings/test/{{ c }}"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small" style="margin-top:6px;">Test all {{ c }}</button></form>
+      {% endif %}
+      {% else %}
+      <p class="muted small">None yet.</p>
+      {% endif %}
+
+      <details style="margin-top:12px;" {{ 'open' if not (targets[c] or env_targets[c]) else '' }}>
+        <summary class="small" style="cursor:pointer;font-weight:600;">+ Add {{ "an email address" if c == "email" else "a webhook" }}</summary>
+        <form method="post" action="/settings/targets" class="target-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}">
+          <input type="hidden" name="channel" value="{{ c }}">
+          <label>Type</label>
+          <select name="kind" data-kind-select>
+            {% for k, name in target_kinds[c].items() %}<option value="{{ k }}">{{ name }}</option>{% endfor %}
+          </select>
+          {% if c == "email" %}
+          <div data-kind="gmail">
+            <p class="muted small">Needs an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">app password</a> (2-Step Verification must be on). Your normal Gmail password won't work.</p>
+          </div>
+          <div data-kind="m365">
+            <p class="muted small">Microsoft 365 needs "Authenticated SMTP" enabled for the mailbox (an admin setting).</p>
+          </div>
+          <div data-kind="gmail m365">
+            <label>Your email address</label><input type="text" name="address" autocomplete="off" placeholder="you@gmail.com">
+            <label>Password <span class="muted">(app password for Gmail)</span></label><input type="password" name="password" autocomplete="new-password">
+          </div>
+          <div data-kind="smtp">
+            <div class="row">
+              <div><label>SMTP server</label><input type="text" name="smtp_host" placeholder="smtp.example.com"></div>
+              <div><label>Port</label><input type="number" name="smtp_port" value="587" style="width:90px;"></div>
+            </div>
+            <label>Username</label><input type="text" name="username" autocomplete="off">
+            <label>Password</label><input type="password" name="password" autocomplete="new-password">
+            <label>From address</label><input type="text" name="from_addr" placeholder="pitwall@example.com">
+          </div>
+          <div data-kind="gmail m365 smtp">
+            <label>Send alerts to <span class="muted">(blank = same address)</span></label><input type="text" name="to_addr">
+          </div>
+          {% else %}
+          <div data-kind="ntfy">
+            <p class="muted small">Free push notifications: install the ntfy app and subscribe to the topic.</p>
+            <label>Server</label><input type="text" name="ntfy_server" value="ntfy.sh">
+            <label>Topic <span class="muted">(blank = a random, hard-to-guess name)</span></label><input type="text" name="ntfy_topic" autocomplete="off">
+          </div>
+          <div data-kind="discord">
+            <p class="muted small">Discord: Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL.</p>
+            <label>Discord webhook URL</label><input type="password" name="discord_url" autocomplete="off" placeholder="https://discord.com/api/webhooks/…">
+          </div>
+          <div data-kind="json">
+            <p class="muted small">Pitwall POSTs JSON: <code>{"type", "title", "text", "url", "data"}</code>.</p>
+            <label>Webhook URL</label><input type="text" name="json_url" placeholder="https://example.com/hook">
+          </div>
+          {% endif %}
+          <div data-kind="apprise">
+            <p class="muted small">Any <a href="https://github.com/caronc/apprise/wiki" target="_blank" rel="noopener">Apprise URL</a>.</p>
+            <label>Apprise URL</label><input type="password" name="apprise_url" autocomplete="off">
+          </div>
+          <label>Name <span class="muted">(optional)</span></label><input type="text" name="label" placeholder="e.g. My phone">
+          <div style="margin-top:10px;"><button>Add</button></div>
+        </form>
+      </details>
+    </div>
+  {% endfor %}
+  </div>
+</div>
+
 <div class="grid">
   <div class="card" id="followed">
     <h2>Followed drivers</h2>
@@ -79,16 +169,6 @@
       <button class="secondary">Follow</button>
     </form>
     {% else %}<p class="muted small">Drivers appear after the first data sync.</p>{% endif %}
-  </div>
-
-  <div class="card" id="channels">
-    <h2>Channels</h2>
-    <p class="muted small">Apprise URLs come from <code>.env</code> (<code>APPRISE_URLS_EMAIL</code>, <code>APPRISE_URLS_WEBHOOK</code>). Shown masked.</p>
-    {% for c in channels %}
-    <h3>{{ c }}</h3>
-    {% for u in channel_urls[c] %}<div><code>{{ u }}</code></div>{% else %}<div class="muted small">Not configured.</div>{% endfor %}
-    <form class="inline" method="post" action="/settings/test/{{ c }}"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small" style="margin-top:6px;">Send test {{ c }}</button></form>
-    {% endfor %}
   </div>
 
   <div class="card">

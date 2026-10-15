@@ -14,10 +14,25 @@ _STD_ATTRS = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
 }
 
 
+_SECRETS: set[str] = set()
+_SORTED: list[str] = []
+
+
+def register_secrets(values: list[str]) -> None:
+    """Add values that must never appear in logs (e.g. a notification URL added in the UI)."""
+    global _SORTED
+    _SECRETS.update(v for v in values if v and len(v) >= 4)
+    _SORTED = sorted(_SECRETS, key=len, reverse=True)
+
+
 class RedactingFilter(logging.Filter):
     def __init__(self, secrets: list[str]) -> None:
         super().__init__()
-        self.secrets = sorted({s for s in secrets if s}, key=len, reverse=True)
+        register_secrets(secrets)
+
+    @property
+    def secrets(self) -> list[str]:
+        return _SORTED
 
     def _scrub(self, text: str) -> str:
         for s in self.secrets:

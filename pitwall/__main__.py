@@ -13,10 +13,11 @@ from pitwall.logging_setup import configure_logging
 
 def send_test(channel: str) -> int:
     from pitwall.notify.builders import test_message
-    from pitwall.notify.dispatch import channel_urls, notify
+    from pitwall.notify.dispatch import notify
+    from pitwall.notify.targets import channel_urls
 
     if not channel_urls(channel):
-        print(f"No {channel} URLs configured.")
+        print(f"No {channel} channels configured (add them in Settings).")
         return 1
     ok, detail = notify(channel, test_message(channel))
     print(f"Test {channel}: {'sent' if ok else 'FAILED'}" + ("" if ok else f" ({detail})"))
@@ -36,9 +37,7 @@ def main() -> None:
     test.add_argument("channel", choices=["email", "webhook"])
     args = parser.parse_args()
 
-    if args.cmd == "test":
-        sys.exit(send_test(args.channel))
-
+    os.umask(0o077)  # the DB holds notification credentials: keep new files private
     env = get_env()
     configure_logging(env.log_level, env.secret_values())
     env.data_dir.mkdir(parents=True, exist_ok=True)
@@ -61,6 +60,8 @@ def main() -> None:
 
     engine = init_engine(env.db_url)
     upgrade(engine)
+    if args.cmd == "test":
+        sys.exit(send_test(args.channel))
     if args.cmd == "sync":
         from pitwall import jobs
 

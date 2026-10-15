@@ -74,7 +74,7 @@ def test_log_redaction_covers_message_and_extras(capsys):
     logging.getLogger().handlers.clear()
 
 
-def test_cli_test_command(monkeypatch, capsys):
+def test_cli_test_command(engine, monkeypatch, capsys):
     from pitwall.__main__ import send_test
 
     with respx.mock() as mock:

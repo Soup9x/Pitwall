@@ -5,7 +5,8 @@
 #   curl -fsSL https://raw.githubusercontent.com/soup9x/pitwall/main/install.sh | sudo bash
 #
 # It checks/installs Docker, gets the code into /opt/pitwall, asks you for the settings Pitwall
-# needs, writes .env, starts the container and sends test notifications. Safe to re-run: your
+# needs, writes .env and starts the container. Email/webhook channels are added afterwards in
+# the web UI (Settings → Notification channels). Safe to re-run: your
 # current settings are offered as defaults, or you can keep them and just update/restart.
 #
 # Options:  --dir DIR      install location (default /opt/pitwall)
@@ -131,18 +132,6 @@ choose() {
     fi
     warn "Please enter a number from 1 to $#."
   done
-}
-
-urlencode() {
-  local LC_ALL=C s="$1" out="" c i
-  for ((i = 0; i < ${#s}; i++)); do
-    c="${s:i:1}"
-    case "$c" in
-      [a-zA-Z0-9.~_-]) out+="$c" ;;
-      *) printf -v c '%%%02X' "'$c"; out+="$c" ;;
-    esac
-  done
-  printf '%s' "$out"
 }
 
 mask() {
@@ -298,7 +287,7 @@ fi
 
 if ((configure)); then
   # --- timezone
-  step "1/7 Timezone"
+  step "1/5 Timezone"
   tz_default="$(env_get TZ)"
   [[ -z "$tz_default" ]] && tz_default="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
   [[ -z "$tz_default" || "$tz_default" == UTC || "$tz_default" == Etc/UTC ]] && tz_default="America/New_York"
@@ -313,7 +302,7 @@ if ((configure)); then
   done
 
   # --- network
-  step "2/7 Network"
+  step "2/5 Network"
   while :; do
     prev="$(env_get PITWALL_PORT)"
     PORT="$(ask "Port for the web UI" "${prev:-8080}")"
@@ -361,7 +350,7 @@ if ((configure)); then
   fi
 
   # --- password
-  step "3/7 Web UI password"
+  step "3/5 Web UI password"
   ADMIN_PW="$(env_get PITWALL_ADMIN_PASSWORD)"
   GENERATED_PW=""
   if [[ -n "$ADMIN_PW" && "$ADMIN_PW" != change-me* ]] && ask_yn "Keep your current password?" y; then
@@ -388,117 +377,13 @@ if ((configure)); then
   [[ -z "$ICS_TOKEN" ]] && ICS_TOKEN="$(random_hex 24)"
   SECRET_KEY="$(env_get PITWALL_SECRET_KEY)"
 
-  # --- email
-  step "4/7 Email notifications"
+  # Email/webhook channels are added in the web UI (Settings → Notification channels).
+  # URLs already in .env from older installs are kept as they are.
   EMAIL_URLS="$(env_get APPRISE_URLS_EMAIL)"
-  opts=("Gmail (needs an app password)" "Microsoft 365 / Outlook.com" "Other SMTP server"
-        "Paste an Apprise URL" "No email")
-  def=5
-  if [[ -n "$EMAIL_URLS" ]]; then
-    opts=("Keep current: $(mask_urls "$EMAIL_URLS")" "${opts[@]}")
-    def=1
-  fi
-  c="$(choose "How should Pitwall send email?" "$def" "${opts[@]}")"
-  [[ -n "$EMAIL_URLS" ]] && c=$((c - 1))  # shift so 0 = keep
-  case "$c" in
-    0) : ;;
-    1)
-      hint "Create an app password at https://myaccount.google.com/apppasswords"
-      hint "(2-Step Verification must be on). It's 16 letters; spaces don't matter."
-      addr="$(ask_required "Your Gmail address")"
-      while :; do
-        app_pw="$(ask_secret "App password")"
-        app_pw="${app_pw// /}"
-        [[ -n "$app_pw" ]] && break
-      done
-      [[ "$app_pw" =~ ^[a-zA-Z]{16}$ ]] || warn "That doesn't look like a 16-letter app password; using it anyway."
-      to="$(ask "Send notifications to" "$addr")"
-      user="${addr%@*}" domain="${addr#*@}"
-      if [[ "${domain,,}" == gmail.com || "${domain,,}" == googlemail.com ]]; then
-        EMAIL_URLS="mailto://$(urlencode "$user"):$(urlencode "$app_pw")@gmail.com"
-        [[ "$to" != "$addr" ]] && EMAIL_URLS+="?to=$(urlencode "$to")"
-      else  # Google Workspace address
-        EMAIL_URLS="mailtos://$(urlencode "$addr"):$(urlencode "$app_pw")@$domain?smtp=smtp.gmail.com&mode=starttls&to=$(urlencode "$to")"
-      fi
-      ;;
-    2)
-      hint "Microsoft 365 needs 'Authenticated SMTP' enabled for the mailbox (admin setting)."
-      addr="$(ask_required "Your Microsoft 365 / Outlook.com address")"
-      pw="$(ask_secret "Password (or app password)")"
-      to="$(ask "Send notifications to" "$addr")"
-      domain="${addr#*@}"
-      smtp="smtp.office365.com"
-      [[ "${domain,,}" == outlook.com || "${domain,,}" == hotmail.com || "${domain,,}" == live.com ]] && smtp="smtp-mail.outlook.com"
-      EMAIL_URLS="mailtos://$(urlencode "$addr"):$(urlencode "$pw")@$domain?smtp=$smtp&mode=starttls&to=$(urlencode "$to")"
-      ;;
-    3)
-      host="$(ask_required "SMTP server (e.g. smtp.example.com)")"
-      sport="$(ask "SMTP port" 587)"
-      if [[ "$sport" == 465 ]]; then mode=ssl; else mode=starttls; fi
-      suser="$(ask_required "SMTP username")"
-      pw="$(ask_secret "SMTP password")"
-      from="$(ask_required "From address" "$([[ "$suser" == *@* ]] && printf '%s' "$suser")")"
-      to="$(ask_required "Send notifications to" "$from")"
-      EMAIL_URLS="mailtos://$(urlencode "$suser"):$(urlencode "$pw")@${from#*@}:$sport?smtp=$host&mode=$mode&from=$(urlencode "$from")&to=$(urlencode "$to")"
-      ;;
-    4)
-      hint "See https://github.com/caronc/apprise/wiki — separate several URLs with commas."
-      EMAIL_URLS="$(ask_required "Apprise URL")"
-      ;;
-    5) EMAIL_URLS="" ;;
-  esac
-
-  # --- webhooks
-  step "5/7 Webhook notifications (phone push, Discord, …)"
   HOOK_URLS="$(env_get APPRISE_URLS_WEBHOOK)"
-  if [[ -n "$HOOK_URLS" ]]; then
-    say "Current webhooks: $(mask_urls "$HOOK_URLS")"
-    ask_yn "Keep them?" y || HOOK_URLS=""
-  fi
-  while :; do
-    c="$(choose "Add a webhook?" 5 "ntfy (free phone push notifications)" "Discord" \
-      "Generic JSON webhook (Home Assistant, n8n, your own endpoint)" "Paste an Apprise URL" \
-      "Done — no more webhooks")"
-    new=""
-    case "$c" in
-      1)
-        server="$(ask "ntfy server" "ntfy.sh")"
-        server="${server#https://}" server="${server#http://}" server="${server%/}"
-        hint "Anyone who knows the topic name can read it, so make it hard to guess."
-        topic="$(ask "Topic name" "pitwall-$(random_hex 5)")"
-        if [[ "$server" == ntfy.sh ]]; then new="ntfy://$topic"; else new="ntfys://$server/$topic"; fi
-        say "Subscribe to topic ${B}$topic${N} in the ntfy app (server: $server)."
-        ;;
-      2)
-        hint "Discord: Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL"
-        while :; do
-          url="$(ask_required "Discord webhook URL")"
-          if [[ "$url" =~ /api/webhooks/([0-9]+)/([A-Za-z0-9_-]+) ]]; then
-            new="discord://${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
-            break
-          fi
-          warn "That doesn't look like https://discord.com/api/webhooks/<id>/<token>"
-        done
-        ;;
-      3)
-        hint "Pitwall will POST JSON like {\"type\": ..., \"title\": ..., \"text\": ...} to this URL."
-        while :; do
-          url="$(ask_required "Webhook URL (https://…)")"
-          case "$url" in
-            https://*) new="jsons://${url#https://}"; break ;;
-            http://*) new="json://${url#http://}"; break ;;
-            *) warn "Please enter a URL starting with http:// or https://" ;;
-          esac
-        done
-        ;;
-      4) new="$(ask_required "Apprise URL")" ;;
-      5) break ;;
-    esac
-    [[ -n "$new" ]] && HOOK_URLS="${HOOK_URLS:+$HOOK_URLS,}$new" && ok "Added $(mask_urls "$new")"
-  done
 
   # --- history
-  step "6/7 History"
+  step "4/5 History"
   hint "Past seasons are downloaded once in the background for track stats."
   this_year="$(date +%Y)"
   while :; do
@@ -511,14 +396,14 @@ if ((configure)); then
   LOG_LEVEL="${LOG_LEVEL:-INFO}"
 
   # --- summary
-  step "7/7 Review"
+  step "5/5 Review"
   say "  Install folder:   $INSTALL_DIR"
   say "  Timezone:         $TZ_VAL"
   say "  Web UI address:   $BASE_URL"
   say "  Listens on:       $BIND:$PORT"
   say "  Password:         $([[ -n "$GENERATED_PW" ]] && echo "(generated)" || echo "(set)")"
-  say "  Email:            $(mask_urls "$EMAIL_URLS")"
-  say "  Webhooks:         $(mask_urls "$HOOK_URLS")"
+  [[ -n "$EMAIL_URLS" ]] && say "  Email (.env):     $(mask_urls "$EMAIL_URLS")"
+  [[ -n "$HOOK_URLS" ]] && say "  Webhooks (.env):  $(mask_urls "$HOOK_URLS")"
   say "  Seasons from:     $START_YEAR"
   ask_yn "Save these settings and start Pitwall?" y || die "Cancelled — nothing was changed."
 
@@ -542,6 +427,8 @@ PITWALL_ADMIN_PASSWORD=$(q "$ADMIN_PW")
 PITWALL_ICS_TOKEN=$(q "$ICS_TOKEN")
 PITWALL_SECRET_KEY=$(q "$SECRET_KEY")
 
+# Email and webhook channels are easiest to add in the web UI (Settings → Notification
+# channels). Apprise URLs here are optional and are used in addition to those.
 APPRISE_URLS_EMAIL=$(q "$EMAIL_URLS")
 APPRISE_URLS_WEBHOOK=$(q "$HOOK_URLS")
 
@@ -614,8 +501,10 @@ say "    ${B}$BASE_URL/calendar.ics?token=$ICS_TOKEN${N}"
 hint "    Google must be able to reach this address from the internet (use your proxy's URL),"
 hint "    and it refreshes subscribed calendars slowly (up to ~24 h)."
 say ""
-say "  Next steps:"
-say "    • Log in and pick the drivers you follow under Settings."
+say "  Next steps — log in, open Settings and:"
+say "    • add where alerts should go under ${B}Notification channels${N} (email: Gmail,"
+say "      Microsoft 365 or SMTP; webhooks: ntfy, Discord or JSON) and press Test,"
+say "    • pick the drivers you follow."
 say "    • Past seasons download in the background (progress bar in the UI)."
 say "    • Spot-check $INSTALL_DIR/data/circuits.yaml (see README section 7)."
 say ""

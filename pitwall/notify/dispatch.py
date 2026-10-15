@@ -15,7 +15,6 @@ import httpx
 from apprise.decorators import notify as apprise_plugin
 
 from pitwall import USER_AGENT
-from pitwall.config import get_env, split_urls
 from pitwall.notify.message import Message
 
 log = logging.getLogger(__name__)
@@ -57,16 +56,12 @@ def _pwjsons(
     return _post_json(body, meta, secure=True)
 
 
-def channel_urls(channel: str) -> list[str]:
-    env = get_env()
-    blob = env.apprise_urls_email if channel == "email" else env.apprise_urls_webhook
-    return split_urls(blob)
-
-
 def mask_url(url: str) -> str:
     """Show only the scheme and host, e.g. 'mailtos://smtp.gmail.com/…'."""
     scheme, _, rest = url.partition("://")
     host = rest.split("?")[0].split("/")[0].rsplit("@", 1)[-1]
+    if scheme.lower() == "ntfy" and host:  # ntfy://<topic>: the topic is the secret
+        host = host[:4] + "…"
     if len(host) > 24:
         host = host[:10] + "…" + host[-6:]
     return f"{scheme}://{host}/…" if rest else f"{scheme}://…"
@@ -81,7 +76,10 @@ def _rewrite(url: str) -> tuple[str, bool]:
 
 def notify(channel: str, msg: Message, urls: list[str] | None = None) -> tuple[bool, str]:
     """Deliver `msg` on `channel` ('email' or 'webhook'). Returns (ok, detail)."""
-    urls = channel_urls(channel) if urls is None else urls
+    if urls is None:
+        from pitwall.notify.targets import channel_urls
+
+        urls = channel_urls(channel)
     if not urls:
         return False, f"no Apprise URLs configured for {channel}"
 

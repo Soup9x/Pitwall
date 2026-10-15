@@ -15,3 +15,20 @@
   tick();
   setInterval(tick, 1000);
 })();
+
+// Settings → add channel: show only the fields for the selected type, and disable hidden
+// inputs so a field that appears in two sections (e.g. password) isn't submitted twice.
+(function () {
+  document.querySelectorAll("form.target-form").forEach(function (form) {
+    const select = form.querySelector("[data-kind-select]");
+    function update() {
+      form.querySelectorAll("[data-kind]").forEach(function (el) {
+        const show = el.dataset.kind.split(" ").indexOf(select.value) !== -1;
+        el.style.display = show ? "" : "none";
+        el.querySelectorAll("input").forEach(function (i) { i.disabled = !show; });
+      });
+    }
+    select.addEventListener("change", update);
+    update();
+  });
+})();

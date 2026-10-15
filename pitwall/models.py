@@ -267,3 +267,20 @@ class SourceStatus(Base):
     last_success_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     last_error_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class NotificationTarget(Base):
+    """An email or webhook destination added in the Settings UI (an Apprise URL).
+
+    The URL holds credentials, so it is never rendered in full; the UI shows `label` and a
+    masked form. Targets from APPRISE_URLS_* in .env are used as well, but aren't stored here."""
+
+    __tablename__ = "notification_target"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel: Mapped[str] = mapped_column(String(20), index=True)  # email / webhook
+    kind: Mapped[str] = mapped_column(String(20))  # gmail, m365, smtp, ntfy, discord, json, apprise
+    label: Mapped[str] = mapped_column(String(200))
+    url: Mapped[str] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

@@ -55,11 +55,12 @@ The installer:
    - your timezone and port
    - whether Pitwall sits behind a reverse proxy
    - a web UI password (or generates one)
-   - how to send email: Gmail, Microsoft 365, another SMTP server, or none
-   - webhooks: ntfy, Discord, or generic JSON
    - how far back to download history
-4. builds the Apprise URLs for you, writes `.env` (readable only by root), and starts Pitwall,
-5. sends a test notification on each channel and prints your web address and calendar-feed URL.
+4. writes `.env` (readable only by root) and starts Pitwall,
+5. prints your web address, password (if generated) and calendar-feed URL.
+
+Then log in and add where alerts should go under **Settings → Notification channels**
+(see section 2).
 
 Run it again at any time to update Pitwall or change settings. Your current answers are the
 defaults, and the old `.env` is backed up first. Options: `--dir` (install location),
@@ -119,49 +120,33 @@ Then go to **Settings**, pick the drivers you follow, and press **Send test** fo
 
 ## 2. Notifications (email and webhooks)
 
-Pitwall sends everything through [Apprise](https://github.com/caronc/apprise/wiki). You give it
-URLs in `.env`. To use several, separate them with commas. After you edit `.env`, apply the
-change with `sudo docker compose up -d`.
+Add destinations in the web UI under **Settings → Notification channels**. Choose a type and fill
+in the form, then press **Add** and **Test**. You can add as many as you like, and disable or
+remove them at any time. Pitwall builds the [Apprise](https://github.com/caronc/apprise/wiki) URL
+for you, and passwords are never shown again after you save them.
 
-### Email with Gmail
+### Email
 
-1. Turn on 2-Step Verification for your Google account.
-2. Create an **app password** at <https://myaccount.google.com/apppasswords>. You get 16
-   letters; type them without spaces.
-3. In `.env`:
+| Type | What you need |
+|---|---|
+| **Gmail** | Your address and an **app password**. Turn on 2-Step Verification, then create one at <https://myaccount.google.com/apppasswords>. Your normal password won't work. Google Workspace addresses work too. |
+| **Microsoft 365 / Outlook.com** | Your address and password. For Microsoft 365, an admin must enable **Authenticated SMTP** for the mailbox. |
+| **Other SMTP server** | Server, port (587 STARTTLS or 465 SSL), username, password and a From address. |
+| **Apprise URL** | Anything else Apprise supports. |
 
-   ```
-   APPRISE_URLS_EMAIL=mailto://you:abcdefghijklmnop@gmail.com
-   ```
-
-   This sends to yourself. To send to another address, add `?to=someone%40example.com`.
-   (`%40` is how you write `@` inside a URL.)
-
-### Email with Microsoft 365
-
-Your M365 admin must allow **SMTP AUTH** for the mailbox. Replace `contoso.com` with your domain:
-
-```
-APPRISE_URLS_EMAIL=mailtos://you%40contoso.com:YOUR_PASSWORD@contoso.com?smtp=smtp.office365.com&mode=starttls
-```
-
-If the password contains special characters, URL-encode them (`@` → `%40`, `:` → `%3A`,
-`/` → `%2F`, `#` → `%23`, `?` → `%3F`, `&` → `%26`).
+By default, alerts go to the sending address; fill in **Send alerts to** to use another one.
+Emails are HTML with a plain-text alternative part.
 
 ### Webhooks
 
-```
-# ntfy.sh (phone push notifications); for a self-hosted server use ntfys://ntfy.example.com/topic
-APPRISE_URLS_WEBHOOK=ntfy://my-secret-pitwall-topic
+| Type | What you need |
+|---|---|
+| **ntfy** | Nothing. Leave the topic blank to get a random, hard-to-guess one. Install the ntfy app and subscribe to the topic shown after saving. A self-hosted server works too. |
+| **Discord** | Server Settings → Integrations → Webhooks → New Webhook → **Copy Webhook URL**, then paste it in. |
+| **Generic JSON** | Your endpoint's URL (Home Assistant, n8n, your own app). |
+| **Apprise URL** | Any other service Apprise supports (Slack, Telegram, Pushover, …). |
 
-# Discord (from Server Settings → Integrations → Webhooks: .../api/webhooks/ID/TOKEN)
-APPRISE_URLS_WEBHOOK=discord://ID/TOKEN
-
-# Your own endpoint (e.g. Home Assistant, n8n): POSTs JSON
-APPRISE_URLS_WEBHOOK=jsons://example.com/path/to/hook
-```
-
-Generic `json://` / `jsons://` webhooks receive Pitwall's own payload:
+Generic JSON webhooks receive Pitwall's own payload:
 
 ```json
 {"type": "reminder", "title": "🏁 Race in 1 hour — Mexico City GP",
@@ -172,7 +157,11 @@ Generic `json://` / `jsons://` webhooks receive Pitwall's own payload:
 `type` is one of `reminder`, `schedule_change`, `preview`, `results`, `standings`, `test`.
 Other services such as Discord and ntfy get the human-readable `text`.
 
-Emails are HTML with a plain-text alternative part.
+### Advanced: Apprise URLs in `.env`
+
+You can also list Apprise URLs in `.env` (`APPRISE_URLS_EMAIL`, `APPRISE_URLS_WEBHOOK`,
+comma-separated). They're used in addition to the channels added in the UI and appear there as
+read-only. Apply changes with `sudo docker compose up -d`.
 
 ### Routing, quiet hours and spoiler mode
 
@@ -284,7 +273,9 @@ of guessing. Please spot-check the file against formula1.com, fix anything wrong
   every form has CSRF protection.
 - `/calendar.ics` uses its token instead of a login, so Google can fetch it.
 - `/health` needs no login and returns no secrets.
-- Secrets are redacted from logs, and the UI shows them only masked.
+- Secrets are redacted from logs, and the UI shows them only masked. Notification-channel
+  passwords added in the UI live in the database in `./data`, which is created readable only by
+  the container's user. Treat backups of `./data` like your `.env`.
 - The container runs as a non-root user with a read-only filesystem. Only `./data` is writable.
 
 ## Troubleshooting

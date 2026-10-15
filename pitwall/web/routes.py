@@ -18,6 +18,7 @@ from starlette.concurrency import run_in_threadpool
 from pitwall import __version__, jobs, scheduler
 from pitwall.config import get_env
 from pitwall.db import get_db, session_scope, utcnow
+from pitwall.logging_setup import register_secrets
 from pitwall.models import (
     SESSION_LABELS,
     SESSION_TYPES,
@@ -25,13 +26,15 @@ from pitwall.models import (
     Event,
     FollowedDriver,
     NotificationLog,
+    NotificationTarget,
     Outbox,
     Result,
     SourceStatus,
     StandingsSnapshot,
 )
 from pitwall.notify import builders, outbox
-from pitwall.notify.dispatch import channel_urls, mask_url
+from pitwall.notify import targets as targets_svc
+from pitwall.notify.dispatch import mask_url
 from pitwall.notify.dispatch import notify as dispatch_notify
 from pitwall.services import ics, reminders, standings, track_stats
 from pitwall.services.presenters import (
@@ -465,7 +468,10 @@ def settings_page(request: Request, db: DB = Depends(get_db)) -> HTMLResponse:
         alert_types=ALERT_TYPES,
         alert_labels=ALERT_LABELS,
         channels=CHANNELS,
-        channel_urls={c: [mask_url(u) for u in channel_urls(c)] for c in CHANNELS},
+        targets={c: targets_svc.db_targets(db, c) for c in CHANNELS},
+        env_targets={c: [mask_url(u) for u in targets_svc.env_urls(c)] for c in CHANNELS},
+        target_kinds=targets_svc.KINDS,
+        mask_url=mask_url,
         ics_base=f"{env.base_url.rstrip('/')}/calendar.ics",
         ics_token_masked=_mask_token(env.ics_token),
         season_drivers=season_drivers,
@@ -535,6 +541,84 @@ async def followed_drivers(request: Request, db: DB = Depends(get_db)) -> Respon
             db.delete(row)
     db.commit()
     return back("/settings#followed")
+
+
+@private.post("/settings/targets")
+async def add_target(request: Request, db: DB = Depends(get_db)) -> Response:
+    form = await checked_form(request)
+    channel = str(form.get("channel", ""))
+    kind = str(form.get("kind", ""))
+    fields: dict[str, str] = {}
+    for k, v in form.multi_items():  # first non-empty value wins (fields repeat across types)
+        if k != "csrf_token" and isinstance(v, str) and v.strip() and k not in fields:
+            fields[k] = v
+    try:
+        built = targets_svc.build(channel, kind, fields)
+    except targets_svc.TargetError as exc:
+        request.session["settings_error"] = f"Couldn't add {channel}: {exc}"
+        return back("/settings#channels")
+    register_secrets(targets_svc.url_secrets(built.url))
+    label = str(form.get("label", "")).strip()[:200] or built.label
+    db.add(NotificationTarget(channel=channel, kind=kind, label=label, url=built.url))
+    db.commit()
+    flash(
+        request,
+        f"Added {label}. "
+        + (built.note + " " if built.note else "")
+        + "Use “Test” to check it works.",
+    )
+    return back("/settings#channels")
+
+
+def _target(db: DB, target_id: int) -> NotificationTarget:
+    target = db.get(NotificationTarget, target_id)
+    if target is None:
+        raise HTTPException(404)
+    return target
+
+
+@private.post("/settings/targets/{target_id}/toggle")
+async def toggle_target(request: Request, target_id: int, db: DB = Depends(get_db)) -> Response:
+    await checked_form(request)
+    target = _target(db, target_id)
+    target.enabled = not target.enabled
+    db.commit()
+    return back("/settings#channels")
+
+
+@private.post("/settings/targets/{target_id}/delete")
+async def delete_target(request: Request, target_id: int, db: DB = Depends(get_db)) -> Response:
+    await checked_form(request)
+    target = _target(db, target_id)
+    flash(request, f"Removed {target.label}.")
+    db.delete(target)
+    db.commit()
+    return back("/settings#channels")
+
+
+@private.post("/settings/targets/{target_id}/test")
+async def test_target(request: Request, target_id: int, db: DB = Depends(get_db)) -> Response:
+    await checked_form(request)
+    target = _target(db, target_id)
+    msg = builders.test_message(target.channel)
+    ok, detail = await run_in_threadpool(dispatch_notify, target.channel, msg, [target.url])
+    db.add(
+        NotificationLog(
+            type="test",
+            channel=target.channel,
+            payload_hash=msg.payload_hash(),
+            title=f"{msg.title} ({target.label})",
+            status="sent" if ok else "failed",
+            detail=detail[:1000],
+        )
+    )
+    db.commit()
+    flash(
+        request,
+        f"Test to {target.label}: "
+        + ("sent ✅ — check that it arrived." if ok else f"failed ❌ — {detail}"),
+    )
+    return back("/settings#channels")
 
 
 @private.post("/settings/test/{channel}")

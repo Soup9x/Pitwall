@@ -16,6 +16,7 @@ from pitwall import scheduler
 from pitwall.config import get_env
 from pitwall.db import init_engine, session_scope
 from pitwall.logging_setup import configure_logging
+from pitwall.notify.targets import register_all_secrets
 from pitwall.services.circuits import merge_all
 from pitwall.web import routes
 from pitwall.web.auth import NotAuthenticated
@@ -43,6 +44,7 @@ def create_app(*, manage_db: bool = True, start_scheduler: bool | None = None) -
                 log.warning("PITWALL_ICS_TOKEN is not set; the calendar feed is disabled")
         with session_scope() as db:
             merge_all(db)
+            register_all_secrets(db)
         if run_scheduler:
             scheduler.start()
         log.info("pitwall started", extra={"base_url": env.base_url, "tz": env.tz})
