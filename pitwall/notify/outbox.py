@@ -74,7 +74,7 @@ def enqueue(
         channels=",".join(channels),
         created_at=now,
         expires_at=msg.expires_at,
-        spoiler=msg.type in SPOILER_TYPES,
+        spoiler=msg.spoiler if msg.spoiler is not None else msg.type in SPOILER_TYPES,
         status="pending",
     )
     db.add(row)

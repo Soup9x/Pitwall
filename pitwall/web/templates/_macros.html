@@ -60,3 +60,22 @@
   <p class="small"><a href="{{ reveal_url }}" rel="nofollow">Show anyway</a> <span class="muted">(this page only)</span></p>
 </div>
 {%- endmacro %}
+
+{# Pirelli nomination as three labelled chips (letter + compound, never colour alone). #}
+{% macro tyre_chips(nom) -%}
+<span class="tchip t-hard" title="Hard: {{ nom.hard }}"><b>H</b> {{ nom.hard }}</span>
+<span class="tchip t-medium" title="Medium: {{ nom.medium }}"><b>M</b> {{ nom.medium }}</span>
+<span class="tchip t-soft" title="Soft: {{ nom.soft }}"><b>S</b> {{ nom.soft }}</span>
+{%- endmacro %}
+
+{% macro tyre_summary(tv) -%}
+{% if tv.nomination %}
+  <div class="tchips">{{ tyre_chips(tv.nomination) }}</div>
+  <p class="muted small">{{ 'Entered by an admin' if tv.nomination.origin == 'manual' else 'Parsed from a Pirelli press release' }}{% if tv.nomination.source_url %} · <a href="{{ tv.nomination.source_url }}" rel="noopener noreferrer" target="_blank">{{ tv.nomination.source_title or 'source' }}</a>{% endif %}</p>
+{% else %}
+  <p><strong>Not announced yet.</strong></p>
+{% endif %}
+{% if tv.last_year %}
+  <p class="small">{{ tv.last_year[0].season }} here: {{ tyre_chips(tv.last_year[1]) }}</p>
+{% endif %}
+{%- endmacro %}

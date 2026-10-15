@@ -20,6 +20,8 @@ dependencies = [
     "python-multipart>=0.0.9",
     "tzdata>=2024.1",
     "pillow>=10",
+    "feedparser>=6.0",
+    "pdfplumber>=0.11",
 ]
 
 [project.optional-dependencies]
@@ -33,7 +35,13 @@ build-backend = "setuptools.build_meta"
 include = ["pitwall*"]
 
 [tool.setuptools.package-data]
-pitwall = ["web/templates/*.html", "web/templates/email/*", "web/static/*", "migrations/script.py.mako"]
+pitwall = [
+    "web/templates/*.html",
+    "web/templates/email/*",
+    "web/static/*",
+    "web/static/vendor/*",
+    "migrations/script.py.mako",
+]
 
 [tool.ruff]
 line-length = 100

@@ -19,7 +19,16 @@ from pitwall.db import session_scope, utcnow
 from pitwall.models import OWNER_ID, Event, Season, Session
 from pitwall.notify import builders, outbox
 from pitwall.notify.message import Message
-from pitwall.services import circuit_maps, digest, openf1_sync, reminders, trivia, weather
+from pitwall.services import (
+    circuit_maps,
+    digest,
+    openf1_sync,
+    penalty_watch,
+    reminders,
+    session_data,
+    trivia,
+    weather,
+)
 from pitwall.services.sync import (
     apply_results,
     apply_schedule,
@@ -34,6 +43,8 @@ from pitwall.settings_store import (
     set_kv,
     set_user_kv,
 )
+from pitwall.sources.fia import FiaClient
+from pitwall.sources.fia import make_client as make_fia_client
 from pitwall.sources.http import SourceUnavailable
 from pitwall.sources.jolpica import JolpicaClient, make_client
 from pitwall.sources.openf1 import OpenF1Client
@@ -456,6 +467,45 @@ def openf1_sync_job(now: datetime | None = None) -> None:
         openf1_sync.sync(client, now)
     finally:
         client.close()
+
+
+@safe_job
+def session_data_job(now: datetime | None = None) -> None:
+    """Race control + measured conditions for finished sessions (no-op when nothing is due)."""
+    now = now or utcnow()
+    if not session_data.pending(now, limit=1):
+        return
+    client = _openf1_factory()
+    try:
+        session_data.sync(client, now)
+    finally:
+        client.close()
+
+
+_fia_factory: Callable[[], FiaClient] = make_fia_client
+
+
+def set_fia_factory(factory: Callable[[], FiaClient]) -> None:
+    global _fia_factory
+    _fia_factory = factory
+
+
+@safe_job
+def penalty_watch_job(now: datetime | None = None, force: bool = False) -> None:
+    """FIA documents during race week (every 2h Wed-Sun, every 30 min Fri/Sat, track-local)."""
+    now = now or utcnow()
+    with session_scope() as db:
+        if not get_kv(db, penalty_watch.URL_KEY):
+            return
+        if not force and penalty_watch.due(db, now) is None:
+            return
+    client = _fia_factory()
+    try:
+        changes = penalty_watch.poll(client, now, force=force)
+    finally:
+        client.close()
+    if changes and penalty_watch.send_alerts(changes, fan_out, now):
+        flush_job()
 
 
 # ---------------------------------------------------------------------------- reminders

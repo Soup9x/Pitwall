@@ -1,0 +1,38 @@
+[
+ {
+  "category": "SafetyCar",
+  "date": "2024-10-27T20:03:00+00:00",
+  "driver_number": null,
+  "flag": null,
+  "lap_number": 1,
+  "meeting_key": 1247,
+  "message": "SAFETY CAR DEPLOYED",
+  "scope": null,
+  "sector": null,
+  "session_key": 9505
+ },
+ {
+  "category": "SafetyCar",
+  "date": "2024-10-27T20:08:00+00:00",
+  "driver_number": null,
+  "flag": null,
+  "lap_number": 3,
+  "meeting_key": 1247,
+  "message": "SAFETY CAR IN THIS LAP",
+  "scope": null,
+  "sector": null,
+  "session_key": 9505
+ },
+ {
+  "category": "Flag",
+  "date": "2024-10-27T21:45:00+00:00",
+  "driver_number": null,
+  "flag": "CHEQUERED",
+  "lap_number": 71,
+  "meeting_key": 1247,
+  "message": "CHEQUERED FLAG",
+  "scope": "Track",
+  "sector": null,
+  "session_key": 9505
+ }
+]

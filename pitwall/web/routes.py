@@ -74,6 +74,8 @@ from pitwall.settings_store import (
     parse_hhmm,
     save_settings,
 )
+from pitwall.units import TEMP_UNITS
+from pitwall.web import racedata
 from pitwall.web.auth import checked_form, require_admin, require_user, session_user
 from pitwall.web.common import back, flash, page
 
@@ -236,7 +238,7 @@ def dashboard(
         next_event=nxt.event if nxt else None,
         event=event,
         sessions=event_sessions(event, settings, now) if event else [],
-        weather=weather.for_event(db, event) if event else {},
+        weather=weather.for_event(db, event, settings.temp_unit) if event else {},
         drivers=drivers,
         constructors=constructors,
         followed_rows=[r for r in (drivers.rows if drivers else []) if r.followed],
@@ -311,7 +313,7 @@ def event_page(
         facts=[]
         if held is not None
         else trivia.for_preview(db, event, avoid_recent=False, user_id=user.id),
-        weather=(wx := weather.for_event(db, event)),
+        weather=(wx := weather.for_event(db, event, settings.temp_unit)),
         rain=weather.rain_warnings(event, wx),
         map_url=circuit_maps.map_url(event.circuit),
         results=results,
@@ -319,6 +321,7 @@ def event_page(
         watched=outbox.is_watched(db, event.id, user.id),
         spoiler_hidden=hidden and spoilers.results_arrived_at(db, event.id) is not None,
         held_event=held,
+        **racedata.event_context(db, event, user, settings, reveal),
     )
 
 
@@ -684,6 +687,9 @@ async def save_settings_route(
         digest_time = str(form.get("digest_time", "08:00"))
         parse_hhmm(digest_time)
         digest_types = [t for t in DIGESTIBLE if form.get(f"digest_type_{t}")]
+        temp_unit = str(form.get("temp_unit", "both"))
+        if temp_unit not in TEMP_UNITS:
+            raise ValueError("Pick °C, °F or both for temperatures")
     except ValueError as exc:
         request.session["settings_error"] = str(exc)
         return back("/settings")
@@ -703,6 +709,7 @@ async def save_settings_route(
         "digest_day": digest_day,
         "digest_time": digest_time,
         "digest_types": digest_types,
+        "temp_unit": temp_unit,
     }
     if start_year is not None:
         updates["backfill_start_year"] = start_year

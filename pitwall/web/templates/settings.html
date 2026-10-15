@@ -17,6 +17,10 @@
     </select>
     <label>"Odd hours" — flag sessions starting between</label>
     <div class="row"><input type="time" name="odd_start" value="{{ settings.odd_start }}"> and <input type="time" name="odd_end" value="{{ settings.odd_end }}"></div>
+    <label for="temp_unit">Temperatures</label>
+    <select id="temp_unit" name="temp_unit">
+      {% for value, label in (('C', '°C'), ('F', '°F'), ('both', '°C and °F')) %}<option value="{{ value }}" {{ 'selected' if settings.temp_unit == value else '' }}>{{ label }}</option>{% endfor %}
+    </select>
   </div>
 
   <div class="card">

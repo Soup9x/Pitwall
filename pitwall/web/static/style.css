@@ -47,7 +47,7 @@ button.secondary, .btn.secondary { background: var(--panel-2); border: 1px solid
 button:hover { filter: brightness(1.1); }
 form.inline { display: inline; }
 label { display: block; margin: 8px 0 4px; color: var(--muted); font-size: 13px; }
-input[type=text], input[type=password], input[type=number], input[type=time], select {
+input[type=text], input[type=password], input[type=number], input[type=time], input[type=date], select {
   background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
   padding: 7px 10px; font-size: 14px; max-width: 100%; }
 input[type=checkbox] { transform: scale(1.15); margin-right: 6px; }
@@ -76,3 +76,35 @@ ul.facts-list { margin: 0; padding-left: 18px; } ul.facts-list li { margin: 4px 
 
 /* Phase 3 */
 img.track-map { width: 100%; max-width: 420px; height: auto; display: block; margin: 0 auto 12px; }
+
+/* Step 2: tyres */
+.tchips { margin: 4px 0 8px; }
+.tchip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 3px;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--panel-2);
+  font-variant-numeric: tabular-nums; font-size: 13px; margin-right: 4px; white-space: nowrap; }
+.tchip b { display: inline-block; width: 20px; height: 20px; line-height: 16px; text-align: center;
+  border-radius: 50%; border: 3px solid; font-size: 11px; background: #111; color: #fff; }
+.t-soft b { border-color: #e8322f; } .t-medium b { border-color: #facc15; }
+.t-hard b { border-color: #e8eaed; }
+details.admin-edit { margin-top: 10px; border-top: 1px dashed var(--border); padding-top: 8px; }
+details.admin-edit summary { cursor: pointer; color: var(--muted); }
+
+/* Step 2: conditions + race control */
+.chart-box { position: relative; height: 220px; margin-top: 12px; }
+.rc-filters { gap: 4px 14px; margin-bottom: 8px; align-items: center; }
+.rc-filters label { display: inline-flex; align-items: center; margin: 0; color: var(--text); }
+details.rc-session { border-top: 1px solid var(--border); padding: 6px 0; }
+details.rc-session summary { cursor: pointer; }
+ol.rc-list { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; }
+ol.rc-list li { padding: 3px 0 3px 8px; border-left: 3px solid var(--border); margin: 2px 0; }
+ol.rc-list li[hidden] { display: none; }
+.rc-time { display: inline-block; min-width: 3.2em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rc-sc { border-left-color: #f59e0b !important; }
+.rc-stewards { border-left-color: #a855f7 !important; }
+.flag-green { border-left-color: #22c55e !important; } .flag-yellow, .flag-double-yellow { border-left-color: #facc15 !important; }
+.flag-red { border-left-color: #ef4444 !important; } .flag-blue { border-left-color: #3b82f6 !important; }
+
+/* Step 2: penalty watch */
+.pu-limit { color: #facc15; font-weight: 700; }
+.pu-over { color: #ef4444; font-weight: 800; }
+table.pu td, table.pu th { white-space: nowrap; }

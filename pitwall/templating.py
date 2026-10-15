@@ -9,6 +9,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from pitwall.services.standings import fmt_points
 from pitwall.timeutil import offset_label
+from pitwall.units import fmt_temp, fmt_temp_range, fmt_wind
 
 TEMPLATE_DIR = Path(__file__).parent / "web" / "templates"
 
@@ -23,6 +24,9 @@ def get_jinja_env() -> Environment:
     )
     env.filters["pts"] = fmt_points
     env.filters["offset_label"] = offset_label
+    env.filters["temp"] = fmt_temp
+    env.filters["temp_range"] = fmt_temp_range
+    env.filters["wind"] = fmt_wind
     return env
 
 

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Penalty watch: edit{% endblock %}
+{% block content %}
+<div class="row" style="justify-content:space-between;align-items:center;">
+  <h1>Penalty watch <span class="badge muted">admin</span></h1>
+  <a href="/penalties?season={{ season }}">← Back to penalty watch</a>
+</div>
+<p class="sub">Manual entries always win over values parsed from FIA documents for the same event and driver.</p>
+
+{% macro event_select(name='event_id', optional=False) -%}
+<select name="{{ name }}" {{ '' if optional else 'required' }}>
+  {% if optional %}<option value="">(none)</option>{% endif %}
+  {% for ev in events %}<option value="{{ ev.id }}" {{ 'selected' if ev.id == default_event else '' }}>R{{ ev.round }} · {{ ev.name }}</option>{% endfor %}
+</select>
+{%- endmacro %}
+{% macro driver_select() -%}
+<select name="driver_id" required>
+  <option value="">–</option>
+  {% for d in drivers %}<option value="{{ d.id }}">{{ d.family_name }}, {{ d.given_name }}{% if d.code %} ({{ d.code }}){% endif %}</option>{% endfor %}
+</select>
+{%- endmacro %}
+
+<div class="grid">
+  <div class="card" id="grid">
+    <h2>Grid penalty</h2>
+    <form method="post" action="/admin/penalties/grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="season" value="{{ season }}">
+      <label>Event</label>{{ event_select() }}
+      <label>Driver</label>{{ driver_select() }}
+      <div class="row">
+        <div><label for="places">Grid places</label><input id="places" type="number" name="places" min="0" max="60" style="width:6em;"></div>
+        <label><input type="checkbox" name="back_of_grid"> Back of the grid</label>
+      </div>
+      <label for="reason">Reason</label><input id="reason" type="text" name="reason" maxlength="300" style="width:100%;" placeholder="e.g. new power unit elements beyond the allocation">
+      <p><button>Save</button></p>
+      <p class="muted small">To overrule a wrong parse, save 0 places without "back of the grid": that records "no penalty" for this driver at this event.</p>
+    </form>
+  </div>
+
+  <div class="card" id="points">
+    <h2>Licence penalty points</h2>
+    <form method="post" action="/admin/penalties/points">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="season" value="{{ season }}">
+      <label>Driver</label>{{ driver_select() }}
+      <div class="row">
+        <div><label for="pts">Points</label><input id="pts" type="number" name="points" min="0" max="12" required style="width:6em;"></div>
+        <div><label for="awarded">Awarded on</label><input id="awarded" type="date" name="awarded_on" max="{{ today }}" value="{{ today }}" required></div>
+      </div>
+      <label>Event <span class="muted">(optional)</span></label>{{ event_select(optional=True) }}
+      <label for="preason">Reason</label><input id="preason" type="text" name="reason" maxlength="300" style="width:100%;">
+      <p><button>Save</button></p>
+      <p class="muted small">Points expire 12 months after the date. With an event chosen, this replaces any parsed points for that driver at that event (0 = none).</p>
+    </form>
+  </div>
+
+  <div class="card" id="usage">
+    <h2>Power unit usage</h2>
+    <form method="post" action="/admin/penalties/usage">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="season" value="{{ season }}">
+      <label>Event</label>{{ event_select() }}
+      <label>Driver</label>{{ driver_select() }}
+      <div class="row">
+        <div><label for="element">Element</label><input id="element" type="text" name="element" list="pu-elements" required style="width:7em;"></div>
+        <div><label for="count">Number used (season)</label><input id="count" type="number" name="count" min="1" max="30" required style="width:6em;"></div>
+      </div>
+      <datalist id="pu-elements">{% for e in elements %}<option value="{{ e }}">{% endfor %}</datalist>
+      <p><button>Save</button></p>
+    </form>
+  </div>
+
+  <div class="card" id="allocation">
+    <h2>{{ season }} allocation</h2>
+    <p class="muted small">How many of each element a driver may use this season before a penalty. Leave the number empty to remove one. Pitwall doesn't fill these in for you.</p>
+    {% if allocations %}<p>{% for e, n in allocations.items() %}<span class="badge muted">{{ e }}: {{ n }}</span> {% endfor %}</p>{% endif %}
+    <form method="post" action="/admin/penalties/allocation">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="season" value="{{ season }}">
+      <div class="row">
+        <div><label for="a-el">Element</label><input id="a-el" type="text" name="element" list="pu-elements" required style="width:7em;"></div>
+        <div><label for="a-n">Allowed</label><input id="a-n" type="number" name="allowed" min="1" max="30" style="width:6em;"></div>
+        <button>Save</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card wide" id="source">
+    <h2>FIA documents</h2>
+    <p class="small">Paste the FIA's documents page for this season (fia.com → Documents → Formula One World Championship → season). During race week Pitwall checks it every 2 hours from Wednesday, and every 30 minutes on Friday and Saturday (track time).</p>
+    <form method="post" action="/admin/penalties/source" class="row">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <input type="text" name="fia_url" value="{{ fia_url }}" placeholder="https://www.fia.com/documents/championships/..." style="flex:1;min-width:260px;">
+      <button>Save</button>
+    </form>
+    <form method="post" action="/admin/penalties/poll" style="margin-top:8px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary" {{ '' if fia_url else 'disabled' }}>Check now</button>
+      <span class="muted small">{% if last_poll %}Last checked {{ last_poll[:16].replace('T', ' ') }} UTC{% else %}Not checked yet{% endif %}</span>
+    </form>
+    {% if failed %}
+    <h3>Couldn't parse</h3>
+    <ul class="small">{% for d in failed %}<li>{{ d.title }} — {{ d.detail }} · <a href="{{ d.url }}" rel="noopener noreferrer" target="_blank">view source</a></li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+
+  <div class="card wide">
+    <h2>Manual entries</h2>
+    {% if not (manual.grid or manual.points or manual.usage) %}<p class="muted">None yet.</p>{% endif %}
+    {% for kind, rows, label in (('grid', manual.grid, 'Grid penalties'), ('points', manual.points, 'Licence points'), ('usage', manual.usage, 'Power unit usage')) if rows %}
+    <h3>{{ label }}</h3>
+    <div class="table-scroll"><table>
+      {% for r in rows %}
+      <tr><td>{{ r.driver.full_name }}</td>
+        <td>{% if kind == 'grid' %}{{ describe_grid(r) }}{% elif kind == 'points' %}{{ r.points }} pts on {{ r.awarded_on }}{% else %}{{ r.element }} #{{ r.count }}{% endif %}</td>
+        <td class="small muted">{{ r.reason if kind != 'usage' else '' }}</td>
+        <td class="num"><form class="inline" method="post" action="/admin/penalties/{{ kind }}/{{ r.id }}/delete" data-confirm="Remove this manual entry?"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="season" value="{{ season }}"><button class="secondary small">Remove</button></form></td></tr>
+      {% endfor %}
+    </table></div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

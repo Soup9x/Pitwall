@@ -369,7 +369,7 @@ def preview_context(
         constructors = standings_svc.table(db, season, "constructor", user_id=user_id)
     race = next((s for s in event.sessions if s.type == "RACE"), None)
     first = min((s.start_utc for s in event.sessions if s.start_utc), default=None)
-    wx = weather_svc.for_event(db, event)
+    wx = weather_svc.for_event(db, event, settings.temp_unit)
     return PreviewContext(
         event=event,
         sessions=sessions,

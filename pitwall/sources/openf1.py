@@ -10,6 +10,16 @@ from pitwall.sources.http import CachedClient, RateLimiter
 BASE_URL = "https://api.openf1.org/v1"
 FIRST_SEASON = 2023
 SESSION_NAMES = {"RACE": "Race", "SPRINT": "Sprint"}
+# OpenF1 session_name for each Pitwall session type (2023 called sprint qualifying a shootout).
+ALL_SESSION_NAMES = {
+    "FP1": {"Practice 1"},
+    "FP2": {"Practice 2"},
+    "FP3": {"Practice 3"},
+    "SQ": {"Sprint Qualifying", "Sprint Shootout"},
+    "SPRINT": {"Sprint"},
+    "Q": {"Qualifying"},
+    "RACE": {"Race"},
+}
 
 # Free tier allows 3 requests/second and 30/minute; stay under both.
 _limiter = RateLimiter(min_interval=2.1, per_hour=1500)
@@ -23,6 +33,29 @@ def make_client(**kwargs: Any) -> OpenF1Client:
 class OpenF1Client(CachedClient):
     def __init__(self, base_url: str = BASE_URL, **kwargs: Any) -> None:
         super().__init__("openf1", base_url, **kwargs)
+
+    def all_sessions(self, year: int) -> list[dict[str, Any]]:
+        """Every session of a season (practice, qualifying, sprint, race)."""
+        return (
+            self.get_json(
+                "sessions", {"year": year}, max_age=timedelta(hours=12), empty_on_404=True
+            )
+            or []
+        )
+
+    def race_control(self, session_key: int) -> list[dict[str, Any]]:
+        return (
+            self.get_json(
+                "race_control", {"session_key": session_key}, max_age=None, empty_on_404=True
+            )
+            or []
+        )
+
+    def weather(self, session_key: int) -> list[dict[str, Any]]:
+        return (
+            self.get_json("weather", {"session_key": session_key}, max_age=None, empty_on_404=True)
+            or []
+        )
 
     def sessions(self, year: int, session_name: str) -> list[dict[str, Any]]:
         return (

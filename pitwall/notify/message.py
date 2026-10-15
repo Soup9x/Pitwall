@@ -27,6 +27,8 @@ class Message:
     dedup_content: str | None = None
     # Recipient. None means the owner account (single-user installs).
     user_id: int | None = None
+    # Held by spoiler mode? None = decided by type (results and standings are).
+    spoiler: bool | None = None
 
     def payload_hash(self) -> str:
         fields: dict[str, Any] = {}

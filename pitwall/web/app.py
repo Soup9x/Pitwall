@@ -20,7 +20,7 @@ from pitwall.models import OWNER_ID, User
 from pitwall.notify.targets import register_all_secrets
 from pitwall.services.circuits import merge_all
 from pitwall.users import bootstrap
-from pitwall.web import accounts, routes
+from pitwall.web import accounts, racedata, routes
 from pitwall.web.auth import NotAuthenticated, PasswordChangeRequired
 from pitwall.web.security import SecurityHeadersMiddleware
 
@@ -87,4 +87,5 @@ def create_app(*, manage_db: bool = True, start_scheduler: bool | None = None) -
     app.include_router(accounts.router)
     app.include_router(routes.private)
     app.include_router(routes.admin)
+    app.include_router(racedata.router)
     return app

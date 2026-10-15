@@ -1,0 +1,38 @@
+[
+ {
+  "air_temperature": 19.8,
+  "date": "2024-10-27T20:00:00+00:00",
+  "humidity": 55.0,
+  "meeting_key": 1247,
+  "pressure": 780.1,
+  "rainfall": 0,
+  "session_key": 9505,
+  "track_temperature": 40.6,
+  "wind_direction": 200,
+  "wind_speed": 1.0
+ },
+ {
+  "air_temperature": 20.4,
+  "date": "2024-10-27T20:10:00+00:00",
+  "humidity": 52.0,
+  "meeting_key": 1247,
+  "pressure": 780.1,
+  "rainfall": 1,
+  "session_key": 9505,
+  "track_temperature": 44.9,
+  "wind_direction": 200,
+  "wind_speed": 1.6
+ },
+ {
+  "air_temperature": 20.9,
+  "date": "2024-10-27T20:20:00+00:00",
+  "humidity": 50.0,
+  "meeting_key": 1247,
+  "pressure": 780.1,
+  "rainfall": 0,
+  "session_key": 9505,
+  "track_temperature": 51.7,
+  "wind_direction": 200,
+  "wind_speed": 2.0
+ }
+]
