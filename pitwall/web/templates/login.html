@@ -1,19 +1,21 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Log in · Pitwall</title><link rel="stylesheet" href="/static/style.css"></head>
+<meta name="robots" content="noindex">
+<title>Log in · Pitwall</title><link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏁</text></svg>"></head>
 <body>
 <div class="login card">
   <div class="brand" style="font-size:1.4rem;">Pit<span>wall</span></div>
-  {% if not configured %}
-  <div class="error">No admin password is configured. Set <code>PITWALL_ADMIN_PASSWORD</code> in <code>.env</code> and restart.</div>
-  {% endif %}
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
   <form method="post" action="/login">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
     <input type="hidden" name="next" value="{{ next }}">
+    <label for="username">Username</label>
+    <input id="username" type="text" name="username" autofocus autocomplete="username" autocapitalize="none" spellcheck="false" style="width:100%;">
     <label for="password">Password</label>
-    <input id="password" type="password" name="password" autofocus autocomplete="current-password" style="width:100%;">
+    <input id="password" type="password" name="password" autocomplete="current-password" style="width:100%;">
     <div style="margin-top:14px;"><button type="submit">Log in</button></div>
   </form>
+  <p class="muted small" style="margin-top:14px;">No account? Ask the person who runs this Pitwall for an invite link.</p>
 </div>
 </body></html>

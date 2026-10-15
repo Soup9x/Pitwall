@@ -12,6 +12,8 @@ from fastapi import HTTPException, Request
 from starlette.datastructures import FormData
 
 from pitwall.config import get_env
+from pitwall.db import session_scope
+from pitwall.models import User
 
 MAX_FAILURES = 5
 WINDOW_SECONDS = 15 * 60
@@ -53,26 +55,54 @@ limiter = LoginRateLimiter()
 
 
 def client_key(request: Request) -> str:
+    if get_env().cloudflare:
+        cf = request.headers.get("cf-connecting-ip")
+        if cf:
+            return cf.strip()
     return request.client.host if request.client else "unknown"
 
 
-def check_password(candidate: str) -> bool:
-    expected = get_env().admin_password
-    if not expected:
-        return False
-    return hmac.compare_digest(candidate.encode(), expected.encode())
+def login_session(request: Request, user: User) -> None:
+    request.session.clear()  # new session on login (no fixation)
+    request.session["uid"] = user.id
+    request.session["ver"] = user.session_version
+
+
+def session_user(request: Request) -> User | None:
+    """The logged-in user, or None. Sessions die when the password changes or the account is
+    disabled or deleted."""
+    uid, ver = request.session.get("uid"), request.session.get("ver")
+    if not uid:
+        return None
+    with session_scope() as db:
+        user = db.get(User, uid)
+        if user is None or not user.active or user.session_version != ver:
+            request.session.clear()
+            return None
+        db.expunge(user)
+    return user
 
 
 def is_logged_in(request: Request) -> bool:
-    return bool(request.session.get("auth"))
+    return session_user(request) is not None
 
 
-def require_user(request: Request) -> None:
-    if not is_logged_in(request):
+def require_user(request: Request) -> User:
+    user = session_user(request)
+    if user is None:
         path = request.url.path
         if request.url.query:
             path += f"?{request.url.query}"
         raise NotAuthenticated(path)
+    request.state.user = user
+    return user
+
+
+def require_admin(request: Request) -> User:
+    user = require_user(request)
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admins only")
+    return user
 
 
 def csrf_token(request: Request) -> str:

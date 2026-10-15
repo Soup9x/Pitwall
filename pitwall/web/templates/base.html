@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
 <title>{% block title %}Pitwall{% endblock %} · Pitwall</title>
 <link rel="stylesheet" href="/static/style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏁</text></svg>">
@@ -11,11 +12,12 @@
 <header class="top"><div class="wrap">
   <div class="brand">Pit<span>wall</span></div>
   <nav>
-    {% for href, label in [("/", "Dashboard"), ("/events", "Calendar"), ("/standings", "Standings"), ("/head-to-head", "Head-to-head"), ("/history", "Notifications"), ("/settings", "Settings")] %}
+    {% for href, label in [("/", "Dashboard"), ("/events", "Calendar"), ("/standings", "Standings"), ("/head-to-head", "Head-to-head"), ("/history", "Notifications"), ("/settings", "Settings")] + ([("/admin/users", "Users")] if user and user.is_admin else []) %}
     <a href="{{ href }}" class="{{ 'active' if (path == href or (href != '/' and path.startswith(href))) else '' }}">{{ label }}</a>
     {% endfor %}
   </nav>
   <div class="spacer"></div>
+  <a class="small muted" href="/account" title="Account">👤 {{ user.username }}</a>
   <form class="inline" method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Log out</button></form>
 </div></header>
 <main class="wrap">

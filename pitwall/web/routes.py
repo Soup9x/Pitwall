@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hmac
 import logging
 import re
 from typing import Any
@@ -13,10 +12,8 @@ from fastapi.responses import (
     FileResponse,
     HTMLResponse,
     JSONResponse,
-    RedirectResponse,
     Response,
 )
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session as DB
 from starlette.concurrency import run_in_threadpool
@@ -26,6 +23,7 @@ from pitwall.config import get_env
 from pitwall.db import get_db, session_scope, utcnow
 from pitwall.logging_setup import register_secrets
 from pitwall.models import (
+    OWNER_ID,
     SESSION_LABELS,
     SESSION_TYPES,
     Circuit,
@@ -39,6 +37,7 @@ from pitwall.models import (
     Session,
     SourceStatus,
     StandingsSnapshot,
+    User,
 )
 from pitwall.notify import builders, outbox
 from pitwall.notify import targets as targets_svc
@@ -75,23 +74,14 @@ from pitwall.settings_store import (
     parse_hhmm,
     save_settings,
 )
-from pitwall.templating import get_jinja_env
-from pitwall.web.auth import (
-    check_password,
-    checked_form,
-    client_key,
-    csrf_token,
-    is_logged_in,
-    limiter,
-    require_user,
-    safe_next,
-)
+from pitwall.web.auth import checked_form, require_admin, require_user, session_user
+from pitwall.web.common import back, flash, page
 
 log = logging.getLogger(__name__)
-templates = Jinja2Templates(env=get_jinja_env())
 
 public = APIRouter()
 private = APIRouter(dependencies=[Depends(require_user)])
+admin = APIRouter(dependencies=[Depends(require_admin)])
 
 COMMON_ZONES = [
     "America/New_York",
@@ -110,38 +100,31 @@ COMMON_ZONES = [
 ]
 
 
-def page(request: Request, name: str, db: DB, **ctx: Any) -> HTMLResponse:
-    settings = load_settings(db)
-    base = {
-        "settings": settings,
-        "csrf": csrf_token(request),
-        "path": request.url.path,
-        "version": __version__,
-        "flash": request.session.pop("flash", None),
-        "backfill": get_kv(db, "backfill_progress"),
-    }
-    base.update(ctx)
-    return templates.TemplateResponse(request, name, base)
-
-
-def flash(request: Request, message: str) -> None:
-    request.session["flash"] = message
-
-
-def back(to: str) -> RedirectResponse:
-    return RedirectResponse(to, status_code=303)
-
-
 # ---------------------------------------------------------------------------- public
 
 
+def _local_request(request: Request) -> bool:
+    """A direct request from this machine (e.g. the Docker healthcheck), not via a proxy."""
+    host = request.client.host if request.client else ""
+    proxied = any(
+        h in request.headers
+        for h in ("x-forwarded-for", "cf-connecting-ip", "forwarded", "x-real-ip")
+    )
+    return host in ("127.0.0.1", "::1", "localhost") and not proxied
+
+
 @public.get("/health")
-def health() -> JSONResponse:
-    body: dict[str, Any] = {"status": "ok", "version": __version__, "time": utcnow().isoformat()}
+def health(request: Request) -> JSONResponse:
+    """Status only for the internet; details for local checks and logged-in users."""
+    detailed = _local_request(request) or session_user(request) is not None
+    body: dict[str, Any] = {"status": "ok"}
     code = 200
     try:
         with session_scope() as db:
             db.execute(text("SELECT 1"))
+            if not detailed:
+                return JSONResponse(body)
+            body.update({"version": __version__, "time": utcnow().isoformat()})
             body["db"] = "ok"
             body["sources"] = {
                 s.source: {
@@ -159,9 +142,11 @@ def health() -> JSONResponse:
             )
     except Exception as exc:
         body["status"] = "error"
-        body["db"] = f"error: {type(exc).__name__}"
+        if detailed:
+            body["db"] = f"error: {type(exc).__name__}"
         code = 503
-    body["scheduler"] = scheduler.state()
+    if detailed:
+        body["scheduler"] = scheduler.state()
     return JSONResponse(body, status_code=code)
 
 
@@ -171,10 +156,14 @@ def calendar_feed(
     sessions: str | None = Query(default=None),
     db: DB = Depends(get_db),
 ) -> Response:
-    expected = get_env().ics_token
-    if not expected or not hmac.compare_digest(token.encode(), expected.encode()):
+    owner = (
+        db.scalars(select(User).where(User.ics_token == token, User.active)).first()
+        if len(token) >= 16
+        else None
+    )
+    if owner is None:
         raise HTTPException(status_code=404)
-    body = ics.build_calendar(db, load_settings(db), ics.parse_filter(sessions))
+    body = ics.build_calendar(db, load_settings(db, owner.id), ics.parse_filter(sessions))
     return Response(
         body,
         media_type="text/calendar; charset=utf-8",
@@ -195,88 +184,41 @@ def circuit_map(circuit_id: str, db: DB = Depends(get_db)) -> Response:
     return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
 
 
-@public.get("/login", response_class=HTMLResponse)
-def login_form(request: Request, next: str = "/") -> HTMLResponse:
-    if is_logged_in(request):
-        return back(safe_next(next))  # type: ignore[return-value]
-    return templates.TemplateResponse(
-        request,
-        "login.html",
-        {
-            "csrf": csrf_token(request),
-            "next": safe_next(next),
-            "error": None,
-            "configured": bool(get_env().admin_password),
-        },
-    )
-
-
-@public.post("/login", response_class=HTMLResponse)
-async def login(request: Request) -> Response:
-    form = await checked_form(request)
-    key = client_key(request)
-    nxt = safe_next(str(form.get("next", "/")))
-    ctx = {"next": nxt, "configured": bool(get_env().admin_password)}
-    if limiter.blocked(key):
-        log.warning("login rate limited", extra={"client": key})
-        return templates.TemplateResponse(
-            request,
-            "login.html",
-            {
-                **ctx,
-                "csrf": csrf_token(request),
-                "error": "Too many attempts. Try again in 15 minutes.",
-            },
-            status_code=429,
-        )
-    if not check_password(str(form.get("password", ""))):
-        limiter.fail(key)
-        log.warning("failed login", extra={"client": key})
-        return templates.TemplateResponse(
-            request,
-            "login.html",
-            {**ctx, "csrf": csrf_token(request), "error": "Wrong password."},
-            status_code=401,
-        )
-    limiter.reset(key)
-    request.session.clear()
-    request.session["auth"] = True
-    return back(nxt)
-
-
-@public.post("/logout")
-async def logout(request: Request) -> Response:
-    await checked_form(request)
-    request.session.clear()
-    return back("/login")
-
-
 # ---------------------------------------------------------------------------- dashboard
 
 
-def _spoiler_hidden(db: DB, event: Event | None) -> bool:
-    settings = load_settings(db)
+def _spoiler_hidden(db: DB, event: Event | None, user: User) -> bool:
+    settings = load_settings(db, user.id)
     return bool(
-        settings.spoiler_enabled and event is not None and not outbox.is_watched(db, event.id)
+        settings.spoiler_enabled
+        and event is not None
+        and not outbox.is_watched(db, event.id, user.id)
     )
 
 
+def _followed(db: DB, user: User) -> list[FollowedDriver]:
+    return list(db.scalars(select(FollowedDriver).where(FollowedDriver.user_id == user.id)))
+
+
 @private.get("/", response_class=HTMLResponse)
-def dashboard(request: Request, db: DB = Depends(get_db)) -> HTMLResponse:
-    settings = load_settings(db)
+def dashboard(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> HTMLResponse:
+    settings = load_settings(db, user.id)
     now = utcnow()
     nxt = next_session(db, now)
     event = current_or_next_event(db, now)
     last_event = last_completed_event(db, now)
     season = standings.latest_season_with_standings(db)
-    drivers = standings.table(db, season, "driver") if season else None
-    constructors = standings.table(db, season, "constructor") if season else None
-    followed = list(db.scalars(select(FollowedDriver)))
-    form = builders._form(db, settings, now) if followed else []
+    drivers = standings.table(db, season, "driver", user_id=user.id) if season else None
+    constructors = standings.table(db, season, "constructor", user_id=user.id) if season else None
+    followed = _followed(db, user)
+    form = builders._form(db, settings, now, user.id) if followed else []
     return page(
         request,
         "dashboard.html",
         db,
+        user,
         next_session=session_view(nxt, settings, now) if nxt else None,
         next_event=nxt.event if nxt else None,
         event=event,
@@ -286,7 +228,7 @@ def dashboard(request: Request, db: DB = Depends(get_db)) -> HTMLResponse:
         constructors=constructors,
         followed_rows=[r for r in (drivers.rows if drivers else []) if r.followed],
         form=form,
-        spoiler_hidden=_spoiler_hidden(db, last_event),
+        spoiler_hidden=_spoiler_hidden(db, last_event, user),
         last_event=last_event,
     )
 
@@ -296,9 +238,12 @@ def dashboard(request: Request, db: DB = Depends(get_db)) -> HTMLResponse:
 
 @private.get("/events", response_class=HTMLResponse)
 def events_list(
-    request: Request, season: int | None = None, db: DB = Depends(get_db)
+    request: Request,
+    season: int | None = None,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> HTMLResponse:
-    settings = load_settings(db)
+    settings = load_settings(db, user.id)
     seasons = list(db.scalars(select(Event.season).distinct().order_by(Event.season.desc())))
     if season is None:
         this_year = utcnow().year
@@ -308,15 +253,19 @@ def events_list(
     for ev in evs:
         race = next((s for s in ev.sessions if s.type == "RACE"), None)
         rows.append({"event": ev, "race": session_view(race, settings) if race else None})
-    return page(request, "events.html", db, rows=rows, season=season, seasons=seasons, now=utcnow())
+    return page(
+        request, "events.html", db, user, rows=rows, season=season, seasons=seasons, now=utcnow()
+    )
 
 
 @private.get("/events/{event_id}", response_class=HTMLResponse)
-def event_page(request: Request, event_id: int, db: DB = Depends(get_db)) -> HTMLResponse:
+def event_page(
+    request: Request, event_id: int, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> HTMLResponse:
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(404)
-    settings = load_settings(db)
+    settings = load_settings(db, user.id)
     results: list[dict[str, Any]] = []
     for sess in sorted(event.sessions, key=lambda s: s.start_utc or utcnow()):
         rows = list(
@@ -328,32 +277,35 @@ def event_page(request: Request, event_id: int, db: DB = Depends(get_db)) -> HTM
         )
         if rows:
             results.append({"session": sess, "label": SESSION_LABELS[sess.type], "rows": rows})
-    followed = {f.driver_id for f in db.scalars(select(FollowedDriver))}
+    followed = {f.driver_id for f in _followed(db, user)}
     return page(
         request,
         "event.html",
         db,
+        user,
         event=event,
         sessions=event_sessions(event, settings),
         stats=track_stats.compute(db, event),
-        facts=trivia.for_preview(db, event, avoid_recent=False),
+        facts=trivia.for_preview(db, event, avoid_recent=False, user_id=user.id),
         weather=(wx := weather.for_event(db, event)),
         rain=weather.rain_warnings(event, wx),
         map_url=circuit_maps.map_url(event.circuit),
         results=results,
         followed=followed,
-        watched=outbox.is_watched(db, event.id),
-        spoiler_hidden=_spoiler_hidden(db, event) and bool(results),
+        watched=outbox.is_watched(db, event.id, user.id),
+        spoiler_hidden=_spoiler_hidden(db, event, user) and bool(results),
     )
 
 
 @private.post("/events/{event_id}/watched")
-async def toggle_watched(request: Request, event_id: int, db: DB = Depends(get_db)) -> Response:
+async def toggle_watched(
+    request: Request, event_id: int, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
     form = await checked_form(request)
     if db.get(Event, event_id) is None:
         raise HTTPException(404)
     watched = form.get("watched", "1") == "1"
-    outbox.mark_watched(db, event_id, watched)
+    outbox.mark_watched(db, event_id, watched, user_id=user.id)
     db.commit()
     if watched:
         await run_in_threadpool(jobs.flush_job)
@@ -362,23 +314,29 @@ async def toggle_watched(request: Request, event_id: int, db: DB = Depends(get_d
 
 
 @private.get("/events/{event_id}/preview", response_class=HTMLResponse)
-def preview_page(event_id: int, db: DB = Depends(get_db)) -> HTMLResponse:
+def preview_page(
+    event_id: int, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> HTMLResponse:
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(404)
-    msg = builders.preview(db, event, load_settings(db))
+    msg = builders.preview(db, event, load_settings(db, user.id), user_id=user.id)
     return HTMLResponse(msg.html or "")
 
 
 @private.post("/events/{event_id}/send-preview")
-async def send_preview(request: Request, event_id: int, db: DB = Depends(get_db)) -> Response:
+async def send_preview(
+    request: Request, event_id: int, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
     await checked_form(request)
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(404)
-    settings = load_settings(db)
+    settings = load_settings(db, user.id)
     now = utcnow()
-    row = jobs.send_preview(db, event, settings, now, f"manual-preview:{event.slug}:{now}")
+    row = jobs.send_preview(
+        db, event, settings, now, f"manual-preview:{event.slug}:{now}", user_id=user.id
+    )
     db.commit()
     await run_in_threadpool(jobs.flush_job)
     flash(
@@ -395,7 +353,10 @@ async def send_preview(request: Request, event_id: int, db: DB = Depends(get_db)
 
 @private.get("/standings", response_class=HTMLResponse)
 def standings_page(
-    request: Request, season: int | None = None, db: DB = Depends(get_db)
+    request: Request,
+    season: int | None = None,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> HTMLResponse:
     seasons = list(
         db.scalars(
@@ -403,12 +364,13 @@ def standings_page(
         )
     )
     season = season or (seasons[0] if seasons else None)
-    drivers = standings.table(db, season, "driver") if season else None
-    constructors = standings.table(db, season, "constructor") if season else None
+    drivers = standings.table(db, season, "driver", user_id=user.id) if season else None
+    constructors = standings.table(db, season, "constructor", user_id=user.id) if season else None
     return page(
         request,
         "standings.html",
         db,
+        user,
         season=season,
         seasons=seasons,
         drivers=drivers,
@@ -418,7 +380,7 @@ def standings_page(
             for k in ("driver", "constructor")
             if season and (tm := title_math.for_season(db, season, k))
         ],
-        spoiler_hidden=_spoiler_hidden(db, last_completed_event(db)),
+        spoiler_hidden=_spoiler_hidden(db, last_completed_event(db), user),
     )
 
 
@@ -432,7 +394,10 @@ def _csv_response(body: str, filename: str) -> Response:
 
 @private.get("/export/standings.csv")
 def export_standings(
-    season: int | None = None, kind: str = "driver", db: DB = Depends(get_db)
+    season: int | None = None,
+    kind: str = "driver",
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> Response:
     if kind not in ("driver", "constructor"):
         raise HTTPException(404)
@@ -445,17 +410,23 @@ def export_standings(
 
 @private.get("/export/drivers.csv")
 def export_drivers(
-    season: int | None = None, driver: str | None = None, db: DB = Depends(get_db)
+    season: int | None = None,
+    driver: str | None = None,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> Response:
     season = season or utcnow().year
-    body = exports.drivers_csv(db, season, [driver] if driver else None)
+    body = exports.drivers_csv(db, season, [driver] if driver else None, user_id=user.id)
     name = driver or "followed-drivers"
     return _csv_response(body, f"pitwall-{name}-{season}.csv")
 
 
 @private.get("/head-to-head", response_class=HTMLResponse)
 def head_to_head_page(
-    request: Request, season: int | None = None, db: DB = Depends(get_db)
+    request: Request,
+    season: int | None = None,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> HTMLResponse:
     seasons = list(
         db.scalars(
@@ -471,16 +442,21 @@ def head_to_head_page(
         request,
         "head_to_head.html",
         db,
+        user,
         season=season,
         seasons=seasons,
         pairs=head_to_head.season(db, season) if season else [],
-        spoiler_hidden=_spoiler_hidden(db, last_completed_event(db)),
+        spoiler_hidden=_spoiler_hidden(db, last_completed_event(db), user),
     )
 
 
 @private.get("/drivers/{driver_id}", response_class=HTMLResponse)
 def driver_page(
-    request: Request, driver_id: str, season: int | None = None, db: DB = Depends(get_db)
+    request: Request,
+    driver_id: str,
+    season: int | None = None,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> HTMLResponse:
     driver = db.get(Driver, driver_id)
     if driver is None:
@@ -500,14 +476,15 @@ def driver_page(
         request,
         "driver.html",
         db,
+        user,
         driver=driver,
         season=season,
         seasons=seasons,
         data=data,
         chart=chart,
         compounds=COMPOUND_COLORS,
-        followed=db.get(FollowedDriver, driver_id) is not None,
-        spoiler_hidden=_spoiler_hidden(db, last_completed_event(db)),
+        followed=db.get(FollowedDriver, (user.id, driver_id)) is not None,
+        spoiler_hidden=_spoiler_hidden(db, last_completed_event(db), user),
     )
 
 
@@ -524,14 +501,21 @@ COMPOUND_COLORS = {
 
 
 @private.get("/history", response_class=HTMLResponse)
-def history(request: Request, db: DB = Depends(get_db)) -> HTMLResponse:
-    logs = list(
-        db.scalars(select(NotificationLog).order_by(NotificationLog.sent_at.desc()).limit(200))
-    )
-    held = list(
-        db.scalars(select(Outbox).where(Outbox.status == "pending").order_by(Outbox.created_at))
-    )
-    return page(request, "history.html", db, logs=logs, held=held)
+def history(
+    request: Request,
+    all: int = 0,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
+) -> HTMLResponse:
+    show_all = bool(all and user.is_admin)
+    logs_q = select(NotificationLog).order_by(NotificationLog.sent_at.desc()).limit(200)
+    held_q = select(Outbox).where(Outbox.status == "pending").order_by(Outbox.created_at)
+    if not show_all:
+        logs_q = logs_q.where(NotificationLog.user_id == user.id)
+        held_q = held_q.where(Outbox.user_id == user.id)
+    logs = list(db.scalars(logs_q))
+    held = list(db.scalars(held_q))
+    return page(request, "history.html", db, user, logs=logs, held=held, show_all=show_all)
 
 
 # ---------------------------------------------------------------------------- settings
@@ -568,15 +552,11 @@ def fmt_offsets(minutes: list[int]) -> str:
     return ", ".join(one(m) for m in minutes)
 
 
-def _mask_token(token: str) -> str:
-    if not token:
-        return ""
-    return token[:4] + "…" + token[-2:] if len(token) > 8 else "…"
-
-
 @private.get("/settings", response_class=HTMLResponse)
-def settings_page(request: Request, db: DB = Depends(get_db)) -> HTMLResponse:
-    settings = load_settings(db)
+def settings_page(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> HTMLResponse:
+    settings = load_settings(db, user.id)
     env = get_env()
     season_drivers = list(
         db.scalars(
@@ -593,12 +573,13 @@ def settings_page(request: Request, db: DB = Depends(get_db)) -> HTMLResponse:
     )
     if not season_drivers:
         season_drivers = list(db.scalars(select(Driver).order_by(Driver.family_name).limit(400)))
-    followed = list(db.scalars(select(FollowedDriver)))
+    followed = _followed(db, user)
     zones = sorted(available_timezones())
     return page(
         request,
         "settings.html",
         db,
+        user,
         zones=zones,
         common_zones=COMMON_ZONES,
         session_types=SESSION_TYPES,
@@ -609,12 +590,16 @@ def settings_page(request: Request, db: DB = Depends(get_db)) -> HTMLResponse:
         weekdays=WEEKDAYS,
         alert_labels=ALERT_LABELS,
         channels=CHANNELS,
-        targets={c: targets_svc.db_targets(db, c) for c in CHANNELS},
-        env_targets={c: [mask_url(u) for u in targets_svc.env_urls(c)] for c in CHANNELS},
+        targets={c: targets_svc.db_targets(db, c, user.id) for c in CHANNELS},
+        env_targets={
+            c: [mask_url(u) for u in targets_svc.env_urls(c)] if user.id == OWNER_ID else []
+            for c in CHANNELS
+        },
         target_kinds=targets_svc.KINDS,
         mask_url=mask_url,
-        ics_base=f"{env.base_url.rstrip('/')}/calendar.ics",
-        ics_token_masked=_mask_token(env.ics_token),
+        ics_url=f"{env.base_url.rstrip('/')}/calendar.ics?token={user.ics_token}"
+        if user.ics_token
+        else None,
         season_drivers=season_drivers,
         followed=followed,
         error=request.session.pop("settings_error", None),
@@ -622,7 +607,9 @@ def settings_page(request: Request, db: DB = Depends(get_db)) -> HTMLResponse:
 
 
 @private.post("/settings")
-async def save_settings_route(request: Request, db: DB = Depends(get_db)) -> Response:
+async def save_settings_route(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
     form = await checked_form(request)
     try:
         tz = str(form.get("timezone", "")).strip()
@@ -633,9 +620,11 @@ async def save_settings_route(request: Request, db: DB = Depends(get_db)) -> Res
         for key in ("quiet_start", "quiet_end", "odd_start", "odd_end"):
             parse_hhmm(str(form.get(key, "00:00")))
         auto_release = int(str(form.get("spoiler_auto_release_hours", "0")) or 0)
-        start_year = int(str(form.get("backfill_start_year", "2000")))
-        if not 1950 <= start_year <= utcnow().year:
-            raise ValueError("Backfill start year must be between 1950 and this year")
+        start_year = None
+        if user.is_admin and form.get("backfill_start_year"):
+            start_year = int(str(form.get("backfill_start_year")))
+            if not 1950 <= start_year <= utcnow().year:
+                raise ValueError("Backfill start year must be between 1950 and this year")
         if not 0 <= auto_release <= 24 * 14:
             raise ValueError("Auto-release must be between 0 and 336 hours")
         digest_day = str(form.get("digest_day", "mon"))
@@ -648,48 +637,52 @@ async def save_settings_route(request: Request, db: DB = Depends(get_db)) -> Res
         request.session["settings_error"] = str(exc)
         return back("/settings")
 
-    old = load_settings(db)
-    new = save_settings(
-        db,
-        {
-            "timezone": tz,
-            "reminder_offsets": offsets,
-            "routing": routing,
-            "quiet_enabled": bool(form.get("quiet_enabled")),
-            "quiet_start": str(form.get("quiet_start")),
-            "quiet_end": str(form.get("quiet_end")),
-            "spoiler_enabled": bool(form.get("spoiler_enabled")),
-            "spoiler_auto_release_hours": auto_release,
-            "odd_start": str(form.get("odd_start")),
-            "odd_end": str(form.get("odd_end")),
-            "backfill_start_year": start_year,
-            "digest_enabled": bool(form.get("digest_enabled")),
-            "digest_day": digest_day,
-            "digest_time": digest_time,
-            "digest_types": digest_types,
-        },
-    )
+    updates: dict[str, Any] = {
+        "timezone": tz,
+        "reminder_offsets": offsets,
+        "routing": routing,
+        "quiet_enabled": bool(form.get("quiet_enabled")),
+        "quiet_start": str(form.get("quiet_start")),
+        "quiet_end": str(form.get("quiet_end")),
+        "spoiler_enabled": bool(form.get("spoiler_enabled")),
+        "spoiler_auto_release_hours": auto_release,
+        "odd_start": str(form.get("odd_start")),
+        "odd_end": str(form.get("odd_end")),
+        "digest_enabled": bool(form.get("digest_enabled")),
+        "digest_day": digest_day,
+        "digest_time": digest_time,
+        "digest_types": digest_types,
+    }
+    if start_year is not None:
+        updates["backfill_start_year"] = start_year
+    old = load_settings(db, user.id)
+    new = save_settings(db, updates, user.id)
     db.commit()
     sched = scheduler.get_scheduler()
     if sched is not None:
-        schedule_keys = ("timezone", "digest_enabled", "digest_day", "digest_time")
-        if any(getattr(new, k) != getattr(old, k) for k in schedule_keys):
-            scheduler.install_recurring_jobs(sched)
-        reminders.reconcile(sched, db, new)
+        if user.id == OWNER_ID and new.timezone != old.timezone:
+            scheduler.install_recurring_jobs(sched)  # nightly jobs follow the owner's timezone
+        reminders.reconcile(sched, db)
     flash(request, "Settings saved.")
     return back("/settings")
 
 
 @private.post("/settings/followed")
-async def followed_drivers(request: Request, db: DB = Depends(get_db)) -> Response:
+async def followed_drivers(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
     form = await checked_form(request)
     action = form.get("action")
     driver_id = str(form.get("driver_id", ""))
-    if action == "add" and db.get(Driver, driver_id) and not db.get(FollowedDriver, driver_id):
-        db.add(FollowedDriver(driver_id=driver_id))
+    if (
+        action == "add"
+        and db.get(Driver, driver_id)
+        and not db.get(FollowedDriver, (user.id, driver_id))
+    ):
+        db.add(FollowedDriver(user_id=user.id, driver_id=driver_id))
         scheduler.run_now("openf1_sync")  # fetch their OpenF1 race detail in the background
     elif action == "remove":
-        row = db.get(FollowedDriver, driver_id)
+        row = db.get(FollowedDriver, (user.id, driver_id))
         if row:
             db.delete(row)
     db.commit()
@@ -697,7 +690,9 @@ async def followed_drivers(request: Request, db: DB = Depends(get_db)) -> Respon
 
 
 @private.post("/settings/targets")
-async def add_target(request: Request, db: DB = Depends(get_db)) -> Response:
+async def add_target(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
     form = await checked_form(request)
     channel = str(form.get("channel", ""))
     kind = str(form.get("kind", ""))
@@ -712,7 +707,9 @@ async def add_target(request: Request, db: DB = Depends(get_db)) -> Response:
         return back("/settings#channels")
     register_secrets(targets_svc.url_secrets(built.url))
     label = str(form.get("label", "")).strip()[:200] or built.label
-    db.add(NotificationTarget(channel=channel, kind=kind, label=label, url=built.url))
+    db.add(
+        NotificationTarget(user_id=user.id, channel=channel, kind=kind, label=label, url=built.url)
+    )
     db.commit()
     flash(
         request,
@@ -723,26 +720,30 @@ async def add_target(request: Request, db: DB = Depends(get_db)) -> Response:
     return back("/settings#channels")
 
 
-def _target(db: DB, target_id: int) -> NotificationTarget:
+def _target(db: DB, target_id: int, user: User) -> NotificationTarget:
     target = db.get(NotificationTarget, target_id)
-    if target is None:
+    if target is None or target.user_id != user.id:  # users only manage their own channels
         raise HTTPException(404)
     return target
 
 
 @private.post("/settings/targets/{target_id}/toggle")
-async def toggle_target(request: Request, target_id: int, db: DB = Depends(get_db)) -> Response:
+async def toggle_target(
+    request: Request, target_id: int, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
     await checked_form(request)
-    target = _target(db, target_id)
+    target = _target(db, target_id, user)
     target.enabled = not target.enabled
     db.commit()
     return back("/settings#channels")
 
 
 @private.post("/settings/targets/{target_id}/delete")
-async def delete_target(request: Request, target_id: int, db: DB = Depends(get_db)) -> Response:
+async def delete_target(
+    request: Request, target_id: int, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
     await checked_form(request)
-    target = _target(db, target_id)
+    target = _target(db, target_id, user)
     flash(request, f"Removed {target.label}.")
     db.delete(target)
     db.commit()
@@ -750,13 +751,16 @@ async def delete_target(request: Request, target_id: int, db: DB = Depends(get_d
 
 
 @private.post("/settings/targets/{target_id}/test")
-async def test_target(request: Request, target_id: int, db: DB = Depends(get_db)) -> Response:
+async def test_target(
+    request: Request, target_id: int, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
     await checked_form(request)
-    target = _target(db, target_id)
+    target = _target(db, target_id, user)
     msg = builders.test_message(target.channel)
     ok, detail = await run_in_threadpool(dispatch_notify, target.channel, msg, [target.url])
     db.add(
         NotificationLog(
+            user_id=user.id,
             type="test",
             channel=target.channel,
             payload_hash=msg.payload_hash(),
@@ -775,14 +779,18 @@ async def test_target(request: Request, target_id: int, db: DB = Depends(get_db)
 
 
 @private.post("/settings/test/{channel}")
-async def test_channel(request: Request, channel: str, db: DB = Depends(get_db)) -> Response:
+async def test_channel(
+    request: Request, channel: str, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
     await checked_form(request)
     if channel not in CHANNELS:
         raise HTTPException(404)
     msg = builders.test_message(channel)
+    msg.user_id = user.id
     ok, detail = await run_in_threadpool(dispatch_notify, channel, msg)
     db.add(
         NotificationLog(
+            user_id=user.id,
             type="test",
             channel=channel,
             payload_hash=msg.payload_hash(),
@@ -796,7 +804,7 @@ async def test_channel(request: Request, channel: str, db: DB = Depends(get_db))
     return back("/settings#channels")
 
 
-@private.post("/admin/run/{job}")
+@admin.post("/admin/run/{job}")
 async def run_job(request: Request, job: str) -> Response:
     await checked_form(request)
     mapping = {

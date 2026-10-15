@@ -5,7 +5,7 @@
 <div class="row" style="justify-content:space-between;">
   <h1>{{ season or '' }} standings{% if drivers %} <span class="muted small">after round {{ drivers.round }}</span>{% endif %}</h1>
   {% if seasons|length > 1 %}
-  <form method="get" action="/standings"><select name="season" onchange="this.form.submit()">
+  <form method="get" action="/standings"><select name="season" data-autosubmit>
     {% for y in seasons %}<option value="{{ y }}" {{ 'selected' if y == season else '' }}>{{ y }}</option>{% endfor %}
   </select></form>
   {% endif %}

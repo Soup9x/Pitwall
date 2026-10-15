@@ -2,7 +2,7 @@
 {% block title %}Settings{% endblock %}
 {% block content %}
 <h1>Settings</h1>
-<p class="sub">Saved in the database. Values in <code>.env</code> are only the defaults.</p>
+<p class="sub">Your personal settings — other users have their own.</p>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
 <form method="post" action="/settings">
@@ -65,12 +65,14 @@
     <p class="muted small">Reminders and race-week previews are always sent on time. The digest also lists the coming week's sessions and the standings; route it under <em>Routing</em> ("Weekly digest").</p>
   </div>
 
+  {% if user.is_admin %}
   <div class="card">
-    <h2>History</h2>
+    <h2>History <span class="badge muted">admin · everyone</span></h2>
     <label for="bsy">Backfill seasons from</label>
     <input id="bsy" type="number" min="1950" name="backfill_start_year" value="{{ settings.backfill_start_year }}">
     <p class="muted small">Past seasons are fetched once (politely rate-limited) and used for track stats.</p>
   </div>
+  {% endif %}
 </div>
 <p><button type="submit">Save settings</button></p>
 </form>
@@ -89,7 +91,7 @@
           <td>{{ t.label }}<div class="muted small"><code>{{ mask_url(t.url) }}</code>{% if not t.enabled %} · disabled{% endif %}</div></td>
           <td class="num" style="white-space:nowrap;">
             {% for action, text in [("test", "Test"), ("toggle", "Disable" if t.enabled else "Enable"), ("delete", "Remove")] %}
-            <form class="inline" method="post" action="/settings/targets/{{ t.id }}/{{ action }}"{% if action == "delete" %} onsubmit="return confirm('Remove {{ t.label|e }}?')"{% endif %}><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">{{ text }}</button></form>
+            <form class="inline" method="post" action="/settings/targets/{{ t.id }}/{{ action }}"{% if action == "delete" %} data-confirm="Remove {{ t.label }}?"{% endif %}><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">{{ text }}</button></form>
             {% endfor %}
           </td>
         </tr>
@@ -186,15 +188,10 @@
 
   <div class="card">
     <h2>Calendar feed (ICS)</h2>
-    {% if ics_token_masked %}
-    <p class="small">Subscribe in Google Calendar via <em>Other calendars → + → From URL</em>:</p>
-    <p><code>{{ ics_base }}?token={{ ics_token_masked }}</code></p>
-    <p class="muted small">The token is masked here; use the full <code>PITWALL_ICS_TOKEN</code> value from your <code>.env</code>. Add <code>&amp;sessions=race,q</code> for races and qualifying only (also: <code>sprint</code>, <code>sq</code>, <code>practice</code>).</p>
-    {% else %}
-    <p class="muted">Disabled — set <code>PITWALL_ICS_TOKEN</code> in <code>.env</code>.</p>
-    {% endif %}
+    <p class="small">Your private Google Calendar link is on your <a href="/account#calendar">Account</a> page.</p>
   </div>
 
+  {% if user.is_admin %}
   <div class="card" id="ops">
     <h2>Data sync</h2>
     <p class="muted small">These run automatically; use the buttons to run one now.</p>
@@ -204,5 +201,6 @@
     {% if backfill %}<p class="muted small">Backfill: {{ backfill.done }}/{{ backfill.total }} seasons{% if backfill.finished_at %}, last finished {{ backfill.finished_at[:16].replace('T', ' ') }} UTC{% endif %}{% if backfill.errors %} — {{ backfill.errors|length }} error(s), will retry tonight{% endif %}.</p>{% endif %}
     <p class="small"><a href="/health" target="_blank">/health</a></p>
   </div>
+  {% endif %}
 </div>
 {% endblock %}

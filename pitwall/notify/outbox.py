@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session as DB
 
 from pitwall.db import utcnow
-from pitwall.models import NotificationLog, Outbox, SpoilerState
+from pitwall.models import OWNER_ID, NotificationLog, Outbox, SpoilerState
 from pitwall.notify.dispatch import notify
 from pitwall.notify.message import Message
 from pitwall.settings_store import SPOILER_TYPES, AppSettings, load_settings
@@ -44,8 +44,11 @@ def already_sent(db: DB, payload_hash: str, channel: str | None = None) -> bool:
 def enqueue(
     db: DB, msg: Message, *, settings: AppSettings | None = None, now: datetime | None = None
 ) -> Outbox | None:
-    """Queue an alert. Returns None if it is a duplicate or nothing is routed for its type."""
-    settings = settings or load_settings(db)
+    """Queue an alert for `msg.user_id` (default: the owner). Returns None if it is a duplicate
+    or the user hasn't routed this alert type to any channel."""
+    user_id = msg.user_id or OWNER_ID
+    msg.user_id = user_id
+    settings = settings or load_settings(db, user_id)
     now = now or utcnow()
     h = msg.payload_hash()
     dup = db.scalars(select(Outbox.id).where(Outbox.payload_hash == h).limit(1)).first()
@@ -57,6 +60,7 @@ def enqueue(
         log.info("alert type not routed to any channel", extra={"type": msg.type})
         return None
     row = Outbox(
+        user_id=user_id,
         type=msg.type,
         payload_hash=h,
         event_id=msg.event_id,
@@ -88,14 +92,14 @@ def _row_message(row: Outbox) -> Message:
         event_id=row.event_id,
         session_id=row.session_id,
         url=extra.get("url"),
+        user_id=row.user_id,
     )
 
 
 def spoiler_released(db: DB, row: Outbox, settings: AppSettings, now: datetime) -> bool:
     if not settings.spoiler_enabled or not row.spoiler or row.event_id is None:
         return True
-    state = db.get(SpoilerState, row.event_id)
-    if state is not None and state.watched:
+    if is_watched(db, row.event_id, row.user_id):
         return True
     hours = settings.spoiler_auto_release_hours
     return bool(hours and hours > 0 and now >= row.created_at + timedelta(hours=hours))
@@ -111,6 +115,7 @@ def in_quiet_hours(settings: AppSettings, now: datetime) -> bool:
 def _log(db: DB, row: Outbox, channel: str, status: str, detail: str, now: datetime) -> None:
     db.add(
         NotificationLog(
+            user_id=row.user_id,
             type=row.type,
             channel=channel,
             payload_hash=row.payload_hash,
@@ -127,14 +132,17 @@ def _log(db: DB, row: Outbox, channel: str, status: str, detail: str, now: datet
 def flush(db: DB, *, now: datetime | None = None, sender: Sender | None = None) -> dict[str, int]:
     now = now or utcnow()
     sender = sender or notify
-    settings = load_settings(db)
-    quiet = in_quiet_hours(settings, now)
+    per_user: dict[int, tuple[AppSettings, bool]] = {}  # settings, in quiet hours
     stats = {"sent": 0, "held": 0, "dropped": 0, "failed": 0}
 
     pending = db.scalars(
         select(Outbox).where(Outbox.status == "pending").order_by(Outbox.created_at, Outbox.id)
     ).all()
     for row in pending:
+        if row.user_id not in per_user:
+            user_settings = load_settings(db, row.user_id)
+            per_user[row.user_id] = (user_settings, in_quiet_hours(user_settings, now))
+        settings, quiet = per_user[row.user_id]
         if row.expires_at is not None and now >= row.expires_at:
             row.status, row.hold_reason, row.resolved_at = "dropped", None, now
             _log(db, row, "-", "dropped", "expired before it could be delivered", now)
@@ -182,17 +190,22 @@ def flush(db: DB, *, now: datetime | None = None, sender: Sender | None = None) 
 
 
 def mark_watched(
-    db: DB, event_id: int, watched: bool = True, *, now: datetime | None = None
+    db: DB,
+    event_id: int,
+    watched: bool = True,
+    *,
+    user_id: int = OWNER_ID,
+    now: datetime | None = None,
 ) -> None:
-    state = db.get(SpoilerState, event_id)
+    state = db.get(SpoilerState, (user_id, event_id))
     if state is None:
-        state = SpoilerState(event_id=event_id)
+        state = SpoilerState(user_id=user_id, event_id=event_id)
         db.add(state)
     state.watched = watched
     state.watched_at = (now or utcnow()) if watched else None
     db.flush()
 
 
-def is_watched(db: DB, event_id: int) -> bool:
-    state = db.get(SpoilerState, event_id)
+def is_watched(db: DB, event_id: int, user_id: int = OWNER_ID) -> bool:
+    state = db.get(SpoilerState, (user_id, event_id))
     return bool(state and state.watched)

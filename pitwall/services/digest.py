@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DB
 
-from pitwall.models import Event, NotificationLog, Outbox, Session
+from pitwall.models import OWNER_ID, Event, NotificationLog, Outbox, Session
 from pitwall.notify.message import Message
 from pitwall.services import standings as standings_svc
 from pitwall.services import weather
@@ -41,20 +41,24 @@ class DigestContext:
     link: str = ""
 
 
-def held(db: DB) -> list[Outbox]:
+def held(db: DB, user_id: int = OWNER_ID) -> list[Outbox]:
     return list(
         db.scalars(
             select(Outbox)
-            .where(Outbox.status == "pending", Outbox.hold_reason == "digest")
+            .where(
+                Outbox.status == "pending",
+                Outbox.hold_reason == "digest",
+                Outbox.user_id == user_id,
+            )
             .order_by(Outbox.created_at, Outbox.id)
         )
     )
 
 
 def build(
-    db: DB, settings: AppSettings, now: datetime, base_url: str
+    db: DB, settings: AppSettings, now: datetime, base_url: str, user_id: int = OWNER_ID
 ) -> tuple[Message, list[Outbox]] | None:
-    rows = held(db)
+    rows = held(db, user_id)
     grouped: dict[str, list[DigestItem]] = {}
     for row in rows:
         lines = row.text.splitlines()
@@ -83,7 +87,7 @@ def build(
         wx = weather.for_event(db, sess.event).get(sess.id)
         upcoming.append((sess.event, session_view(sess, settings, now), wx))
     season = standings_svc.latest_season_with_standings(db)
-    drivers = standings_svc.table(db, season, "driver") if season else None
+    drivers = standings_svc.table(db, season, "driver", user_id=user_id) if season else None
     if not rows and not upcoming:
         return None
 
@@ -93,6 +97,7 @@ def build(
     text = render("email/digest.txt", ctx=ctx).strip()
     html = render("email/digest.html", ctx=ctx, title=title, link=ctx.link)
     msg = Message(
+        user_id=user_id,
         type="digest",
         title=title,
         text=text,
@@ -112,6 +117,7 @@ def mark_digested(db: DB, rows: list[Outbox], now: datetime) -> None:
         row.status, row.hold_reason, row.resolved_at = "digested", None, now
         db.add(
             NotificationLog(
+                user_id=row.user_id,
                 type=row.type,
                 channel="digest",
                 payload_hash=row.payload_hash,

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session as DB
 
 from pitwall.db import utcnow
 from pitwall.models import Event, Session
-from pitwall.settings_store import AppSettings
+from pitwall.settings_store import AppSettings, load_settings
 
 log = logging.getLogger(__name__)
 
@@ -36,8 +36,16 @@ def job_id(session_id: int, offset_minutes: int) -> str:
     return f"{PREFIX}{session_id}:{offset_minutes}"
 
 
-def plan(db: DB, settings: AppSettings, now: datetime | None = None) -> dict[str, PlannedReminder]:
+def plan(
+    db: DB, settings: AppSettings | None = None, now: datetime | None = None
+) -> dict[str, PlannedReminder]:
+    """Reminder jobs to schedule. With `settings=None`, the union of every active user's
+    offsets: one job per (session, offset); at fire time it notifies each user who wants it."""
     now = now or utcnow()
+    offsets: dict[str, set[int]] = {}
+    for s in [settings] if settings else _all_settings(db):
+        for stype, values in s.reminder_offsets.items():
+            offsets.setdefault(stype, set()).update(int(v) for v in values)
     out: dict[str, PlannedReminder] = {}
     sessions = db.scalars(
         select(Session)
@@ -46,7 +54,7 @@ def plan(db: DB, settings: AppSettings, now: datetime | None = None) -> dict[str
     )
     for sess in sessions:
         assert sess.start_utc is not None
-        for offset in settings.reminder_offsets.get(sess.type, []):
+        for offset in sorted(offsets.get(sess.type, ())):
             run_at = sess.start_utc - timedelta(minutes=int(offset))
             if run_at <= now:
                 continue
@@ -55,8 +63,14 @@ def plan(db: DB, settings: AppSettings, now: datetime | None = None) -> dict[str
     return out
 
 
+def _all_settings(db: DB) -> list[AppSettings]:
+    from pitwall.users import active_users
+
+    return [load_settings(db, u.id) for u in active_users(db)]
+
+
 def reconcile(
-    scheduler: Any, db: DB, settings: AppSettings, now: datetime | None = None
+    scheduler: Any, db: DB, settings: AppSettings | None = None, now: datetime | None = None
 ) -> dict[str, int]:
     """Make the scheduler's reminder jobs match the plan. Returns counts for logging/tests."""
     desired = plan(db, settings, now)

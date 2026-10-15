@@ -13,17 +13,27 @@ from typing import Any, TypeVar
 from sqlalchemy import select
 
 from pitwall import scheduler as sched_mod
+from pitwall import users
 from pitwall.config import get_env
 from pitwall.db import session_scope, utcnow
-from pitwall.models import Event, Season, Session
+from pitwall.models import OWNER_ID, Event, Season, Session
 from pitwall.notify import builders, outbox
+from pitwall.notify.message import Message
 from pitwall.services import circuit_maps, digest, openf1_sync, reminders, trivia, weather
 from pitwall.services.sync import (
     apply_results,
     apply_schedule,
     apply_standings,
 )
-from pitwall.settings_store import get_kv, load_settings, set_kv
+from pitwall.settings_store import (
+    WEEKDAYS,
+    AppSettings,
+    get_kv,
+    get_user_kv,
+    load_settings,
+    set_kv,
+    set_user_kv,
+)
 from pitwall.sources.http import SourceUnavailable
 from pitwall.sources.jolpica import JolpicaClient, make_client
 from pitwall.sources.openf1 import OpenF1Client
@@ -59,12 +69,34 @@ def safe_job[F: Callable[..., Any]](fn: F) -> F:
     return wrapper  # type: ignore[return-value]
 
 
+def fan_out(
+    db: Any,
+    build: Callable[[AppSettings, int], Message | None],
+    now: datetime,
+    users_filter: Callable[[AppSettings], bool] | None = None,
+) -> int:
+    """Build and queue an alert for every active user, with their own settings (timezone,
+    routing, followed drivers...). Returns how many were queued."""
+    queued = 0
+    for user in users.active_users(db):
+        settings = load_settings(db, user.id)
+        if users_filter is not None and not users_filter(settings):
+            continue
+        msg = build(settings, user.id)
+        if msg is None:
+            continue
+        msg.user_id = user.id
+        if outbox.enqueue(db, msg, settings=settings, now=now) is not None:
+            queued += 1
+    return queued
+
+
 def _reconcile_reminders(now: datetime | None = None) -> None:
     sched = sched_mod.get_scheduler()
     if sched is None:
         return
     with session_scope() as db:
-        reminders.reconcile(sched, db, load_settings(db), now)
+        reminders.reconcile(sched, db, None, now)
 
 
 # ---------------------------------------------------------------------------- schedule
@@ -95,11 +127,8 @@ def sync_schedule(client: JolpicaClient, year: int, now: datetime | None = None)
             )
             return 0
         result = apply_schedule(db, year, races, now=now)
-        settings = load_settings(db)
         for change in result.changes:
-            outbox.enqueue(
-                db, builders.schedule_change(db, change, settings), settings=settings, now=now
-            )
+            fan_out(db, lambda s, _u, c=change: builders.schedule_change(db, c, s), now)
         if result.changes:
             log.info(
                 "schedule changes detected", extra={"year": year, "events": len(result.changes)}
@@ -175,9 +204,7 @@ def update_standings(
                 Event.season == season, Event.round == upd.round, Event.status == "scheduled"
             )
         ).first()
-        msg = builders.standings(db, season, event)
-        if msg is not None:
-            outbox.enqueue(db, msg, now=now)
+        fan_out(db, lambda _s, uid: builders.standings(db, season, event, uid), now)
     return True
 
 
@@ -203,10 +230,7 @@ def results_sync_job(now: datetime | None = None) -> None:
                 sess = apply_results(db, race, stype, now=now)
                 if sess is None:
                     continue
-                settings = load_settings(db)
-                msg = builders.results(db, sess, settings)
-                if msg is not None:
-                    outbox.enqueue(db, msg, settings=settings, now=now)
+                fan_out(db, lambda s, uid, ss=sess: builders.results(db, ss, s, uid), now)
                 log.info("results stored", extra={"season": season, "round": rnd, "session": stype})
             if stype in ("RACE", "SPRINT"):
                 pending.append({"season": season, "round": rnd, "since": now.isoformat()})
@@ -232,14 +256,21 @@ def results_sync_job(now: datetime | None = None) -> None:
 # ---------------------------------------------------------------------------- preview
 
 
-def race_week_event(now: datetime) -> int | None:
-    """The event whose race falls in the 7 days starting today (owner's local date)."""
+def week_start(now: datetime, tz: Any) -> datetime:
+    """Monday 00:00 of the current week in timezone `tz`."""
+    local = now.astimezone(tz)
+    monday = local.date() - timedelta(days=local.weekday())
+    return datetime.combine(monday, datetime.min.time(), tzinfo=tz)
+
+
+def race_week_event(now: datetime, tz: Any = None) -> int | None:
+    """The race the Monday preview is about: the first race in the 7 days after this week's
+    Monday 09:00 (in `tz`, default the owner's timezone). Measuring from the preview time,
+    not the calendar week, keeps users far east of the circuit (where a Sunday race lands on
+    Monday morning) from getting the preview after the race."""
     with session_scope() as db:
-        settings = load_settings(db)
-        tz = settings.tz
-        start_local = now.astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
-        start = start_local
-        end = start_local + timedelta(days=7)
+        tz = tz or load_settings(db).tz
+        start = week_start(now, tz) + PREVIEW_AT
         sess = db.scalars(
             select(Session)
             .join(Event)
@@ -248,40 +279,104 @@ def race_week_event(now: datetime) -> int | None:
                 Session.status == "scheduled",
                 Event.status == "scheduled",
                 Session.start_utc >= start,
-                Session.start_utc < end,
+                Session.start_utc < start + timedelta(days=7),
             )
             .order_by(Session.start_utc)
         ).first()
         return sess.event_id if sess else None
 
 
-@safe_job
-def preview_job(now: datetime | None = None) -> None:
-    now = now or utcnow()
-    event_id = race_week_event(now)
+PREVIEW_AT = timedelta(hours=9)  # Monday 09:00 in each user's timezone
+LAST_PREVIEW = "last_preview"
+LAST_DIGEST = "last_digest"
+
+
+def maybe_send_preview(user_id: int, now: datetime) -> bool:
+    """Send this user's race-week preview once, from Monday 09:00 their time."""
+    with session_scope() as db:
+        settings = load_settings(db, user_id)
+        if now < week_start(now, settings.tz) + PREVIEW_AT:
+            return False
+    event_id = race_week_event(now, settings.tz)
     if event_id is None:
-        log.info("no race this week; no preview")
-        return
-    weather_sync_job(now, event_id)  # freshest forecast for the preview
+        return False
+    with session_scope() as db:
+        event = db.get(Event, event_id)
+        if event is None or get_user_kv(db, user_id, LAST_PREVIEW) == event.slug:
+            return False
+    weather_sync_job(now, event_id)  # freshest forecast (cached for an hour across users)
     with session_scope() as db:
         event = db.get(Event, event_id)
         assert event is not None
-        settings = load_settings(db)
-        send_preview(db, event, settings, now)
-    flush_job()
+        send_preview(db, event, load_settings(db, user_id), now, user_id=user_id)
+        set_user_kv(db, user_id, LAST_PREVIEW, event.slug)
+    return True
+
+
+@safe_job
+def preview_job(now: datetime | None = None) -> None:
+    """Send due race-week previews to every user (normally run by `personal_job`)."""
+    now = now or utcnow()
+    with session_scope() as db:
+        ids = [u.id for u in users.active_users(db)]
+    sent = sum(maybe_send_preview(uid, now) for uid in ids)
+    if sent:
+        flush_job()
 
 
 def send_preview(
-    db: Any, event: Event, settings: Any, now: datetime, dedup_content: str | None = None
+    db: Any,
+    event: Event,
+    settings: Any,
+    now: datetime,
+    dedup_content: str | None = None,
+    user_id: int = OWNER_ID,
 ) -> bool:
     """Queue the race-week preview and remember its trivia so later previews don't repeat it."""
-    msg = builders.preview(db, event, settings, now)
+    msg = builders.preview(db, event, settings, now, user_id=user_id)
     if dedup_content:
         msg.dedup_content = dedup_content
     row = outbox.enqueue(db, msg, settings=settings, now=now)
     if row is not None:
-        trivia.remember_keys(db, [f["key"] for f in msg.data.get("facts", [])])
+        trivia.remember_keys(db, [f["key"] for f in msg.data.get("facts", [])], user_id)
     return row is not None
+
+
+def _last_digest_slot(now: datetime, settings: AppSettings) -> datetime:
+    """The most recent configured digest time (day + HH:MM in the user's timezone) <= now."""
+    hh, mm = (int(x) for x in settings.digest_time.split(":"))
+    day = WEEKDAYS.index(settings.digest_day)
+    slot = week_start(now, settings.tz) + timedelta(days=day, hours=hh, minutes=mm)
+    return slot if slot <= now else slot - timedelta(days=7)
+
+
+def maybe_send_digest(user_id: int, now: datetime) -> bool:
+    with session_scope() as db:
+        settings = load_settings(db, user_id)
+        if not settings.digest_enabled:
+            return False
+        slot = _last_digest_slot(now, settings)
+        last = get_user_kv(db, user_id, LAST_DIGEST)
+        if last is None:
+            # Just switched on: start from the next scheduled time, don't send right away.
+            set_user_kv(db, user_id, LAST_DIGEST, now.isoformat())
+            return False
+        if datetime.fromisoformat(last) >= slot:
+            return False
+        set_user_kv(db, user_id, LAST_DIGEST, now.isoformat())
+    digest_job(now, user_id)
+    return True
+
+
+@safe_job
+def personal_job(now: datetime | None = None) -> None:
+    """Every 5 minutes: previews and digests that are due in each user's own timezone."""
+    now = now or utcnow()
+    with session_scope() as db:
+        ids = [u.id for u in users.active_users(db)]
+    for uid in ids:
+        maybe_send_preview(uid, now)
+        maybe_send_digest(uid, now)
 
 
 # ------------------------------------------------------------------- weather / maps / digest
@@ -315,20 +410,28 @@ def circuit_maps_job(now: datetime | None = None) -> None:
 
 
 @safe_job
-def digest_job(now: datetime | None = None) -> None:
+def digest_job(now: datetime | None = None, user_id: int | None = None) -> None:
+    """Send the weekly digest now to `user_id` (default: every user who has it switched on)."""
     now = now or utcnow()
+    with session_scope() as db:
+        ids = [user_id] if user_id else [u.id for u in users.active_users(db)]
+    for uid in ids:
+        _send_digest(uid, now)
+    flush_job()
+
+
+def _send_digest(user_id: int, now: datetime) -> None:
     with _flush_lock, session_scope() as db:
-        settings = load_settings(db)
+        settings = load_settings(db, user_id)
         if not settings.digest_enabled:
             return
-        built = digest.build(db, settings, now, get_env().base_url)
+        built = digest.build(db, settings, now, get_env().base_url, user_id)
         if built is None:
-            log.info("nothing for the weekly digest")
+            log.info("nothing for the weekly digest", extra={"user": user_id})
             return
         msg, rows = built
         if outbox.enqueue(db, msg, settings=settings, now=now) is not None:
             digest.mark_digested(db, rows, now)
-    flush_job()
 
 
 # ---------------------------------------------------------------------------- OpenF1
@@ -371,9 +474,12 @@ def send_reminder_job(session_id: int, offset_minutes: int, planned_for: str) ->
             return
         if now >= sess.start_utc:
             return
-        settings = load_settings(db)
-        outbox.enqueue(
-            db, builders.reminder(sess, offset_minutes, settings, now), settings=settings, now=now
+        # Only users who asked for a reminder at this offset for this session type.
+        fan_out(
+            db,
+            lambda s, _u: builders.reminder(sess, offset_minutes, s, now),
+            now,
+            lambda s: offset_minutes in s.reminder_offsets.get(sess.type, []),
         )
     flush_job()
 

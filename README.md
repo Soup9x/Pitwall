@@ -107,14 +107,15 @@ The installer:
 2. downloads Pitwall to `/opt/pitwall`,
 3. asks for:
    - your timezone and port
-   - whether Pitwall sits behind a reverse proxy
-   - a web UI password (or generates one)
+   - how people will reach Pitwall: local network only, a **Cloudflare Tunnel** (section 6), or
+     your own reverse proxy
+   - a password for the `admin` account (or generates one)
    - how far back to download history
 4. writes `.env` (readable only by root) and starts Pitwall,
-5. prints your web address, password (if generated) and calendar-feed URL.
+5. prints your web address and login.
 
-Then log in and add where alerts should go under **Settings → Notification channels**
-(see section 2).
+Then log in as **admin**. Add where alerts should go under **Settings → Notification
+channels** (section 2), and invite other people under **Users** (section 8).
 
 Run it again at any time to update Pitwall or change settings. Your current answers are the
 defaults, and the old `.env` is backed up first. Options: `--dir` (install location),
@@ -174,7 +175,7 @@ Then go to **Settings**, pick the drivers you follow, and press **Send test** fo
 
 ## 2. Notifications (email and webhooks)
 
-Add destinations in the web UI under **Settings → Notification channels**. Choose a type and fill
+Each user adds their own destinations in the web UI under **Settings → Notification channels**. Choose a type and fill
 in the form, then press **Add** and **Test**. You can add as many as you like, and disable or
 remove them at any time. Pitwall builds the [Apprise](https://github.com/caronc/apprise/wiki) URL
 for you, and passwords are never shown again after you save them.
@@ -225,11 +226,14 @@ Quiet hours and spoiler mode are in Settings too.
 
 ## 3. Google Calendar (ICS feed)
 
-Your feed URL is:
+Every user has a private feed link under **Account** in the web UI. It looks like this:
 
 ```
-http://mh-flex-01:8080/calendar.ics?token=YOUR_PITWALL_ICS_TOKEN
+https://pitwall.example.com/calendar.ics?token=…
 ```
+
+Session times in the event descriptions use that user's timezone. **Create a new link** on the
+Account page makes the old one stop working.
 
 To include only some sessions, add `&sessions=race,q`. Other values: `sprint`, `sq`,
 `practice`, `fp1`, `fp2`, `fp3`.
@@ -240,8 +244,8 @@ To subscribe in Google Calendar (on a computer):
 2. Paste the feed URL and click **Add calendar**.
 
 **Google must be able to reach the URL from the internet.** A `mh-flex-01` address only works
-inside your network, so publish Pitwall through your reverse proxy (section 6) and use that
-address. Only `/calendar.ics` needs to be reachable, and it only answers with the right token.
+inside your network, so publish Pitwall through a Cloudflare Tunnel or your reverse proxy
+(section 6) and use that address. The feed only answers with a valid token.
 
 > **Note:** Google refreshes subscribed calendars slowly, sometimes only once a day. Time
 > changes may take up to ~24 h to show in Google Calendar. That is why schedule changes are also
@@ -274,7 +278,44 @@ sudo docker compose start
 
 To restore, put `data/` and `.env` back in `/opt/pitwall` and run `sudo docker compose up -d`.
 
-## 6. Running behind a reverse proxy
+## 6. Opening Pitwall to the internet
+
+### Option A: Cloudflare Tunnel (recommended)
+
+A tunnel connects Pitwall to Cloudflare *outbound*, so you don't open any ports on your router.
+Cloudflare provides the HTTPS certificate.
+
+1. In the [Cloudflare dashboard](https://one.dash.cloudflare.com/), go to **Zero Trust →
+   Networks → Tunnels → Create a tunnel**. Choose **Cloudflared** and give it a name.
+2. Cloudflare shows an install command. Copy only the **token**: the long text after `--token`.
+   You don't need to run the command, because Pitwall's installer runs `cloudflared` in Docker
+   for you.
+3. In the tunnel's **Public Hostname** tab, add a hostname such as `pitwall.yourdomain.com`:
+   - **Service type:** HTTP
+   - **URL:** `pitwall:8080`
+4. Run `sudo ./install.sh` in `/opt/pitwall`, choose **Go through the questions again**, and
+   at "How will people reach Pitwall?" pick **Cloudflare Tunnel**. Paste the token and the
+   hostname.
+
+The installer then:
+- starts a `cloudflared` container next to Pitwall;
+- makes Pitwall listen only on this machine (no LAN or router exposure);
+- turns on HTTPS-only cookies;
+- tells Pitwall to take visitors' real IPs from Cloudflare, so login rate limiting works per
+  person.
+
+Check the tunnel with `sudo docker compose logs cloudflared`. Then open
+`https://pitwall.yourdomain.com` and log in.
+
+Recommended Cloudflare settings:
+- **SSL/TLS → Edge Certificates → Always Use HTTPS:** on.
+- **Security → Bots → Bot Fight Mode:** on.
+- **Optional extra lock:** a Cloudflare Access application (Zero Trust → Access) can ask for an
+  email code before anyone reaches Pitwall. If you add one, create **Bypass** policies for
+  `/calendar.ics`, `/circuit-maps/*` and `/invite/*`. Google Calendar and email clients can't
+  log in, and new users need to open their invite link.
+
+### Option B: your own reverse proxy
 
 **Direct port (no proxy).** This is the default. Browse to `http://mh-flex-01:8080`. Change
 the host port with `PITWALL_PORT` in `.env`.
@@ -321,12 +362,65 @@ of guessing. Please spot-check the file against formula1.com, fix anything wrong
 
 ---
 
+## 8. Users and invites
+
+Everyone shares the F1 data. Each person has their own:
+- login and timezone
+- followed drivers
+- email and webhook channels
+- reminder times, quiet hours, spoiler mode and weekly digest
+- calendar feed
+
+**Inviting someone (admins):**
+1. Open **Users → Create invite link** and send the link. It works once and expires after
+   7 days.
+2. The person opens it, picks a username and password, and lands on their own Settings page.
+
+**Managing users (admins):**
+- **Forgotten password:** use **Reset link** next to the person, which creates a one-time
+  link valid for 48 hours.
+- You can also make someone an admin, or disable or delete their account.
+- Admins also see system settings (history download, data sync) and can view everyone's
+  notification history.
+
+**Your own account:** under **Account** you can change your password, get your calendar link,
+or sign out everywhere.
+
+**If you were using Pitwall before multi-user support:** your existing settings, channels,
+followed drivers and calendar link now belong to the user **admin**. The admin password is the
+one from `.env` (`PITWALL_ADMIN_PASSWORD`). After that first start, passwords are managed in
+Pitwall, so editing `.env` no longer changes them.
+
+**Locked out of every admin account?** Run:
+
+```bash
+cd /opt/pitwall
+sudo docker compose exec pitwall python -m pitwall set-password admin
+```
+
+This also unlocks the account. To create another admin from the command line:
+`... python -m pitwall create-user NAME --admin`.
+
 ## Security notes
 
-- The web UI needs the admin password. Logins are rate-limited (5 failures per 15 min), and
-  every form has CSRF protection.
-- `/calendar.ics` uses its token instead of a login, so Google can fetch it.
-- `/health` needs no login and returns no secrets.
+- **Logins:**
+  - Every page needs a login.
+  - Passwords are hashed with scrypt and must be at least 10 characters.
+  - Sessions end when you change your password or an admin disables you.
+  - Every form has CSRF protection.
+- **Brute-force protection:**
+  - Logins are rate-limited per visitor (5 failures per 15 minutes).
+  - Each account also locks for 15 minutes after 5 wrong passwords.
+  - Error messages never reveal whether a username exists.
+- **Accounts:** there's no open sign-up. New accounts need an admin's one-time invite link,
+  and only a hash of that link is stored.
+- **Public URLs:** `/calendar.ics` uses a per-user token instead of a login, so Google can fetch
+  it. `/circuit-maps/*` is public, so email clients can show maps. `/health` tells internet
+  visitors only `{"status": "ok"}`; details are for logged-in users and the local healthcheck.
+- **Browser hardening:**
+  - Strict Content-Security-Policy with no inline scripts.
+  - `X-Frame-Options: DENY`, `nosniff` and a no-referrer-leak policy.
+  - Pages aren't cached, and search engines are asked not to index them.
 - Secrets are redacted from logs, and the UI shows them only masked. Notification-channel
   passwords added in the UI live in the database in `./data`, which is created readable only by
   the container's user. Treat backups of `./data` like your `.env`.
@@ -334,8 +428,9 @@ of guessing. Please spot-check the file against formula1.com, fix anything wrong
 
 ## Troubleshooting
 
-- **Can't log in:** check `PITWALL_ADMIN_PASSWORD` in `.env`, then run
-  `sudo docker compose up -d`. After 5 wrong attempts, wait 15 minutes.
+- **Can't log in:** the username for the original account is `admin`. After 5 wrong attempts
+  the account locks for 15 minutes. To reset a password, see section 8; editing `.env` no
+  longer changes it.
 - **"Permission denied" on `/app/data` in the logs:** run `sudo chown -R 1000:1000 data`, or set
   `PUID`/`PGID` in `.env` to the folder's owner.
 - **Test notification fails:** the error appears at the top of the Settings page and on the

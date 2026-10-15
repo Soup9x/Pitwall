@@ -10,7 +10,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session as DB
 
 from pitwall.db import utcnow
-from pitwall.models import SESSION_EMOJI, SESSION_LABELS, Event, FollowedDriver, Result, Session
+from pitwall.models import (
+    OWNER_ID,
+    SESSION_EMOJI,
+    SESSION_LABELS,
+    Event,
+    FollowedDriver,
+    Result,
+    Session,
+)
 from pitwall.notify.message import Message
 from pitwall.services import circuit_maps, title_math, track_stats, trivia
 from pitwall.services import standings as standings_svc
@@ -145,11 +153,16 @@ def schedule_change(db: DB, change: EventChange, settings: AppSettings) -> Messa
 # ---------------------------------------------------------------------------- results
 
 
-def _followed_ids(db: DB) -> set[str]:
-    return {f.driver_id for f in db.scalars(select(FollowedDriver))}
+def _followed_ids(db: DB, user_id: int = OWNER_ID) -> set[str]:
+    return {
+        f.driver_id
+        for f in db.scalars(select(FollowedDriver).where(FollowedDriver.user_id == user_id))
+    }
 
 
-def results(db: DB, sess: Session, settings: AppSettings) -> Message | None:
+def results(
+    db: DB, sess: Session, settings: AppSettings, user_id: int = OWNER_ID
+) -> Message | None:
     rows = list(
         db.scalars(
             select(Result)
@@ -162,7 +175,7 @@ def results(db: DB, sess: Session, settings: AppSettings) -> Message | None:
     event = sess.event
     label = SESSION_LABELS.get(sess.type, sess.type)
     title = f"{SESSION_EMOJI.get(sess.type, '🏁')} {label} results — {event.short_name}"
-    followed = _followed_ids(db)
+    followed = _followed_ids(db, user_id)
     top_n = 10
 
     def line(r: Result) -> str:
@@ -192,6 +205,7 @@ def results(db: DB, sess: Session, settings: AppSettings) -> Message | None:
     text = "\n".join([f"{label} — {event.name}", *lines, event_url(event)])
     html = render("email/simple.html", title=title, lines=lines, link=event_url(event))
     return Message(
+        user_id=user_id,
         type="results",
         title=title,
         text=text,
@@ -219,9 +233,9 @@ def results(db: DB, sess: Session, settings: AppSettings) -> Message | None:
 # ---------------------------------------------------------------------------- standings
 
 
-def standings(db: DB, season: int, event: Event | None) -> Message | None:
-    drivers = standings_svc.table(db, season, "driver")
-    constructors = standings_svc.table(db, season, "constructor")
+def standings(db: DB, season: int, event: Event | None, user_id: int = OWNER_ID) -> Message | None:
+    drivers = standings_svc.table(db, season, "driver", user_id=user_id)
+    constructors = standings_svc.table(db, season, "constructor", user_id=user_id)
     if drivers is None:
         return None
     after = f" after {event.short_name}" if event else f" after round {drivers.round}"
@@ -248,6 +262,7 @@ def standings(db: DB, season: int, event: Event | None) -> Message | None:
     if constructors:
         content += "|" + "|".join(f"{r.entity_id}:{r.points}" for r in constructors.rows)
     return Message(
+        user_id=user_id,
         type="standings",
         title=title,
         text=text,
@@ -294,9 +309,11 @@ class PreviewContext:
     map_url: str | None = None
 
 
-def _form(db: DB, settings: AppSettings, before: datetime) -> list[FormLine]:
+def _form(
+    db: DB, settings: AppSettings, before: datetime, user_id: int = OWNER_ID
+) -> list[FormLine]:
     out: list[FormLine] = []
-    for f in db.scalars(select(FollowedDriver)):
+    for f in db.scalars(select(FollowedDriver).where(FollowedDriver.user_id == user_id)):
         rows = db.execute(
             select(Result, Event)
             .join(Session, Result.session_id == Session.id)
@@ -337,6 +354,7 @@ def preview_context(
     now: datetime | None = None,
     *,
     avoid_recent: bool = True,
+    user_id: int = OWNER_ID,
 ) -> PreviewContext:
     now = now or utcnow()
     sessions = event_sessions(event, settings, now)
@@ -344,8 +362,8 @@ def preview_context(
     season = standings_svc.latest_season_with_standings(db)
     drivers = constructors = None
     if season is not None and season >= event.season - 1:
-        drivers = standings_svc.table(db, season, "driver")
-        constructors = standings_svc.table(db, season, "constructor")
+        drivers = standings_svc.table(db, season, "driver", user_id=user_id)
+        constructors = standings_svc.table(db, season, "constructor", user_id=user_id)
     race = next((s for s in event.sessions if s.type == "RACE"), None)
     first = min((s.start_utc for s in event.sessions if s.start_utc), default=None)
     wx = weather_svc.for_event(db, event)
@@ -357,11 +375,11 @@ def preview_context(
         drivers=drivers,
         constructors=constructors,
         followed_rows=[r for r in (drivers.rows if drivers else []) if r.followed],
-        form=_form(db, settings, race.start_utc if race and race.start_utc else now),
+        form=_form(db, settings, race.start_utc if race and race.start_utc else now, user_id),
         link=event_url(event),
         countdown=humanize_delta((first - now).total_seconds()) if first and first > now else None,
         title=preview_title_math(db, event),
-        facts=trivia.for_preview(db, event, avoid_recent=avoid_recent),
+        facts=trivia.for_preview(db, event, avoid_recent=avoid_recent, user_id=user_id),
         weather=wx,
         rain=weather_svc.rain_warnings(event, wx),
         map_url=circuit_maps.map_url(event.circuit),
@@ -375,9 +393,10 @@ def preview(
     now: datetime | None = None,
     *,
     avoid_recent: bool = True,
+    user_id: int = OWNER_ID,
 ) -> Message:
     """`data["facts"]` lists the trivia used, so the caller can remember them (no repeats)."""
-    ctx = preview_context(db, event, settings, now, avoid_recent=avoid_recent)
+    ctx = preview_context(db, event, settings, now, avoid_recent=avoid_recent, user_id=user_id)
     badge = " ⚡ Sprint weekend" if event.is_sprint_weekend else ""
     title = f"🏎️ Race week: {event.name}{badge}"
     text = render("email/preview.txt", ctx=ctx, title=title).strip()
@@ -404,6 +423,7 @@ def preview(
         "facts": [{"type": f.type, "text": f.text, "key": f.key} for f in ctx.facts],
     }
     return Message(
+        user_id=user_id,
         type="preview",
         title=title,
         text=text,
