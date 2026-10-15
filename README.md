@@ -107,8 +107,8 @@ The installer:
 2. downloads Pitwall to `/opt/pitwall`,
 3. asks for:
    - your timezone and port
-   - how people will reach Pitwall: local network only, a **Cloudflare Tunnel** (section 6), or
-     your own reverse proxy
+   - how people will reach Pitwall: local network only, or from the internet through your
+     existing **Cloudflare Tunnel** or reverse proxy (section 6)
    - a password for the `admin` account (or generates one)
    - how far back to download history
 4. writes `.env` (readable only by root) and starts Pitwall,
@@ -280,32 +280,47 @@ To restore, put `data/` and `.env` back in `/opt/pitwall` and run `sudo docker c
 
 ## 6. Opening Pitwall to the internet
 
-### Option A: Cloudflare Tunnel (recommended)
+Pitwall doesn't run a tunnel of its own. Publish it through the Cloudflare Tunnel (or reverse
+proxy) you already have on your network, and Pitwall's own logins keep it locked down.
 
-A tunnel connects Pitwall to Cloudflare *outbound*, so you don't open any ports on your router.
-Cloudflare provides the HTTPS certificate.
+**Direct port (no proxy).** This is the default. Browse to `http://mh-flex-01:8080`. Change
+the host port with `PITWALL_PORT` in `.env`.
+
+### Option A: your existing Cloudflare Tunnel (recommended)
+
+A tunnel connects your network to Cloudflare *outbound*, so you don't open any ports on your
+router, and Cloudflare provides the HTTPS certificate.
 
 1. In the [Cloudflare dashboard](https://one.dash.cloudflare.com/), go to **Zero Trust →
-   Networks → Tunnels → Create a tunnel**. Choose **Cloudflared** and give it a name.
-2. Cloudflare shows an install command. Copy only the **token**: the long text after `--token`.
-   You don't need to run the command, because Pitwall's installer runs `cloudflared` in Docker
-   for you.
-3. In the tunnel's **Public Hostname** tab, add a hostname such as `pitwall.yourdomain.com`:
+   Networks → Tunnels**, open your tunnel and add a **Published application route**:
+   - **Subdomain / Domain:** e.g. `pitwall` . `yourdomain.com`
    - **Service type:** HTTP
-   - **URL:** `pitwall:8080`
-4. Run `sudo ./install.sh` in `/opt/pitwall`, choose **Go through the questions again**, and
-   at "How will people reach Pitwall?" pick **Cloudflare Tunnel**. Paste the token and the
-   hostname.
+   - **URL:** the Pitwall server's LAN address and port, e.g. `192.168.1.50:8080`
+     (or `127.0.0.1:8080` if `cloudflared` runs directly on the Pitwall server).
+2. Run `sudo ./install.sh` in `/opt/pitwall`, choose **Go through the questions again**, and
+   at "How will people reach Pitwall?" pick **From the internet through my existing Cloudflare
+   Tunnel or reverse proxy**. Enter `https://pitwall.yourdomain.com` and the IP address of the
+   machine running `cloudflared`.
 
 The installer then:
-- starts a `cloudflared` container next to Pitwall;
-- makes Pitwall listen only on this machine (no LAN or router exposure);
-- turns on HTTPS-only cookies;
-- tells Pitwall to take visitors' real IPs from Cloudflare, so login rate limiting works per
-  person.
+- turns on HTTPS-only cookies (log in at the `https://` address from then on; the plain
+  LAN address can't keep you logged in);
+- trusts the forwarded visitor IP **only from the `cloudflared` machine**, so login rate
+  limiting works per person and nobody else can fake their IP;
+- if `cloudflared` runs directly on the Pitwall server, makes Pitwall listen only on
+  `127.0.0.1` so it isn't reachable from the LAN at all.
 
-Check the tunnel with `sudo docker compose logs cloudflared`. Then open
-`https://pitwall.yourdomain.com` and log in.
+To do it by hand, set these in `.env` and run `sudo docker compose up -d`:
+
+```
+PITWALL_BASE_URL=https://pitwall.yourdomain.com
+PITWALL_SECURE_COOKIES=true
+FORWARDED_ALLOW_IPS=192.168.1.20   # the cloudflared machine (several: comma separated)
+```
+
+If `cloudflared` runs in Docker on the Pitwall server itself, its requests come from a Docker
+network address; use `FORWARDED_ALLOW_IPS=172.16.0.0/12`. Never set it to `*` while Pitwall's
+port is reachable from other machines: anyone on your LAN could then fake their IP.
 
 Recommended Cloudflare settings:
 - **SSL/TLS → Edge Certificates → Always Use HTTPS:** on.
@@ -317,20 +332,12 @@ Recommended Cloudflare settings:
 
 ### Option B: your own reverse proxy
 
-**Direct port (no proxy).** This is the default. Browse to `http://mh-flex-01:8080`. Change
-the host port with `PITWALL_PORT` in `.env`.
+Point the proxy at `http://mh-flex-01:8080` (or `127.0.0.1:8080` if it runs on the same host),
+then answer the installer the same way as for Option A, giving the proxy's IP address. By hand,
+`.env` needs the same three lines as above, with `FORWARDED_ALLOW_IPS` set to the proxy's IP.
 
-**Behind your existing proxy.** Point the proxy at `http://mh-flex-01:8080` (or
-`127.0.0.1:8080` if it runs on the same host). Then in `.env`:
-
-```
-PITWALL_BASE_URL=https://pitwall.example.com
-PITWALL_SECURE_COOKIES=true
-FORWARDED_ALLOW_IPS=<your proxy's IP>   # so Pitwall sees real client IPs (login rate limiting)
-```
-
-If the proxy runs on the same machine, you can stop exposing the port to the network. Set
-`PITWALL_BIND=127.0.0.1` in `.env`; the installer does this when you say the proxy is local.
+If the proxy runs directly on the same machine, you can stop exposing the port to the network.
+Set `PITWALL_BIND=127.0.0.1` in `.env`; the installer does this when you say the proxy is local.
 
 Caddy example:
 

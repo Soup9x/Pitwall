@@ -382,28 +382,54 @@ def test_security_headers(client):
     assert "onchange=" not in client.get("/login").text
 
 
-def test_cloudflare_client_ip_used_for_rate_limiting(client, monkeypatch):
-    from pitwall.config import get_env
+def _behind_proxy(peer: str):
+    """The app as `python -m pitwall serve` runs it, trusting only the tunnel machine
+    192.168.1.20 for X-Forwarded-For, with requests arriving from `peer`."""
+    from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-    monkeypatch.setenv("PITWALL_CLOUDFLARE", "true")
-    get_env.cache_clear()
+    from pitwall.web.app import create_app
+
+    app = ProxyHeadersMiddleware(
+        create_app(manage_db=False, start_scheduler=False), trusted_hosts="192.168.1.20"
+    )
+    return TestClient(app, client=(peer, 50000))
+
+
+def _fail_logins(c, forwarded_for: str) -> None:
     for _ in range(auth.MAX_FAILURES):  # unknown user: tests the per-IP limit, not the lockout
-        client.post(
+        c.post(
             "/login",
-            data={"username": "mallory", "password": "nope-nope-nope", "csrf_token": csrf(client)},
-            headers={"cf-connecting-ip": "198.51.100.7"},
+            data={"username": "mallory", "password": "nope-nope-nope", "csrf_token": csrf(c)},
+            headers={"x-forwarded-for": forwarded_for},
         )
-    blocked = client.post(
-        "/login",
-        data={"username": "admin", "password": ADMIN_PW, "csrf_token": csrf(client)},
-        headers={"cf-connecting-ip": "198.51.100.7"},
-    )
-    assert blocked.status_code == 429
-    # A different visitor (different real IP) isn't blocked by that person's failures...
-    ok = client.post(
-        "/login",
-        data={"username": "admin", "password": ADMIN_PW, "csrf_token": csrf(client)},
-        headers={"cf-connecting-ip": "203.0.113.50"},
-        follow_redirects=False,
-    )
-    assert ok.status_code == 303
+
+
+def test_real_visitor_ip_from_trusted_tunnel_used_for_rate_limiting(client):
+    with _behind_proxy("192.168.1.20") as c:
+        _fail_logins(c, "198.51.100.7")
+        blocked = c.post(
+            "/login",
+            data={"username": "admin", "password": ADMIN_PW, "csrf_token": csrf(c)},
+            headers={"x-forwarded-for": "198.51.100.7"},
+        )
+        assert blocked.status_code == 429
+        # A different visitor through the same tunnel isn't blocked by that person's failures.
+        ok = c.post(
+            "/login",
+            data={"username": "admin", "password": ADMIN_PW, "csrf_token": csrf(c)},
+            headers={"x-forwarded-for": "203.0.113.50"},
+            follow_redirects=False,
+        )
+        assert ok.status_code == 303
+
+
+def test_forwarded_ip_from_untrusted_machine_is_ignored(client):
+    with _behind_proxy("192.168.1.99") as c:
+        _fail_logins(c, "198.51.100.7")
+        # Changing the header doesn't get around the limit: the machine's own IP is used.
+        dodge = c.post(
+            "/login",
+            data={"username": "admin", "password": ADMIN_PW, "csrf_token": csrf(c)},
+            headers={"x-forwarded-for": "203.0.113.50"},
+        )
+        assert dodge.status_code == 429

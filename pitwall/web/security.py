@@ -1,4 +1,4 @@
-"""Security headers for running on the public internet (e.g. behind a Cloudflare tunnel)."""
+"""Security headers for running on the public internet (e.g. behind a Cloudflare Tunnel)."""
 
 from __future__ import annotations
 

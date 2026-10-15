@@ -27,9 +27,6 @@ class EnvSettings(BaseSettings):
     database_url: str = Field(default="", alias="PITWALL_DATABASE_URL")
     scheduler_enabled: bool = Field(default=True, alias="PITWALL_SCHEDULER_ENABLED")
     secure_cookies: bool = Field(default=False, alias="PITWALL_SECURE_COOKIES")
-    # Behind a Cloudflare tunnel: take the client IP from CF-Connecting-IP (set by Cloudflare,
-    # can't be spoofed through it). Only enable when Pitwall is reachable *only* via the tunnel.
-    cloudflare: bool = Field(default=False, alias="PITWALL_CLOUDFLARE")
 
     jolpica_base_url: str = Field(
         default="https://api.jolpi.ca/ergast/f1", alias="PITWALL_JOLPICA_URL"

@@ -11,7 +11,6 @@ from collections import defaultdict, deque
 from fastapi import HTTPException, Request
 from starlette.datastructures import FormData
 
-from pitwall.config import get_env
 from pitwall.db import session_scope
 from pitwall.models import User
 
@@ -55,10 +54,10 @@ limiter = LoginRateLimiter()
 
 
 def client_key(request: Request) -> str:
-    if get_env().cloudflare:
-        cf = request.headers.get("cf-connecting-ip")
-        if cf:
-            return cf.strip()
+    """The visitor's IP, for rate limiting. Behind a proxy or Cloudflare Tunnel, uvicorn has
+    already replaced the proxy's address with the real visitor's (from X-Forwarded-For) - but
+    only for requests from addresses listed in FORWARDED_ALLOW_IPS, so nobody else can fake
+    it by sending that header themselves."""
     return request.client.host if request.client else "unknown"
 
 
