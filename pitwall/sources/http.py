@@ -102,10 +102,12 @@ class CachedClient:
         params: dict[str, Any] | None = None,
         *,
         max_age: timedelta | None = timedelta(0),
+        empty_on_404: bool = False,
     ) -> Any:
         """Fetch JSON. If a cached copy is younger than `max_age` it is used without a request
         (`max_age=None` means cached copies never expire). On failure, any cached copy is
-        returned and a warning logged; with no cache, SourceUnavailable is raised."""
+        returned and a warning logged; with no cache, SourceUnavailable is raised.
+        `empty_on_404` treats a 404 as an empty list (for APIs that answer "no data" that way)."""
         url = self.url_for(path, params)
         with session_scope() as db:
             cached = db.get(ApiCache, url)
@@ -118,19 +120,12 @@ class CachedClient:
 
         try:
             data = self._fetch(url)
+        except httpx.HTTPStatusError as exc:
+            if not (empty_on_404 and exc.response.status_code == 404):
+                return self._failed(url, exc, cached_body)
+            data = []
         except Exception as exc:
-            self._record_error(str(exc))
-            if cached_body is not None:
-                log.warning(
-                    "API request failed; serving cached data",
-                    extra={"source": self.source, "url": url, "error": str(exc)},
-                )
-                return json.loads(cached_body)
-            log.warning(
-                "API request failed with no cached data",
-                extra={"source": self.source, "url": url, "error": str(exc)},
-            )
-            raise SourceUnavailable(f"{self.source}: {exc}") from exc
+            return self._failed(url, exc, cached_body)
 
         with session_scope() as db:
             row = db.get(ApiCache, url)
@@ -142,6 +137,20 @@ class CachedClient:
                 row.fetched_at = utcnow()
             self._record_success(db)
         return data
+
+    def _failed(self, url: str, exc: Exception, cached_body: str | None) -> Any:
+        self._record_error(str(exc))
+        if cached_body is not None:
+            log.warning(
+                "API request failed; serving cached data",
+                extra={"source": self.source, "url": url, "error": str(exc)},
+            )
+            return json.loads(cached_body)
+        log.warning(
+            "API request failed with no cached data",
+            extra={"source": self.source, "url": url, "error": str(exc)},
+        )
+        raise SourceUnavailable(f"{self.source}: {exc}") from exc
 
     def _fetch(self, url: str) -> Any:
         attempt = 0

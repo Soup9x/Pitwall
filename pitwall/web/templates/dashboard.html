@@ -29,7 +29,7 @@
     <h2>Followed drivers</h2>
     <table>
     {% for r in followed_rows %}
-      <tr class="followed"><td>P{{ r.position }}</td><td>{{ r.name }}</td><td class="num">{{ r.points|pts }} pts</td><td class="num muted">{% if r.gap_leader %}-{{ r.gap_leader|pts }}{% endif %}</td></tr>
+      <tr class="followed"><td>P{{ r.position }}</td><td><a href="/drivers/{{ r.entity_id }}">{{ r.name }}</a></td><td class="num">{{ r.points|pts }} pts</td><td class="num muted">{% if r.gap_leader %}-{{ r.gap_leader|pts }}{% endif %}</td></tr>
     {% endfor %}
     </table>
     {% if form %}<h3>Last 3 races</h3>

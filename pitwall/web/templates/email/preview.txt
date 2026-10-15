@@ -30,12 +30,26 @@ STANDINGS (after round {{ ctx.drivers.round }})
 {{ r.position }}. {{ r.name }} {{ r.points|pts }} pts {{ r.arrow }}
 {% endfor %}
 {% endif %}
+{% for tm in ctx.title %}
+
+{{ "DRIVERS'" if tm.kind == "driver" else "CONSTRUCTORS'" }} TITLE
+{% for line in tm.summary() %}
+{{ line }}
+{% endfor %}
+{% endfor %}
 {% if ctx.form %}
 
 FOLLOWED DRIVERS (last 3)
 {% for f in ctx.form %}
 - {{ f.driver }}: {% for ev, pos in f.results %}{{ pos }} ({{ ev }}){% if not loop.last %}, {% endif %}{% endfor %}
 
+{% endfor %}
+{% endif %}
+{% if ctx.facts %}
+
+DID YOU KNOW?
+{% for f in ctx.facts %}
+- {{ f.text }}
 {% endfor %}
 {% endif %}
 

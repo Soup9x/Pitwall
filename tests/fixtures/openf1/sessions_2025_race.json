@@ -1,0 +1,4 @@
+[
+ {"session_key": 9701, "session_name": "Race", "session_type": "Race", "date_start": "2025-03-08T14:00:00+00:00", "date_end": "2025-03-08T16:00:00+00:00", "meeting_key": 1250, "year": 2025, "circuit_short_name": "Filler", "country_name": "Nowhere", "location": "Filler"},
+ {"session_key": 9702, "session_name": "Race", "session_type": "Race", "date_start": "2025-03-15T14:00:00+00:00", "date_end": "2025-03-15T16:00:00+00:00", "meeting_key": 1251, "year": 2025, "circuit_short_name": "Testford", "country_name": "United Kingdom", "location": "Testford"}
+]

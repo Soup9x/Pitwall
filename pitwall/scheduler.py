@@ -87,6 +87,15 @@ def install_recurring_jobs(sched: Any) -> None:
         misfire_grace_time=6 * 3600,
         name="Historical backfill (nightly)",
     )
+    sched.add_job(
+        "pitwall.jobs:openf1_sync_job",
+        "interval",
+        hours=2,
+        id="openf1_sync",
+        replace_existing=True,
+        next_run_time=now + timedelta(minutes=3),
+        name="OpenF1 detail for followed drivers (every 2h)",
+    )
     if not backfill_done:
         sched.add_job(
             "pitwall.jobs:backfill_job",

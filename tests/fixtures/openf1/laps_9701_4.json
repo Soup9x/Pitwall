@@ -1,0 +1,6 @@
+[
+ {"session_key": 9701, "driver_number": 4, "lap_number": 1, "lap_duration": null, "is_pit_out_lap": false},
+ {"session_key": 9701, "driver_number": 4, "lap_number": 2, "lap_duration": 92.481, "is_pit_out_lap": false},
+ {"session_key": 9701, "driver_number": 4, "lap_number": 3, "lap_duration": 91.907, "is_pit_out_lap": false},
+ {"session_key": 9701, "driver_number": 4, "lap_number": 4, "lap_duration": 95.122, "is_pit_out_lap": true}
+]
