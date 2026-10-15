@@ -54,7 +54,8 @@ input[type=checkbox] { transform: scale(1.15); margin-right: 6px; }
 .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: 14px; }
 .facts dt { color: var(--muted); } .facts dd { margin: 0; }
-details.spoiler summary { cursor: pointer; color: var(--warn); font-weight: 600; }
+.spoiler-notice p { margin: 4px 0; }
+.spoiler-notice p:first-child { color: var(--warn); font-weight: 600; }
 .progress { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
 .progress > div { height: 100%; background: var(--accent); }
 code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; font-size: 13px; word-break: break-all; }

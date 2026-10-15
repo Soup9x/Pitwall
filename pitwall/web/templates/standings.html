@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import standings_table %}
+{% from "_macros.html" import spoiler_notice, standings_table %}
 {% block title %}Standings{% endblock %}
 {% block content %}
 <div class="row" style="justify-content:space-between;">
@@ -10,10 +10,11 @@
   </select></form>
   {% endif %}
 </div>
-{% if not drivers %}
+{% if held_event %}
+<div class="card">{{ spoiler_notice(held_event, "/standings?season=" ~ season ~ "&reveal=1") }}</div>
+{% elif not drivers %}
 <div class="card"><p class="muted">No standings stored yet.</p></div>
 {% else %}
-{% if spoiler_hidden %}<details class="spoiler"><summary>Hidden by spoiler mode — click to show anyway</summary>{% endif %}
 {% if title %}
 <div class="grid" style="margin-bottom:16px;">
 {% for tm in title %}
@@ -29,7 +30,6 @@
   <div class="card"><h2>Drivers</h2>{{ standings_table(drivers) }}</div>
   {% if constructors %}<div class="card"><h2>Constructors</h2>{{ standings_table(constructors, None, "Team") }}</div>{% endif %}
 </div>
-{% if spoiler_hidden %}</details>{% endif %}
 <p class="small"><a href="/head-to-head?season={{ season }}">Teammate head-to-head →</a>
   · Download CSV: <a href="/export/standings.csv?season={{ season }}&amp;kind=driver">drivers</a>,
   <a href="/export/standings.csv?season={{ season }}&amp;kind=constructor">constructors</a>,

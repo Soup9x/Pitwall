@@ -50,6 +50,7 @@ from pitwall.services import (
     head_to_head,
     ics,
     reminders,
+    spoilers,
     standings,
     title_math,
     track_stats,
@@ -59,7 +60,6 @@ from pitwall.services import (
 from pitwall.services.presenters import (
     current_or_next_event,
     event_sessions,
-    last_completed_event,
     next_session,
     session_view,
 )
@@ -188,12 +188,18 @@ def circuit_map(circuit_id: str, db: DB = Depends(get_db)) -> Response:
 
 
 def _spoiler_hidden(db: DB, event: Event | None, user: User) -> bool:
-    settings = load_settings(db, user.id)
-    return bool(
-        settings.spoiler_enabled
-        and event is not None
-        and not outbox.is_watched(db, event.id, user.id)
-    )
+    """Same rule as the alert queue: hidden until watched or auto-released."""
+    if event is None:
+        return False
+    return spoilers.held(db, event.id, user.id, load_settings(db, user.id))
+
+
+def _held_event(db: DB, user: User, reveal: bool = False) -> Event | None:
+    """The latest event whose results are held for this user (None if nothing is held, or the
+    user asked to show this page anyway). Held data is never sent to the browser at all."""
+    if reveal:
+        return None
+    return spoilers.held_event(db, user.id, load_settings(db, user.id))
 
 
 def _followed(db: DB, user: User) -> list[FollowedDriver]:
@@ -202,18 +208,25 @@ def _followed(db: DB, user: User) -> list[FollowedDriver]:
 
 @private.get("/", response_class=HTMLResponse)
 def dashboard(
-    request: Request, db: DB = Depends(get_db), user: User = Depends(require_user)
+    request: Request,
+    reveal: bool = False,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> HTMLResponse:
     settings = load_settings(db, user.id)
     now = utcnow()
     nxt = next_session(db, now)
     event = current_or_next_event(db, now)
-    last_event = last_completed_event(db, now)
+    held = _held_event(db, user, reveal)
     season = standings.latest_season_with_standings(db)
-    drivers = standings.table(db, season, "driver", user_id=user.id) if season else None
-    constructors = standings.table(db, season, "constructor", user_id=user.id) if season else None
-    followed = _followed(db, user)
-    form = builders._form(db, settings, now, user.id) if followed else []
+    drivers = constructors = None
+    form: list[builders.FormLine] = []
+    if held is None:
+        if season:
+            drivers = standings.table(db, season, "driver", user_id=user.id)
+            constructors = standings.table(db, season, "constructor", user_id=user.id)
+        if _followed(db, user):
+            form = builders._form(db, settings, now, user.id)
     return page(
         request,
         "dashboard.html",
@@ -228,8 +241,8 @@ def dashboard(
         constructors=constructors,
         followed_rows=[r for r in (drivers.rows if drivers else []) if r.followed],
         form=form,
-        spoiler_hidden=_spoiler_hidden(db, last_event, user),
-        last_event=last_event,
+        held_event=held,
+        has_standings=season is not None,
     )
 
 
@@ -260,14 +273,23 @@ def events_list(
 
 @private.get("/events/{event_id}", response_class=HTMLResponse)
 def event_page(
-    request: Request, event_id: int, db: DB = Depends(get_db), user: User = Depends(require_user)
+    request: Request,
+    event_id: int,
+    reveal: bool = False,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> HTMLResponse:
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(404)
     settings = load_settings(db, user.id)
+    hidden = not reveal and _spoiler_hidden(db, event, user)
+    # Trivia uses the latest results (milestones, streaks), so it waits for any held event.
+    held = _held_event(db, user, reveal)
     results: list[dict[str, Any]] = []
     for sess in sorted(event.sessions, key=lambda s: s.start_utc or utcnow()):
+        if hidden:
+            break
         rows = list(
             db.scalars(
                 select(Result)
@@ -286,14 +308,17 @@ def event_page(
         event=event,
         sessions=event_sessions(event, settings),
         stats=track_stats.compute(db, event),
-        facts=trivia.for_preview(db, event, avoid_recent=False, user_id=user.id),
+        facts=[]
+        if held is not None
+        else trivia.for_preview(db, event, avoid_recent=False, user_id=user.id),
         weather=(wx := weather.for_event(db, event)),
         rain=weather.rain_warnings(event, wx),
         map_url=circuit_maps.map_url(event.circuit),
         results=results,
         followed=followed,
         watched=outbox.is_watched(db, event.id, user.id),
-        spoiler_hidden=_spoiler_hidden(db, event, user) and bool(results),
+        spoiler_hidden=hidden and spoilers.results_arrived_at(db, event.id) is not None,
+        held_event=held,
     )
 
 
@@ -317,6 +342,7 @@ async def toggle_watched(
 def preview_page(
     event_id: int, db: DB = Depends(get_db), user: User = Depends(require_user)
 ) -> HTMLResponse:
+    # Same content as the email, so the same spoiler rules apply (see builders.preview_context).
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(404)
@@ -355,6 +381,7 @@ async def send_preview(
 def standings_page(
     request: Request,
     season: int | None = None,
+    reveal: bool = False,
     db: DB = Depends(get_db),
     user: User = Depends(require_user),
 ) -> HTMLResponse:
@@ -364,8 +391,12 @@ def standings_page(
         )
     )
     season = season or (seasons[0] if seasons else None)
-    drivers = standings.table(db, season, "driver", user_id=user.id) if season else None
-    constructors = standings.table(db, season, "constructor", user_id=user.id) if season else None
+    held = _held_event(db, user, reveal)
+    hide = held is not None and season is not None and season >= held.season
+    drivers = constructors = None
+    if season and not hide:
+        drivers = standings.table(db, season, "driver", user_id=user.id)
+        constructors = standings.table(db, season, "constructor", user_id=user.id)
     return page(
         request,
         "standings.html",
@@ -378,9 +409,9 @@ def standings_page(
         title=[
             tm
             for k in ("driver", "constructor")
-            if season and (tm := title_math.for_season(db, season, k))
+            if season and not hide and (tm := title_math.for_season(db, season, k))
         ],
-        spoiler_hidden=_spoiler_hidden(db, last_completed_event(db), user),
+        held_event=held if hide else None,
     )
 
 
@@ -392,16 +423,28 @@ def _csv_response(body: str, filename: str) -> Response:
     )
 
 
+def _refuse_if_held(db: DB, user: User, season: int | None, reveal: bool) -> None:
+    held = _held_event(db, user, reveal)
+    if held is not None and (season is None or season >= held.season):
+        raise HTTPException(
+            409,
+            f"Hidden by spoiler mode until you mark {held.name} as watched "
+            "(add ?reveal=1 to download anyway).",
+        )
+
+
 @private.get("/export/standings.csv")
 def export_standings(
     season: int | None = None,
     kind: str = "driver",
+    reveal: bool = False,
     db: DB = Depends(get_db),
     user: User = Depends(require_user),
 ) -> Response:
     if kind not in ("driver", "constructor"):
         raise HTTPException(404)
     season = season or standings.latest_season_with_standings(db)
+    _refuse_if_held(db, user, season, reveal)
     body = exports.standings_csv(db, season, kind) if season else None
     if body is None:
         raise HTTPException(404, "No standings stored for that season")
@@ -412,10 +455,12 @@ def export_standings(
 def export_drivers(
     season: int | None = None,
     driver: str | None = None,
+    reveal: bool = False,
     db: DB = Depends(get_db),
     user: User = Depends(require_user),
 ) -> Response:
     season = season or utcnow().year
+    _refuse_if_held(db, user, season, reveal)
     body = exports.drivers_csv(db, season, [driver] if driver else None, user_id=user.id)
     name = driver or "followed-drivers"
     return _csv_response(body, f"pitwall-{name}-{season}.csv")
@@ -425,6 +470,7 @@ def export_drivers(
 def head_to_head_page(
     request: Request,
     season: int | None = None,
+    reveal: bool = False,
     db: DB = Depends(get_db),
     user: User = Depends(require_user),
 ) -> HTMLResponse:
@@ -438,6 +484,8 @@ def head_to_head_page(
         )
     )
     season = season or (seasons[0] if seasons else None)
+    held = _held_event(db, user, reveal)
+    hide = held is not None and season is not None and season >= held.season
     return page(
         request,
         "head_to_head.html",
@@ -445,8 +493,8 @@ def head_to_head_page(
         user,
         season=season,
         seasons=seasons,
-        pairs=head_to_head.season(db, season) if season else [],
-        spoiler_hidden=_spoiler_hidden(db, last_completed_event(db), user),
+        pairs=head_to_head.season(db, season) if season and not hide else [],
+        held_event=held if hide else None,
     )
 
 
@@ -455,6 +503,7 @@ def driver_page(
     request: Request,
     driver_id: str,
     season: int | None = None,
+    reveal: bool = False,
     db: DB = Depends(get_db),
     user: User = Depends(require_user),
 ) -> HTMLResponse:
@@ -465,7 +514,9 @@ def driver_page(
     season = season or (seasons[0] if seasons else None)
     if season and season not in seasons:
         seasons = sorted({*seasons, season}, reverse=True)
-    data = driver_stats.season(db, driver_id, season) if season else None
+    held = _held_event(db, user, reveal)
+    hide = held is not None and season is not None and season >= held.season
+    data = driver_stats.season(db, driver_id, season) if season and not hide else None
     chart = ""
     if data and data.rows:
         chart = driver_stats.trend_svg(
@@ -484,7 +535,7 @@ def driver_page(
         chart=chart,
         compounds=COMPOUND_COLORS,
         followed=db.get(FollowedDriver, (user.id, driver_id)) is not None,
-        spoiler_hidden=_spoiler_hidden(db, last_completed_event(db), user),
+        held_event=held if hide else None,
     )
 
 

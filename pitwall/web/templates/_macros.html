@@ -52,3 +52,11 @@
 </dl>
 {% if not c.facts_verified and (c.length_km or c.lap_record_time) %}<p class="muted small">Curated facts not yet verified (see data/circuits.yaml).</p>{% endif %}
 {% endmacro %}
+
+{# Shown instead of anything spoiler mode holds back. The held data itself is never sent. #}
+{% macro spoiler_notice(ev, reveal_url) -%}
+<div class="spoiler-notice">
+  <p>🙈 Hidden by spoiler mode until you mark <a href="/events/{{ ev.id }}">{{ ev.name }}</a> as watched.</p>
+  <p class="small"><a href="{{ reveal_url }}" rel="nofollow">Show anyway</a> <span class="muted">(this page only)</span></p>
+</div>
+{%- endmacro %}

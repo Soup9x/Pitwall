@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import session_table, track_facts %}
+{% from "_macros.html" import session_table, spoiler_notice, track_facts %}
 {% block title %}{{ event.name }}{% endblock %}
 {% block content %}
 <h1>{{ event.name }} {% if event.is_sprint_weekend %}<span class="badge sprint">SPRINT WEEKEND</span>{% endif %}{% if event.status == 'cancelled' %} <span class="badge cancelled">CANCELLED</span>{% endif %}</h1>
@@ -45,10 +45,11 @@
       </div>
     </div>
     {% if settings.spoiler_enabled %}<p class="muted small">Spoiler mode is on: results &amp; standings alerts for this event are held until you click <em>Watched</em>{% if settings.spoiler_auto_release_hours %} (or {{ settings.spoiler_auto_release_hours }}h pass){% endif %}.</p>{% endif %}
-    {% if not results %}
+    {% if spoiler_hidden %}
+      {{ spoiler_notice(event, "/events/" ~ event.id ~ "?reveal=1") }}
+    {% elif not results %}
       <p class="muted">No results yet.</p>
     {% else %}
-      {% if spoiler_hidden %}<details class="spoiler"><summary>Results hidden (spoiler mode) — click to show anyway</summary>{% endif %}
       <div class="grid">
       {% for block in results|reverse %}
         <div>
@@ -69,7 +70,6 @@
         </div>
       {% endfor %}
       </div>
-      {% if spoiler_hidden %}</details>{% endif %}
     {% endif %}
   </div>
 </div>

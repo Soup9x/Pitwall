@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session as DB
 
 from pitwall.models import OWNER_ID, Event, NotificationLog, Outbox, Session
 from pitwall.notify.message import Message
+from pitwall.services import spoilers, weather
 from pitwall.services import standings as standings_svc
-from pitwall.services import weather
 from pitwall.services.presenters import SessionView, session_view
 from pitwall.services.standings import StandingsTable
 from pitwall.settings_store import ALERT_LABELS, AppSettings
@@ -87,7 +87,9 @@ def build(
         wx = weather.for_event(db, sess.event).get(sess.id)
         upcoming.append((sess.event, session_view(sess, settings, now), wx))
     season = standings_svc.latest_season_with_standings(db)
-    drivers = standings_svc.table(db, season, "driver", user_id=user_id) if season else None
+    drivers = None
+    if season and spoilers.held_event(db, user_id, settings, now) is None:
+        drivers = standings_svc.table(db, season, "driver", user_id=user_id)
     if not rows and not upcoming:
         return None
 

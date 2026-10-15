@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import session_table, standings_table %}
+{% from "_macros.html" import session_table, spoiler_notice, standings_table %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
 <div class="grid">
@@ -40,15 +40,15 @@
 
   <div class="card wide">
     <h2>Standings{% if drivers %} <span class="muted small">after round {{ drivers.round }}</span>{% endif %}</h2>
-    {% if not drivers %}
+    {% if held_event %}
+      {{ spoiler_notice(held_event, "/?reveal=1") }}
+    {% elif not drivers %}
       <p class="muted">No standings yet — they appear after the first sync/backfill.</p>
     {% else %}
-      {% if spoiler_hidden %}<details class="spoiler"><summary>Hidden by spoiler mode until you mark {{ last_event.name }} as watched — click to show anyway</summary>{% endif %}
       <div class="grid">
         <div>{{ standings_table(drivers, 10) }}<p class="small"><a href="/standings">Full standings →</a></p></div>
         {% if constructors %}<div>{{ standings_table(constructors, 10, "Team") }}</div>{% endif %}
       </div>
-      {% if spoiler_hidden %}</details>{% endif %}
     {% endif %}
   </div>
 </div>

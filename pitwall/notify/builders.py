@@ -20,7 +20,7 @@ from pitwall.models import (
     Session,
 )
 from pitwall.notify.message import Message
-from pitwall.services import circuit_maps, title_math, track_stats, trivia
+from pitwall.services import circuit_maps, spoilers, title_math, track_stats, trivia
 from pitwall.services import standings as standings_svc
 from pitwall.services import weather as weather_svc
 from pitwall.services.presenters import (
@@ -307,6 +307,7 @@ class PreviewContext:
     weather: dict[int, weather_svc.WeatherView] = field(default_factory=dict)
     rain: list[str] = field(default_factory=list)
     map_url: str | None = None
+    held_event: Event | None = None  # spoiler mode: standings, form and trivia left out
 
 
 def _form(
@@ -359,9 +360,11 @@ def preview_context(
     now = now or utcnow()
     sessions = event_sessions(event, settings, now)
     notes = [n for v in sessions if (n := odd_hour_note(v))]
+    # Standings, recent form, title maths and trivia all reflect the latest results.
+    held = spoilers.held_event(db, user_id, settings, now)
     season = standings_svc.latest_season_with_standings(db)
     drivers = constructors = None
-    if season is not None and season >= event.season - 1:
+    if held is None and season is not None and season >= event.season - 1:
         drivers = standings_svc.table(db, season, "driver", user_id=user_id)
         constructors = standings_svc.table(db, season, "constructor", user_id=user_id)
     race = next((s for s in event.sessions if s.type == "RACE"), None)
@@ -375,14 +378,19 @@ def preview_context(
         drivers=drivers,
         constructors=constructors,
         followed_rows=[r for r in (drivers.rows if drivers else []) if r.followed],
-        form=_form(db, settings, race.start_utc if race and race.start_utc else now, user_id),
+        form=[]
+        if held
+        else _form(db, settings, race.start_utc if race and race.start_utc else now, user_id),
         link=event_url(event),
         countdown=humanize_delta((first - now).total_seconds()) if first and first > now else None,
-        title=preview_title_math(db, event),
-        facts=trivia.for_preview(db, event, avoid_recent=avoid_recent, user_id=user_id),
+        title=[] if held else preview_title_math(db, event),
+        facts=[]
+        if held
+        else trivia.for_preview(db, event, avoid_recent=avoid_recent, user_id=user_id),
         weather=wx,
         rain=weather_svc.rain_warnings(event, wx),
         map_url=circuit_maps.map_url(event.circuit),
+        held_event=held,
     )
 
 

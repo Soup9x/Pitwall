@@ -78,6 +78,24 @@ bahrain:
   map_image: null
   verified: false
 
+# Sepang hosted the Malaysian GP from 1999 to 2017 and the 2026 Bahrain GP. Length and turns
+# are for the 1999-2017 Grand Prix layout; check they match the 2026 layout. Race laps and the
+# lap record are left null: the 2026 race distance and any new record aren't known here.
+sepang:
+  name: "Sepang International Circuit"
+  timezone: Asia/Kuala_Lumpur
+  length_km: 5.543
+  laps: null
+  turns: 15
+  drs_zones: null
+  first_gp_year: 1999
+  lap_record:
+    driver: null
+    time: null
+    year: null
+  map_image: null
+  verified: false
+
 jeddah:
   name: "Jeddah Corniche Circuit"
   timezone: Asia/Riyadh

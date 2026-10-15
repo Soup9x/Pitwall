@@ -14,15 +14,17 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DB
 
 from pitwall.db import utcnow
-from pitwall.models import OWNER_ID, NotificationLog, Outbox, SpoilerState
+from pitwall.models import OWNER_ID, NotificationLog, Outbox
 from pitwall.notify.dispatch import notify
 from pitwall.notify.message import Message
+from pitwall.services import spoilers
+from pitwall.services.spoilers import is_watched, mark_watched  # noqa: F401 (used by callers)
 from pitwall.settings_store import SPOILER_TYPES, AppSettings, load_settings
 from pitwall.timeutil import in_window
 
@@ -97,12 +99,9 @@ def _row_message(row: Outbox) -> Message:
 
 
 def spoiler_released(db: DB, row: Outbox, settings: AppSettings, now: datetime) -> bool:
-    if not settings.spoiler_enabled or not row.spoiler or row.event_id is None:
+    if not row.spoiler:
         return True
-    if is_watched(db, row.event_id, row.user_id):
-        return True
-    hours = settings.spoiler_auto_release_hours
-    return bool(hours and hours > 0 and now >= row.created_at + timedelta(hours=hours))
+    return not spoilers.held(db, row.event_id, row.user_id, settings, now, since=row.created_at)
 
 
 def in_quiet_hours(settings: AppSettings, now: datetime) -> bool:
@@ -187,25 +186,3 @@ def flush(db: DB, *, now: datetime | None = None, sender: Sender | None = None) 
             stats["failed"] += 1
     db.flush()
     return stats
-
-
-def mark_watched(
-    db: DB,
-    event_id: int,
-    watched: bool = True,
-    *,
-    user_id: int = OWNER_ID,
-    now: datetime | None = None,
-) -> None:
-    state = db.get(SpoilerState, (user_id, event_id))
-    if state is None:
-        state = SpoilerState(user_id=user_id, event_id=event_id)
-        db.add(state)
-    state.watched = watched
-    state.watched_at = (now or utcnow()) if watched else None
-    db.flush()
-
-
-def is_watched(db: DB, event_id: int, user_id: int = OWNER_ID) -> bool:
-    state = db.get(SpoilerState, (user_id, event_id))
-    return bool(state and state.watched)
