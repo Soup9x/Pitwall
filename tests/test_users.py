@@ -433,3 +433,23 @@ def test_forwarded_ip_from_untrusted_machine_is_ignored(client):
             headers={"x-forwarded-for": "203.0.113.50"},
         )
         assert dodge.status_code == 429
+
+
+def test_login_cookie_secure_only_for_https_visits(client):
+    def login_cookie(c, headers):
+        r = c.post(
+            "/login",
+            data={"username": "admin", "password": ADMIN_PW, "csrf_token": csrf(c)},
+            headers=headers,
+            follow_redirects=False,
+        )
+        assert r.status_code == 303
+        assert "strict-transport-security" not in r.headers  # would break http on the LAN
+        return next(v for v in r.headers.get_list("set-cookie") if "pitwall_session=" in v)
+
+    with _behind_proxy("192.168.1.20") as c:  # through the tunnel, which says it was HTTPS
+        cookie = login_cookie(c, {"x-forwarded-proto": "https", "x-forwarded-for": "1.2.3.4"})
+        assert "; secure" in cookie.lower() and "httponly" in cookie.lower()
+    with _behind_proxy("192.168.1.99") as c:  # LAN over plain http, even if it claims https
+        cookie = login_cookie(c, {"x-forwarded-proto": "https"})
+        assert "secure" not in cookie.lower()

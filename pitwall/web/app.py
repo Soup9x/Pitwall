@@ -68,9 +68,9 @@ def create_app(*, manage_db: bool = True, start_scheduler: bool | None = None) -
         session_cookie="pitwall_session",
         max_age=30 * 24 * 3600,
         same_site="lax",
-        https_only=env.secure_cookies,
     )
-    app.add_middleware(SecurityHeadersMiddleware, hsts=env.secure_cookies)
+    # Outside the session middleware, so it can mark the session cookie Secure on HTTPS.
+    app.add_middleware(SecurityHeadersMiddleware)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.exception_handler(NotAuthenticated)

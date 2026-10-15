@@ -296,31 +296,32 @@ router, and Cloudflare provides the HTTPS certificate.
    - **Subdomain / Domain:** e.g. `pitwall` . `yourdomain.com`
    - **Service type:** HTTP
    - **URL:** the Pitwall server's LAN address and port, e.g. `192.168.1.50:8080`
-     (or `127.0.0.1:8080` if `cloudflared` runs directly on the Pitwall server).
 2. Run `sudo ./install.sh` in `/opt/pitwall`, choose **Go through the questions again**, and
    at "How will people reach Pitwall?" pick **From the internet through my existing Cloudflare
    Tunnel or reverse proxy**. Enter `https://pitwall.yourdomain.com` and the IP address of the
    machine running `cloudflared`.
 
-The installer then:
-- turns on HTTPS-only cookies (log in at the `https://` address from then on; the plain
-  LAN address can't keep you logged in);
-- trusts the forwarded visitor IP **only from the `cloudflared` machine**, so login rate
-  limiting works per person and nobody else can fake their IP;
-- if `cloudflared` runs directly on the Pitwall server, makes Pitwall listen only on
-  `127.0.0.1` so it isn't reachable from the LAN at all.
+Pitwall then trusts the forwarded visitor details **only from the `cloudflared` machine**: login
+rate limiting works per person, nobody else can fake their IP, and the login cookie is
+HTTPS-only for visits that came in over HTTPS.
 
 To do it by hand, set these in `.env` and run `sudo docker compose up -d`:
 
 ```
 PITWALL_BASE_URL=https://pitwall.yourdomain.com
-PITWALL_SECURE_COOKIES=true
 FORWARDED_ALLOW_IPS=192.168.1.20   # the cloudflared machine (several: comma separated)
 ```
 
-If `cloudflared` runs in Docker on the Pitwall server itself, its requests come from a Docker
-network address; use `FORWARDED_ALLOW_IPS=172.16.0.0/12`. Never set it to `*` while Pitwall's
-port is reachable from other machines: anyone on your LAN could then fake their IP.
+Never set `FORWARDED_ALLOW_IPS` to `*` while Pitwall's port is reachable from other machines:
+anyone on your LAN could then fake their IP.
+
+**On your LAN.** Pitwall itself speaks plain HTTP; the HTTPS certificate lives at Cloudflare.
+So inside your network either:
+- use `http://<server LAN IP>:8080` (works as before, including logging in), or
+- use `https://pitwall.yourdomain.com` **without** a local DNS record pointing that name at the
+  server. With such a record your browser talks HTTPS straight to the server, which has no
+  certificate, and shows `ERR_SSL_PROTOCOL_ERROR`. Without it, the request goes out to
+  Cloudflare and back in through your tunnel.
 
 Recommended Cloudflare settings:
 - **SSL/TLS → Edge Certificates → Always Use HTTPS:** on.
@@ -332,12 +333,10 @@ Recommended Cloudflare settings:
 
 ### Option B: your own reverse proxy
 
-Point the proxy at `http://mh-flex-01:8080` (or `127.0.0.1:8080` if it runs on the same host),
-then answer the installer the same way as for Option A, giving the proxy's IP address. By hand,
-`.env` needs the same three lines as above, with `FORWARDED_ALLOW_IPS` set to the proxy's IP.
-
-If the proxy runs directly on the same machine, you can stop exposing the port to the network.
-Set `PITWALL_BIND=127.0.0.1` in `.env`; the installer does this when you say the proxy is local.
+Point the proxy at `http://mh-flex-01:8080`, then answer the installer the same way as for
+Option A, giving the proxy's IP address. By hand, `.env` needs the same two lines as above,
+with `FORWARDED_ALLOW_IPS` set to the proxy's IP. The proxy must send `X-Forwarded-For` and
+`X-Forwarded-Proto` (Caddy does by default; see the nginx example).
 
 Caddy example:
 
