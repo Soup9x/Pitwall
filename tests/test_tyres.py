@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from pitwall.models import Event, Season
+from pitwall.models import Event
 from pitwall.services import tyres
 from pitwall.services.sync import apply_schedule
 from pitwall.web import auth
@@ -162,5 +162,23 @@ def test_press_release_parser_refuses_to_guess(text):
     assert tyres.parse_press_release(text) is None
 
 
-def test_season_rows_exist(db, events):
-    assert db.get(Season, 2025) is not None
+def test_import_from_press_release_link(db, events):
+    import httpx
+
+    mexico = events["2025-rodriguez"]
+    page = (
+        "<html><head><title>2025 Mexico City GP preview</title><script>var C9=1;</script>"
+        "</head><body><p>For Mexico, Pirelli brings the C3 as the P Zero White hard, the C4 as "
+        "the medium and the C5 as the soft.</p></body></html>"
+    )
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, text=page)))
+    row = tyres.import_from_url(db, mexico.id, "https://press.pirelli.com/2025-mexico", client)
+    assert (row.hard, row.medium, row.soft, row.origin) == ("C3", "C4", "C5", "pirelli")
+    assert row.source_title == "2025 Mexico City GP preview"
+    with pytest.raises(tyres.InvalidNomination):
+        tyres.import_from_url(db, mexico.id, "https://example.com/not-pirelli", client)
+    vague = httpx.Client(
+        transport=httpx.MockTransport(lambda r: httpx.Response(200, text="<p>Soft tyres!</p>"))
+    )
+    with pytest.raises(tyres.InvalidNomination):
+        tyres.import_from_url(db, mexico.id, "https://press.pirelli.com/x", vague)

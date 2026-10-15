@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DB
@@ -161,3 +162,43 @@ def parse_press_release(text: str) -> tuple[str, str, str] | None:
         return validate(*picked)
     except InvalidNomination:
         return None
+
+
+# ---------------------------------------------------------------------------- import by link
+
+_TAG = re.compile(r"<(script|style)\b.*?</\1>|<[^>]+>", re.I | re.S)
+PIRELLI_HOSTS = ("pirelli.com", "press.pirelli.com")
+
+
+def page_text(html_text: str) -> str:
+    import html as html_mod
+
+    return " ".join(html_mod.unescape(_TAG.sub(" ", html_text)).split())
+
+
+def import_from_url(db: DB, event_id: int, url: str, client: Any) -> TyreNomination:
+    """Fetch a Pirelli press release (an admin pastes the link) and store the nomination it
+    states. Raises InvalidNomination if the page doesn't state exactly one clear nomination."""
+    from urllib.parse import urlparse
+
+    import httpx
+
+    url = url.strip()
+    host = urlparse(url).hostname or ""
+    if not url.startswith("https://") or not host.endswith(PIRELLI_HOSTS):
+        raise InvalidNomination(
+            "Paste a link to a Pirelli press release (https://...pirelli.com/...)."
+        )
+    try:
+        resp = client.get(url)
+        resp.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise InvalidNomination(f"Couldn't fetch that page ({exc}).") from exc
+    title_m = re.search(r"<title>(.*?)</title>", resp.text, re.I | re.S)
+    title = page_text(title_m.group(1)) if title_m else "Pirelli press release"
+    picked = parse_press_release(page_text(resp.text))
+    if picked is None:
+        raise InvalidNomination(
+            "Couldn't find one clear hard/medium/soft nomination on that page; enter it by hand."
+        )
+    return store_parsed(db, event_id, picked, title=title, url=url, published_at=None)

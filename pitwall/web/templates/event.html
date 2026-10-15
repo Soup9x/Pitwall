@@ -46,6 +46,12 @@
         {% if tyres.nomination and tyres.nomination.origin == 'manual' %}<button class="secondary" name="action" value="clear" formnovalidate>Remove manual entry</button>{% endif %}</p>
         <p class="muted small">C1 is the hardest compound. A manual entry overrides anything parsed from Pirelli.</p>
       </form>
+      <form method="post" action="/admin/events/{{ event.id }}/tyres/import" class="row" style="margin-top:8px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input type="text" name="url" placeholder="Pirelli preview press release link" style="flex:1;min-width:200px;" required>
+        <button class="secondary">Import</button>
+      </form>
+      <p class="muted small">Import reads the release and only saves it if it names exactly one hard, medium and soft.</p>
     </details>
     {% endif %}
   </div>

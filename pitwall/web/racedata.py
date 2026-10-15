@@ -107,6 +107,36 @@ def event_context(
 # ---------------------------------------------------------------------------- tyres
 
 
+@router.post("/admin/events/{event_id}/tyres/import")
+async def import_tyres(
+    request: Request, event_id: int, db: DB = Depends(get_db), user: User = Depends(require_admin)
+) -> Response:
+    form = await checked_form(request)
+    event = _event(db, event_id)
+    client = _pirelli_client()
+    try:
+        await run_in_threadpool(
+            tyres.import_from_url, db, event.id, str(form.get("url", "")), client
+        )
+    except tyres.InvalidNomination as exc:
+        db.rollback()
+        flash(request, f"Not imported: {exc}")
+        return back(f"/events/{event.id}#tyres")
+    finally:
+        client.close()
+    db.commit()
+    flash(request, "Tyre nomination imported from the press release.")
+    return back(f"/events/{event.id}#tyres")
+
+
+def _pirelli_client() -> Any:
+    import httpx
+
+    from pitwall import USER_AGENT
+
+    return httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=20.0, follow_redirects=True)
+
+
 @router.post("/admin/events/{event_id}/tyres")
 async def save_tyres(
     request: Request, event_id: int, db: DB = Depends(get_db), user: User = Depends(require_admin)
