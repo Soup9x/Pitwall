@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_macros.html" import standings_table %}
+{% block title %}Standings{% endblock %}
+{% block content %}
+<div class="row" style="justify-content:space-between;">
+  <h1>{{ season or '' }} standings{% if drivers %} <span class="muted small">after round {{ drivers.round }}</span>{% endif %}</h1>
+  {% if seasons|length > 1 %}
+  <form method="get" action="/standings"><select name="season" onchange="this.form.submit()">
+    {% for y in seasons %}<option value="{{ y }}" {{ 'selected' if y == season else '' }}>{{ y }}</option>{% endfor %}
+  </select></form>
+  {% endif %}
+</div>
+{% if not drivers %}
+<div class="card"><p class="muted">No standings stored yet.</p></div>
+{% else %}
+{% if spoiler_hidden %}<details class="spoiler"><summary>Hidden by spoiler mode — click to show anyway</summary>{% endif %}
+<div class="grid">
+  <div class="card"><h2>Drivers</h2>{{ standings_table(drivers) }}</div>
+  {% if constructors %}<div class="card"><h2>Constructors</h2>{{ standings_table(constructors, None, "Team") }}</div>{% endif %}
+</div>
+{% if spoiler_hidden %}</details>{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Pitwall{% endblock %} · Pitwall</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏁</text></svg>">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="brand">Pit<span>wall</span></div>
+  <nav>
+    {% for href, label in [("/", "Dashboard"), ("/events", "Calendar"), ("/standings", "Standings"), ("/history", "Notifications"), ("/settings", "Settings")] %}
+    <a href="{{ href }}" class="{{ 'active' if (path == href or (href != '/' and path.startswith(href))) else '' }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+  <div class="spacer"></div>
+  <form class="inline" method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Log out</button></form>
+</div></header>
+<main class="wrap">
+{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+{% if backfill and backfill.running %}
+<div class="card" style="margin-bottom:16px;">
+  <div class="small">Historical backfill in progress — {{ backfill.done }}/{{ backfill.total }} seasons{% if backfill.current %} (now: {{ backfill.current }}){% endif %}. Track stats fill in as it runs; everything else works normally.</div>
+  <div class="progress" style="margin-top:6px;"><div style="width: {{ (100 * backfill.done / (backfill.total or 1))|round|int }}%"></div></div>
+</div>
+{% endif %}
+{% block content %}{% endblock %}
+</main>
+<footer>Pitwall {{ version }} · times shown in {{ settings.timezone }}</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>{{ title }}</title></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:16px 0;">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border-radius:8px;overflow:hidden;">
+<tr><td style="background:#15151e;color:#ffffff;padding:16px 20px;border-bottom:4px solid #e10600;">
+  <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#9ca3af;">Pitwall</div>
+  <div style="font-size:20px;font-weight:700;margin-top:4px;">{{ title }}</div>
+</td></tr>
+<tr><td style="padding:20px;font-size:15px;line-height:1.5;">
+{% block body %}{% endblock %}
+</td></tr>
+{% if link %}
+<tr><td style="padding:0 20px 20px;">
+  <a href="{{ link }}" style="display:inline-block;background:#e10600;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:6px;font-weight:600;">Open in Pitwall</a>
+</td></tr>
+{% endif %}
+</table>
+<div style="font-size:12px;color:#6b7280;padding:12px;">Sent by your self-hosted Pitwall.</div>
+</td></tr></table>
+</body></html>

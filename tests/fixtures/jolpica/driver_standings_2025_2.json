@@ -1,0 +1,142 @@
+{
+ "MRData": {
+  "xmlns": "",
+  "series": "f1",
+  "url": "https://api.jolpi.ca/ergast/f1/2025/driverStandings.json",
+  "limit": "100",
+  "offset": "0",
+  "total": "5",
+  "StandingsTable": {
+   "season": "2025",
+   "round": "2",
+   "StandingsLists": [
+    {
+     "season": "2025",
+     "round": "2",
+     "DriverStandings": [
+      {
+       "position": "1",
+       "positionText": "1",
+       "points": "44",
+       "wins": "1",
+       "Driver": {
+        "driverId": "piastri",
+        "permanentNumber": "81",
+        "code": "PIA",
+        "url": "https://en.wikipedia.org/wiki/Piastri",
+        "givenName": "Oscar",
+        "familyName": "Piastri",
+        "dateOfBirth": "2001-04-06",
+        "nationality": "Australian"
+       },
+       "Constructors": [
+        {
+         "constructorId": "mclaren",
+         "url": "https://en.wikipedia.org/wiki/McLaren",
+         "name": "McLaren",
+         "nationality": "British"
+        }
+       ]
+      },
+      {
+       "position": "2",
+       "positionText": "2",
+       "points": "40",
+       "wins": "1",
+       "Driver": {
+        "driverId": "norris",
+        "permanentNumber": "4",
+        "code": "NOR",
+        "url": "https://en.wikipedia.org/wiki/Norris",
+        "givenName": "Lando",
+        "familyName": "Norris",
+        "dateOfBirth": "1999-11-13",
+        "nationality": "British"
+       },
+       "Constructors": [
+        {
+         "constructorId": "mclaren",
+         "url": "https://en.wikipedia.org/wiki/McLaren",
+         "name": "McLaren",
+         "nationality": "British"
+        }
+       ]
+      },
+      {
+       "position": "3",
+       "positionText": "3",
+       "points": "36",
+       "wins": "0",
+       "Driver": {
+        "driverId": "max_verstappen",
+        "permanentNumber": "1",
+        "code": "VER",
+        "url": "https://en.wikipedia.org/wiki/Verstappen",
+        "givenName": "Max",
+        "familyName": "Verstappen",
+        "dateOfBirth": "1997-09-30",
+        "nationality": "Dutch"
+       },
+       "Constructors": [
+        {
+         "constructorId": "red_bull",
+         "url": "https://en.wikipedia.org/wiki/Red Bull",
+         "name": "Red Bull",
+         "nationality": "Austrian"
+        }
+       ]
+      },
+      {
+       "position": "4",
+       "positionText": "4",
+       "points": "20",
+       "wins": "0",
+       "Driver": {
+        "driverId": "leclerc",
+        "permanentNumber": "16",
+        "code": "LEC",
+        "url": "https://en.wikipedia.org/wiki/Leclerc",
+        "givenName": "Charles",
+        "familyName": "Leclerc",
+        "dateOfBirth": "1997-10-16",
+        "nationality": "Monegasque"
+       },
+       "Constructors": [
+        {
+         "constructorId": "ferrari",
+         "url": "https://en.wikipedia.org/wiki/Ferrari",
+         "name": "Ferrari",
+         "nationality": "Italian"
+        }
+       ]
+      },
+      {
+       "position": "5",
+       "positionText": "5",
+       "points": "15",
+       "wins": "0",
+       "Driver": {
+        "driverId": "hamilton",
+        "permanentNumber": "44",
+        "code": "HAM",
+        "url": "https://en.wikipedia.org/wiki/Hamilton",
+        "givenName": "Lewis",
+        "familyName": "Hamilton",
+        "dateOfBirth": "1985-01-07",
+        "nationality": "British"
+       },
+       "Constructors": [
+        {
+         "constructorId": "ferrari",
+         "url": "https://en.wikipedia.org/wiki/Ferrari",
+         "name": "Ferrari",
+         "nationality": "Italian"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

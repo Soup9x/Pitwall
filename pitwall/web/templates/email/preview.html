@@ -1,0 +1,53 @@
+{% extends "email/_base.html" %}
+{% set ev = ctx.event %}
+{% set c = ev.circuit %}
+{% block body %}
+<p style="margin:0 0 4px;font-size:16px;"><strong>{{ c.name }}</strong></p>
+<p style="margin:0 0 12px;color:#4b5563;">{{ c.locality }}{% if c.country %}, {{ c.country }}{% endif %} · Round {{ ev.round }}
+{% if ev.is_sprint_weekend %} · <span style="background:#fde68a;color:#92400e;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:700;">SPRINT WEEKEND</span>{% endif %}</p>
+
+<h3 style="margin:16px 0 8px;">Sessions</h3>
+<table role="presentation" width="100%" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
+<tr style="background:#f3f4f6;text-align:left;"><th>Session</th><th>Your time</th><th>Track time</th></tr>
+{% for s in ctx.sessions %}
+<tr style="border-bottom:1px solid #e5e7eb;">
+  <td>{{ s.emoji }} {{ s.label }}{% if s.status == "cancelled" %} <em>(cancelled)</em>{% endif %}</td>
+  <td>{{ s.owner_time }} {{ s.owner_tz }}{% if s.odd %} <span title="odd hours">🌙</span>{% endif %}</td>
+  <td style="color:#4b5563;">{{ s.local_time }} {{ s.local_tz }}</td>
+</tr>
+{% endfor %}
+</table>
+{% for n in ctx.odd_notes %}<p style="margin:6px 0 0;color:#b45309;">🌙 {{ n }}</p>{% endfor %}
+
+{% set st = ctx.stats %}
+<h3 style="margin:16px 0 8px;">Track</h3>
+<table role="presentation" cellpadding="3" cellspacing="0" style="font-size:14px;">
+{% if c.length_km %}<tr><td style="color:#6b7280;">Length</td><td>{{ "%.3f"|format(c.length_km) }} km{% if c.laps %} × {{ c.laps }} laps{% endif %}</td></tr>{% endif %}
+{% if c.turns %}<tr><td style="color:#6b7280;">Turns</td><td>{{ c.turns }}</td></tr>{% endif %}
+{% if c.drs_zones %}<tr><td style="color:#6b7280;">DRS zones (2025)</td><td>{{ c.drs_zones }}</td></tr>{% endif %}
+{% if c.first_gp_year %}<tr><td style="color:#6b7280;">First GP</td><td>{{ c.first_gp_year }}</td></tr>{% endif %}
+{% if c.lap_record_time %}<tr><td style="color:#6b7280;">Lap record</td><td>{{ c.lap_record_time }} — {{ c.lap_record_driver }} ({{ c.lap_record_year }})</td></tr>{% endif %}
+{% if st.last_winner %}<tr><td style="color:#6b7280;">{{ st.last_winner.season }} winner</td><td>{{ st.last_winner.driver }}{% if st.last_winner.constructor %} ({{ st.last_winner.constructor }}){% endif %}</td></tr>{% endif %}
+{% if st.last_pole %}<tr><td style="color:#6b7280;">{{ st.last_pole.season }} pole</td><td>{{ st.last_pole.driver }}{% if st.last_pole.constructor %} ({{ st.last_pole.constructor }}){% endif %}</td></tr>{% endif %}
+{% if st.winningest_driver %}<tr><td style="color:#6b7280;">Most wins (active)</td><td>{{ st.winningest_driver.name }} ({{ st.winningest_driver.wins }})</td></tr>{% endif %}
+{% if st.winningest_constructor %}<tr><td style="color:#6b7280;">Most wins (team)</td><td>{{ st.winningest_constructor.name }} ({{ st.winningest_constructor.wins }})</td></tr>{% endif %}
+{% if st.pole_to_win_pct is not none %}<tr><td style="color:#6b7280;">Pole → win</td><td>{{ st.pole_to_win_pct }}% ({{ st.pole_to_win[0] }}/{{ st.pole_to_win[1] }} since {{ st.seasons[0] }})</td></tr>{% endif %}
+{% if st.winner_avg_gain %}<tr><td style="color:#6b7280;">Winner gain</td><td>+{{ st.winner_avg_gain[0] }} places from grid on average</td></tr>{% endif %}
+</table>
+
+{% if ctx.drivers %}
+<h3 style="margin:16px 0 8px;">Standings after round {{ ctx.drivers.round }}</h3>
+{% with rows=ctx.drivers.rows[:5], heading="Driver" %}{% include "email/_standings_table.html" %}{% endwith %}
+{% if ctx.constructors %}{% with rows=ctx.constructors.rows[:5], heading="Team" %}{% include "email/_standings_table.html" %}{% endwith %}{% endif %}
+{% for r in ctx.followed_rows if r.position and r.position > 5 %}
+<p style="margin:2px 0;">★ {{ r.name }}: P{{ r.position }}, {{ r.points|pts }} pts (-{{ r.gap_leader|pts }} to leader)</p>
+{% endfor %}
+{% endif %}
+
+{% if ctx.form %}
+<h3 style="margin:16px 0 8px;">Followed drivers — last 3 races</h3>
+{% for f in ctx.form %}
+<p style="margin:2px 0;"><strong>{{ f.driver }}</strong>: {% if f.results %}{% for ev, pos in f.results %}{{ pos }} <span style="color:#6b7280;">({{ ev }})</span>{% if not loop.last %} · {% endif %}{% endfor %}{% else %}no results yet{% endif %}</p>
+{% endfor %}
+{% endif %}
+{% endblock %}

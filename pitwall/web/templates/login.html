@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log in · Pitwall</title><link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<div class="login card">
+  <div class="brand" style="font-size:1.4rem;">Pit<span>wall</span></div>
+  {% if not configured %}
+  <div class="error">No admin password is configured. Set <code>PITWALL_ADMIN_PASSWORD</code> in <code>.env</code> and restart.</div>
+  {% endif %}
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post" action="/login">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="password">Password</label>
+    <input id="password" type="password" name="password" autofocus autocomplete="current-password" style="width:100%;">
+    <div style="margin-top:14px;"><button type="submit">Log in</button></div>
+  </form>
+</div>
+</body></html>

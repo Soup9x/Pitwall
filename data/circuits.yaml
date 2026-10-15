@@ -1,0 +1,379 @@
+# Curated circuit facts that the APIs don't provide.
+#
+# Keys are Jolpica/Ergast circuitIds (e.g. "albert_park"). Pitwall merges these values into the
+# circuit table on every schedule sync, so edits here take effect within 6 hours (or on restart).
+#
+# IMPORTANT: these values were compiled without live verification and every entry is marked
+# `verified: false`. Please spot-check them against formula1.com and flip `verified` to true.
+# Anything we were not sure about is left as null on purpose: Pitwall hides missing fields
+# rather than showing a guess.
+#
+# Notes:
+#   - timezone: IANA zone of the circuit, used for "track-local" times.
+#   - drs_zones: the DRS-era count (2025). The 2026 regulations replace DRS with active aero /
+#     overtake mode, so treat this as historical context.
+#   - lap_record: the official *race* lap record (set during a Grand Prix, not qualifying).
+#     Left null where a 2025 race may have lowered it.
+#   - map_image: an https:// URL or a path relative to the data directory (e.g. maps/monza.png).
+#   - madring: the circuitId for the new Madrid circuit is assumed to be "madring"; if the
+#     Jolpica schedule uses a different id, rename the key.
+
+albert_park:
+  name: "Albert Park Grand Prix Circuit"
+  timezone: Australia/Melbourne
+  length_km: 5.278
+  laps: 58
+  turns: 14
+  drs_zones: 4
+  first_gp_year: 1996
+  lap_record:
+    driver: "Charles Leclerc"
+    time: "1:19.813"
+    year: 2024
+  map_image: null
+  verified: false
+
+shanghai:
+  name: "Shanghai International Circuit"
+  timezone: Asia/Shanghai
+  length_km: 5.451
+  laps: 56
+  turns: 16
+  drs_zones: 2
+  first_gp_year: 2004
+  lap_record:
+    driver: "Michael Schumacher"
+    time: "1:32.238"
+    year: 2004
+  map_image: null
+  verified: false
+
+suzuka:
+  name: "Suzuka Circuit"
+  timezone: Asia/Tokyo
+  length_km: 5.807
+  laps: 53
+  turns: 18
+  drs_zones: 1
+  first_gp_year: 1987
+  lap_record:
+    driver: null
+    time: null
+    year: null
+  map_image: null
+  verified: false
+
+bahrain:
+  name: "Bahrain International Circuit"
+  timezone: Asia/Bahrain
+  length_km: 5.412
+  laps: 57
+  turns: 15
+  drs_zones: 3
+  first_gp_year: 2004
+  lap_record:
+    driver: "Pedro de la Rosa"
+    time: "1:31.447"
+    year: 2005
+  map_image: null
+  verified: false
+
+jeddah:
+  name: "Jeddah Corniche Circuit"
+  timezone: Asia/Riyadh
+  length_km: 6.174
+  laps: 50
+  turns: 27
+  drs_zones: 3
+  first_gp_year: 2021
+  lap_record:
+    driver: "Lewis Hamilton"
+    time: "1:30.734"
+    year: 2021
+  map_image: null
+  verified: false
+
+miami:
+  name: "Miami International Autodrome"
+  timezone: America/New_York
+  length_km: 5.412
+  laps: 57
+  turns: 19
+  drs_zones: 3
+  first_gp_year: 2022
+  lap_record:
+    driver: "Max Verstappen"
+    time: "1:29.708"
+    year: 2023
+  map_image: null
+  verified: false
+
+villeneuve:
+  name: "Circuit Gilles Villeneuve"
+  timezone: America/Toronto
+  length_km: 4.361
+  laps: 70
+  turns: 14
+  drs_zones: 3
+  first_gp_year: 1978
+  lap_record:
+    driver: "Valtteri Bottas"
+    time: "1:13.078"
+    year: 2019
+  map_image: null
+  verified: false
+
+monaco:
+  name: "Circuit de Monaco"
+  timezone: Europe/Monaco
+  length_km: 3.337
+  laps: 78
+  turns: 19
+  drs_zones: 1
+  first_gp_year: 1950
+  lap_record:
+    driver: "Lewis Hamilton"
+    time: "1:12.909"
+    year: 2021
+  map_image: null
+  verified: false
+
+catalunya:
+  name: "Circuit de Barcelona-Catalunya"
+  timezone: Europe/Madrid
+  length_km: 4.657
+  laps: 66
+  turns: 14
+  drs_zones: 2
+  first_gp_year: 1991
+  lap_record:
+    driver: null
+    time: null
+    year: null
+  map_image: null
+  verified: false
+
+red_bull_ring:
+  name: "Red Bull Ring"
+  timezone: Europe/Vienna
+  length_km: 4.318
+  laps: 71
+  turns: 10
+  drs_zones: 3
+  first_gp_year: 1970
+  lap_record:
+    driver: "Carlos Sainz"
+    time: "1:05.619"
+    year: 2020
+  map_image: null
+  verified: false
+
+silverstone:
+  name: "Silverstone Circuit"
+  timezone: Europe/London
+  length_km: 5.891
+  laps: 52
+  turns: 18
+  drs_zones: 2
+  first_gp_year: 1950
+  lap_record:
+    driver: "Max Verstappen"
+    time: "1:27.097"
+    year: 2020
+  map_image: null
+  verified: false
+
+spa:
+  name: "Circuit de Spa-Francorchamps"
+  timezone: Europe/Brussels
+  length_km: 7.004
+  laps: 44
+  turns: 19
+  drs_zones: 2
+  first_gp_year: 1950
+  lap_record:
+    driver: "Valtteri Bottas"
+    time: "1:46.286"
+    year: 2018
+  map_image: null
+  verified: false
+
+hungaroring:
+  name: "Hungaroring"
+  timezone: Europe/Budapest
+  length_km: 4.381
+  laps: 70
+  turns: 14
+  drs_zones: 2
+  first_gp_year: 1986
+  lap_record:
+    driver: "Lewis Hamilton"
+    time: "1:16.627"
+    year: 2020
+  map_image: null
+  verified: false
+
+zandvoort:
+  name: "Circuit Park Zandvoort"
+  timezone: Europe/Amsterdam
+  length_km: 4.259
+  laps: 72
+  turns: 14
+  drs_zones: 2
+  first_gp_year: 1952
+  lap_record:
+    driver: "Lewis Hamilton"
+    time: "1:11.097"
+    year: 2021
+  map_image: null
+  verified: false
+
+monza:
+  name: "Autodromo Nazionale di Monza"
+  timezone: Europe/Rome
+  length_km: 5.793
+  laps: 53
+  turns: 11
+  drs_zones: 2
+  first_gp_year: 1950
+  lap_record:
+    driver: null
+    time: null
+    year: null
+  map_image: null
+  verified: false
+
+madring:
+  name: "Madring"
+  timezone: Europe/Madrid
+  length_km: null
+  laps: null
+  turns: null
+  drs_zones: null
+  first_gp_year: 2026
+  lap_record:
+    driver: null
+    time: null
+    year: null
+  map_image: null
+  verified: false
+
+baku:
+  name: "Baku City Circuit"
+  timezone: Asia/Baku
+  length_km: 6.003
+  laps: 51
+  turns: 20
+  drs_zones: 2
+  first_gp_year: 2016
+  lap_record:
+    driver: "Charles Leclerc"
+    time: "1:43.009"
+    year: 2019
+  map_image: null
+  verified: false
+
+marina_bay:
+  name: "Marina Bay Street Circuit"
+  timezone: Asia/Singapore
+  length_km: 4.94
+  laps: 62
+  turns: 19
+  drs_zones: null
+  first_gp_year: 2008
+  lap_record:
+    driver: null
+    time: null
+    year: null
+  map_image: null
+  verified: false
+
+americas:
+  name: "Circuit of the Americas"
+  timezone: America/Chicago
+  length_km: 5.513
+  laps: 56
+  turns: 20
+  drs_zones: 2
+  first_gp_year: 2012
+  lap_record:
+    driver: "Charles Leclerc"
+    time: "1:36.169"
+    year: 2019
+  map_image: null
+  verified: false
+
+rodriguez:
+  name: "Autódromo Hermanos Rodríguez"
+  timezone: America/Mexico_City
+  length_km: 4.304
+  laps: 71
+  turns: 17
+  drs_zones: 3
+  first_gp_year: 1963
+  lap_record:
+    driver: "Valtteri Bottas"
+    time: "1:17.774"
+    year: 2021
+  map_image: null
+  verified: false
+
+interlagos:
+  name: "Autódromo José Carlos Pace"
+  timezone: America/Sao_Paulo
+  length_km: 4.309
+  laps: 71
+  turns: 15
+  drs_zones: 2
+  first_gp_year: 1973
+  lap_record:
+    driver: "Valtteri Bottas"
+    time: "1:10.540"
+    year: 2018
+  map_image: null
+  verified: false
+
+vegas:
+  name: "Las Vegas Strip Street Circuit"
+  timezone: America/Los_Angeles
+  length_km: 6.201
+  laps: 50
+  turns: 17
+  drs_zones: 2
+  first_gp_year: 2023
+  lap_record:
+    driver: null
+    time: null
+    year: null
+  map_image: null
+  verified: false
+
+losail:
+  name: "Losail International Circuit"
+  timezone: Asia/Qatar
+  length_km: 5.419
+  laps: 57
+  turns: 16
+  drs_zones: null
+  first_gp_year: 2021
+  lap_record:
+    driver: null
+    time: null
+    year: null
+  map_image: null
+  verified: false
+
+yas_marina:
+  name: "Yas Marina Circuit"
+  timezone: Asia/Dubai
+  length_km: 5.281
+  laps: 58
+  turns: 16
+  drs_zones: 2
+  first_gp_year: 2009
+  lap_record:
+    driver: "Max Verstappen"
+    time: "1:26.103"
+    year: 2021
+  map_image: null
+  verified: false

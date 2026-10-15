@@ -1,0 +1,9 @@
+{% extends "email/_base.html" %}
+{% block body %}
+<h3 style="margin:0 0 8px;">Drivers</h3>
+{% with rows=drivers.rows[:10], heading="Driver" %}{% include "email/_standings_table.html" %}{% endwith %}
+{% if constructors %}
+<h3 style="margin:12px 0 8px;">Constructors</h3>
+{% with rows=constructors.rows[:5], heading="Team" %}{% include "email/_standings_table.html" %}{% endwith %}
+{% endif %}
+{% endblock %}

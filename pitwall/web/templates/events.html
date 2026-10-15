@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Calendar {{ season }}{% endblock %}
+{% block content %}
+<div class="row" style="justify-content:space-between;">
+  <h1>{{ season }} calendar</h1>
+  {% if seasons|length > 1 %}
+  <form method="get" action="/events"><select name="season" onchange="this.form.submit()">
+    {% for y in seasons %}<option value="{{ y }}" {{ 'selected' if y == season else '' }}>{{ y }}</option>{% endfor %}
+  </select></form>
+  {% endif %}
+</div>
+<div class="card table-scroll">
+<table>
+<tr><th class="num">Rd</th><th>Grand Prix</th><th>Location</th><th>Race (your time)</th><th></th></tr>
+{% for row in rows %}{% set ev = row.event %}
+<tr class="{{ 'cancelled' if ev.status == 'cancelled' else ('past' if row.race and row.race.is_past else '') }}">
+  <td class="num">{{ ev.round }}</td>
+  <td><a href="/events/{{ ev.id }}">{{ ev.name }}</a> {% if ev.is_sprint_weekend %}<span class="badge sprint">SPRINT</span>{% endif %}{% if ev.status == 'cancelled' %} <span class="badge cancelled">cancelled</span>{% endif %}</td>
+  <td>{{ ev.circuit.locality }}, {{ ev.circuit.country }}</td>
+  <td>{% if row.race and row.race.start_utc %}{{ row.race.owner_time }}{% if row.race.odd %} 🌙{% endif %}{% elif ev.end_date %}{{ ev.end_date.strftime('%a %d %b') }}{% else %}—{% endif %}</td>
+  <td></td>
+</tr>
+{% else %}
+<tr><td colspan="5" class="muted">No events yet — the schedule syncs shortly after start.</td></tr>
+{% endfor %}
+</table>
+</div>
+{% endblock %}

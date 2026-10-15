@@ -1,0 +1,42 @@
+{% set ev = ctx.event %}{% set c = ev.circuit %}{% set st = ctx.stats %}
+{{ title }}
+{{ c.name }} — {{ c.locality }}{% if c.country %}, {{ c.country }}{% endif %} (Round {{ ev.round }})
+
+SESSIONS (your time / track time)
+{% for s in ctx.sessions %}
+- {{ s.label }}: {{ s.owner_time }} {{ s.owner_tz }}{% if s.local_time %} / {{ s.local_time }} {{ s.local_tz }}{% endif %}{% if s.odd %} [odd hours]{% endif %}{% if s.status == "cancelled" %} [cancelled]{% endif %}
+
+{% endfor %}
+{% for n in ctx.odd_notes %}
+! {{ n }}
+{% endfor %}
+
+TRACK
+{% if c.length_km %}- Length: {{ "%.3f"|format(c.length_km) }} km{% if c.laps %} x {{ c.laps }} laps{% endif %}
+
+{% endif %}
+{% if c.turns %}- Turns: {{ c.turns }}
+{% endif %}
+{% if c.lap_record_time %}- Lap record: {{ c.lap_record_time }}, {{ c.lap_record_driver }} ({{ c.lap_record_year }})
+{% endif %}
+{% if st.last_winner %}- {{ st.last_winner.season }} winner: {{ st.last_winner.driver }}
+{% endif %}
+{% if st.last_pole %}- {{ st.last_pole.season }} pole: {{ st.last_pole.driver }}
+{% endif %}
+{% if ctx.drivers %}
+
+STANDINGS (after round {{ ctx.drivers.round }})
+{% for r in ctx.drivers.rows[:5] %}
+{{ r.position }}. {{ r.name }} {{ r.points|pts }} pts {{ r.arrow }}
+{% endfor %}
+{% endif %}
+{% if ctx.form %}
+
+FOLLOWED DRIVERS (last 3)
+{% for f in ctx.form %}
+- {{ f.driver }}: {% for ev, pos in f.results %}{{ pos }} ({{ ev }}){% if not loop.last %}, {% endif %}{% endfor %}
+
+{% endfor %}
+{% endif %}
+
+{{ ctx.link }}
