@@ -383,7 +383,7 @@ def test_security_headers(client):
 
 
 def _behind_proxy(peer: str):
-    """The app as `python -m pitwall serve` runs it, trusting only the tunnel machine
+    """The app as `python -m pitwall serve` runs it, trusting only the proxy machine
     192.168.1.20 for X-Forwarded-For, with requests arriving from `peer`."""
     from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
@@ -404,7 +404,7 @@ def _fail_logins(c, forwarded_for: str) -> None:
         )
 
 
-def test_real_visitor_ip_from_trusted_tunnel_used_for_rate_limiting(client):
+def test_real_visitor_ip_from_trusted_proxy_used_for_rate_limiting(client):
     with _behind_proxy("192.168.1.20") as c:
         _fail_logins(c, "198.51.100.7")
         blocked = c.post(
@@ -413,7 +413,7 @@ def test_real_visitor_ip_from_trusted_tunnel_used_for_rate_limiting(client):
             headers={"x-forwarded-for": "198.51.100.7"},
         )
         assert blocked.status_code == 429
-        # A different visitor through the same tunnel isn't blocked by that person's failures.
+        # A different visitor through the same proxy isn't blocked by that person's failures.
         ok = c.post(
             "/login",
             data={"username": "admin", "password": ADMIN_PW, "csrf_token": csrf(c)},
@@ -447,7 +447,7 @@ def test_login_cookie_secure_only_for_https_visits(client):
         assert "strict-transport-security" not in r.headers  # would break http on the LAN
         return next(v for v in r.headers.get_list("set-cookie") if "pitwall_session=" in v)
 
-    with _behind_proxy("192.168.1.20") as c:  # through the tunnel, which says it was HTTPS
+    with _behind_proxy("192.168.1.20") as c:  # through the proxy, which says it was HTTPS
         cookie = login_cookie(c, {"x-forwarded-proto": "https", "x-forwarded-for": "1.2.3.4"})
         assert "; secure" in cookie.lower() and "httponly" in cookie.lower()
     with _behind_proxy("192.168.1.99") as c:  # LAN over plain http, even if it claims https

@@ -314,46 +314,19 @@ if ((configure)); then
     warn "Something is already listening on port $PORT. Pitwall won't start unless you free it or pick another port."
   fi
 
-  host_name="$(hostname -s 2>/dev/null || hostname)"
+  lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  [[ -n "$lan_ip" ]] || lan_ip="$(hostname -s 2>/dev/null || hostname)"
   BIND="0.0.0.0"
-  FWD="127.0.0.1"
-  access_default=1
-  [[ "$(env_get PITWALL_BASE_URL)" == https://* ]] && access_default=2
-  access="$(choose "How will people reach Pitwall?" "$access_default" \
-    "Only on my local network (http://$host_name:$PORT)" \
-    "From the internet through my existing Cloudflare Tunnel or reverse proxy")"
-  case "$access" in
-    1)
-      prev_url="$(env_get PITWALL_BASE_URL)"
-      [[ -z "$prev_url" || "$prev_url" == https://* ]] && prev_url="http://$host_name:$PORT"
-      BASE_URL="$(ask "Address you'll type in the browser" "$prev_url")"
-      BASE_URL="${BASE_URL%/}"
-      ;;
-    2)
-      prev_url="$(env_get PITWALL_BASE_URL)"
-      [[ "$prev_url" == https://* ]] || prev_url=""
-      while :; do
-        BASE_URL="$(ask_required "Public URL you'll use (e.g. https://pitwall.example.com)" "$prev_url")"
-        [[ "$BASE_URL" =~ ^https?://[^/[:space:]]+ ]] && break
-        warn "Please enter a full URL starting with https:// (or http://)."
-      done
-      BASE_URL="${BASE_URL%/}"
-      lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
-      hint "In Cloudflare (Zero Trust → Networks → Tunnels → your tunnel → Published application"
-      hint "routes), set the service to  HTTP  ${lan_ip:-$host_name}:$PORT"
-      hint "On your LAN you can also keep using http://${lan_ip:-$host_name}:$PORT"
-      hint "Pitwall needs the IP address of the machine running cloudflared (or your proxy) so it"
-      hint "can see visitors' real IPs for login rate limiting, without letting anyone fake them."
-      prev="$(env_get FORWARDED_ALLOW_IPS)"
-      [[ "$prev" == 127.0.0.1 || "$prev" == "*" ]] && prev=""
-      while :; do
-        FWD="$(ask_required "IP address of the cloudflared/proxy machine (e.g. 192.168.1.20)" "$prev")"
-        FWD="${FWD//[[:space:]]/}"
-        [[ "$FWD" =~ ^[0-9A-Fa-f:./]+(,[0-9A-Fa-f:./]+)*$ ]] && break
-        warn "Please enter an IP address (several can be separated with commas)."
-      done
-      ;;
-  esac
+  hint "Pitwall will be at http://$lan_ip:$PORT on your network. The address below is used for"
+  hint "links in alerts and the calendar feed."
+  prev_url="$(env_get PITWALL_BASE_URL)"
+  [[ -z "$prev_url" || "$prev_url" == https://* ]] && prev_url="http://$lan_ip:$PORT"
+  while :; do
+    BASE_URL="$(ask "Address you'll type in the browser" "$prev_url")"
+    [[ "$BASE_URL" =~ ^https?://[^/[:space:]]+ ]] && break
+    warn "Please enter a full address starting with http://"
+  done
+  BASE_URL="${BASE_URL%/}"
 
   # --- password
   step "3/5 Admin password"
@@ -412,7 +385,6 @@ if ((configure)); then
   say "  Timezone:         $TZ_VAL"
   say "  Web UI address:   $BASE_URL"
   say "  Listens on:       $BIND:$PORT"
-  [[ "$access" == 2 ]] && say "  Trusted proxy:    $FWD"
   say "  Password:         $([[ -n "$GENERATED_PW" ]] && echo "(generated)" || echo "(set)")"
   [[ -n "$EMAIL_URLS" ]] && say "  Email (.env):     $(mask_urls "$EMAIL_URLS")"
   [[ -n "$HOOK_URLS" ]] && say "  Webhooks (.env):  $(mask_urls "$HOOK_URLS")"
@@ -447,8 +419,6 @@ APPRISE_URLS_WEBHOOK=$(q "$HOOK_URLS")
 PITWALL_BACKFILL_START_YEAR=$START_YEAR
 PITWALL_LOG_LEVEL=$LOG_LEVEL
 
-FORWARDED_ALLOW_IPS=$(q "$FWD")
-
 PUID=$APP_UID
 PGID=$APP_GID
 EOF
@@ -463,7 +433,7 @@ step "Starting Pitwall"
 mkdir -p data
 puid="$(env_get PUID)" pgid="$(env_get PGID)"
 chown -R "${puid:-$APP_UID}:${pgid:-$APP_GID}" data
-# Older versions could run their own cloudflared container; make sure it's gone.
+# Older versions could run their own tunnel container; make sure it's gone.
 docker rm -f pitwall-tunnel >/dev/null 2>&1 || true
 docker compose up -d --build --remove-orphans || die "docker compose failed — see the messages above."
 
@@ -522,7 +492,7 @@ fi
 say ""
 say "  Calendar feed: log in, open ${B}Account${N} and copy your private link into Google Calendar"
 say "  (Other calendars → + → From URL)."
-hint "  Google must be able to reach it from the internet (e.g. through your Cloudflare Tunnel),"
+hint "  Google must be able to reach it from the internet (a LAN address won't work for that),"
 hint "  and it refreshes subscribed calendars slowly (up to ~24 h)."
 say ""
 say "  Next steps — log in, open Settings and:"

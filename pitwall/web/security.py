@@ -1,9 +1,8 @@
-"""Security headers for running on the public internet (e.g. behind a Cloudflare Tunnel).
+"""Security headers for every response.
 
-Cookies are marked Secure on HTTPS requests only (as seen through a trusted proxy's
-X-Forwarded-Proto), so the same install works at https://pitwall.example.com through the tunnel
-and at http://server:8080 on the LAN. No HSTS header is sent: it would make browsers refuse the
-plain-HTTP LAN address for that hostname."""
+Cookies are marked Secure on HTTPS requests only (e.g. behind an HTTPS proxy that sends
+X-Forwarded-Proto), so plain-HTTP access on the LAN keeps working. No HSTS header is sent: it
+would make browsers refuse the plain-HTTP address."""
 
 from __future__ import annotations
 
