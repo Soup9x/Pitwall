@@ -140,3 +140,41 @@ def sent(monkeypatch: pytest.MonkeyPatch) -> Sent:
     s = Sent()
     monkeypatch.setattr(outbox, "notify", s)
     return s
+
+
+@pytest.fixture(autouse=True)
+def offline_clients():
+    """No test may reach the network: by default every job gets clients whose transport
+    answers 503 immediately (tests that need data install their own fixtures)."""
+    from pitwall import jobs
+    from pitwall.sources.http import RateLimiter
+    from pitwall.sources.jolpica import JolpicaClient
+    from pitwall.sources.jolpica import make_client as jolpica_default
+    from pitwall.sources.openf1 import OpenF1Client
+    from pitwall.sources.openf1 import make_client as openf1_default
+    from pitwall.sources.openmeteo import OpenMeteoClient
+    from pitwall.sources.openmeteo import make_client as meteo_default
+
+    def offline(cls):
+        return lambda: cls(
+            limiter=RateLimiter(),
+            sleep=lambda _s: None,
+            max_retries=0,
+            transport=httpx.MockTransport(lambda _r: httpx.Response(503)),
+        )
+
+    jobs.set_client_factory(
+        lambda: JolpicaClient(
+            "https://api.jolpi.ca/ergast/f1",
+            limiter=RateLimiter(),
+            max_retries=0,
+            sleep=lambda _s: None,
+            transport=httpx.MockTransport(lambda _r: httpx.Response(503)),
+        )
+    )
+    jobs.set_openf1_factory(offline(OpenF1Client))
+    jobs.set_weather_factory(offline(OpenMeteoClient))
+    yield
+    jobs.set_client_factory(jolpica_default)
+    jobs.set_openf1_factory(openf1_default)
+    jobs.set_weather_factory(meteo_default)

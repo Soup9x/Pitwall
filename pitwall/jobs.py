@@ -13,10 +13,11 @@ from typing import Any, TypeVar
 from sqlalchemy import select
 
 from pitwall import scheduler as sched_mod
+from pitwall.config import get_env
 from pitwall.db import session_scope, utcnow
 from pitwall.models import Event, Season, Session
 from pitwall.notify import builders, outbox
-from pitwall.services import openf1_sync, reminders, trivia
+from pitwall.services import circuit_maps, digest, openf1_sync, reminders, trivia, weather
 from pitwall.services.sync import (
     apply_results,
     apply_schedule,
@@ -27,6 +28,8 @@ from pitwall.sources.http import SourceUnavailable
 from pitwall.sources.jolpica import JolpicaClient, make_client
 from pitwall.sources.openf1 import OpenF1Client
 from pitwall.sources.openf1 import make_client as make_openf1_client
+from pitwall.sources.openmeteo import OpenMeteoClient
+from pitwall.sources.openmeteo import make_client as make_openmeteo_client
 
 log = logging.getLogger(__name__)
 
@@ -259,6 +262,7 @@ def preview_job(now: datetime | None = None) -> None:
     if event_id is None:
         log.info("no race this week; no preview")
         return
+    weather_sync_job(now, event_id)  # freshest forecast for the preview
     with session_scope() as db:
         event = db.get(Event, event_id)
         assert event is not None
@@ -278,6 +282,53 @@ def send_preview(
     if row is not None:
         trivia.remember_keys(db, [f["key"] for f in msg.data.get("facts", [])])
     return row is not None
+
+
+# ------------------------------------------------------------------- weather / maps / digest
+
+_weather_factory: Callable[[], OpenMeteoClient] = make_openmeteo_client
+
+
+def set_weather_factory(factory: Callable[[], OpenMeteoClient]) -> None:
+    global _weather_factory
+    _weather_factory = factory
+
+
+@safe_job
+def weather_sync_job(now: datetime | None = None, event_id: int | None = None) -> None:
+    client = _weather_factory()
+    try:
+        n = weather.sync(client, now, event_id)
+    finally:
+        client.close()
+    if n:
+        log.info("weather forecasts updated", extra={"sessions": n})
+
+
+@safe_job
+def circuit_maps_job(now: datetime | None = None) -> None:
+    client = _openf1_factory()
+    try:
+        circuit_maps.generate_missing(client, now)
+    finally:
+        client.close()
+
+
+@safe_job
+def digest_job(now: datetime | None = None) -> None:
+    now = now or utcnow()
+    with _flush_lock, session_scope() as db:
+        settings = load_settings(db)
+        if not settings.digest_enabled:
+            return
+        built = digest.build(db, settings, now, get_env().base_url)
+        if built is None:
+            log.info("nothing for the weekly digest")
+            return
+        msg, rows = built
+        if outbox.enqueue(db, msg, settings=settings, now=now) is not None:
+            digest.mark_digested(db, rows, now)
+    flush_job()
 
 
 # ---------------------------------------------------------------------------- OpenF1

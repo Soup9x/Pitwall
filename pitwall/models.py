@@ -302,3 +302,19 @@ class DriverSessionDetail(Base):
     pit_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     stints_json: Mapped[str] = mapped_column(Text, default="[]")
     fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class SessionWeather(Base):
+    """Forecast for a session's time window (Open-Meteo), refreshed every few hours."""
+
+    __tablename__ = "session_weather"
+
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("session.id", ondelete="CASCADE"), primary_key=True
+    )
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    temp_c: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rain_chance: Mapped[int | None] = mapped_column(Integer, nullable=True)  # max %, window
+    precip_mm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    wind_kmh: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weather_code: Mapped[int | None] = mapped_column(Integer, nullable=True)

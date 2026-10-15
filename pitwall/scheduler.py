@@ -96,6 +96,42 @@ def install_recurring_jobs(sched: Any) -> None:
         next_run_time=now + timedelta(minutes=3),
         name="OpenF1 detail for followed drivers (every 2h)",
     )
+    sched.add_job(
+        "pitwall.jobs:weather_sync_job",
+        "interval",
+        hours=3,
+        id="weather_sync",
+        replace_existing=True,
+        next_run_time=now + timedelta(minutes=1),
+        name="Weather forecasts (every 3h)",
+    )
+    sched.add_job(
+        "pitwall.jobs:circuit_maps_job",
+        "cron",
+        hour=4,
+        minute=15,
+        timezone=tz,
+        id="circuit_maps",
+        replace_existing=True,
+        misfire_grace_time=6 * 3600,
+        name="Draw missing circuit maps (nightly)",
+    )
+    if settings.digest_enabled:
+        hh, mm = settings.digest_time.split(":")
+        sched.add_job(
+            "pitwall.jobs:digest_job",
+            "cron",
+            day_of_week=settings.digest_day,
+            hour=int(hh),
+            minute=int(mm),
+            timezone=tz,
+            id="weekly_digest",
+            replace_existing=True,
+            misfire_grace_time=6 * 3600,
+            name="Weekly digest",
+        )
+    elif sched.get_job("weekly_digest") is not None:
+        sched.remove_job("weekly_digest")
     if not backfill_done:
         sched.add_job(
             "pitwall.jobs:backfill_job",

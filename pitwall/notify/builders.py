@@ -12,8 +12,9 @@ from sqlalchemy.orm import Session as DB
 from pitwall.db import utcnow
 from pitwall.models import SESSION_EMOJI, SESSION_LABELS, Event, FollowedDriver, Result, Session
 from pitwall.notify.message import Message
+from pitwall.services import circuit_maps, title_math, track_stats, trivia
 from pitwall.services import standings as standings_svc
-from pitwall.services import title_math, track_stats, trivia
+from pitwall.services import weather as weather_svc
 from pitwall.services.presenters import (
     SessionView,
     event_sessions,
@@ -288,6 +289,9 @@ class PreviewContext:
     countdown: str | None
     title: list[title_math.TitleMath] = field(default_factory=list)
     facts: list[trivia.Fact] = field(default_factory=list)
+    weather: dict[int, weather_svc.WeatherView] = field(default_factory=dict)
+    rain: list[str] = field(default_factory=list)
+    map_url: str | None = None
 
 
 def _form(db: DB, settings: AppSettings, before: datetime) -> list[FormLine]:
@@ -344,6 +348,7 @@ def preview_context(
         constructors = standings_svc.table(db, season, "constructor")
     race = next((s for s in event.sessions if s.type == "RACE"), None)
     first = min((s.start_utc for s in event.sessions if s.start_utc), default=None)
+    wx = weather_svc.for_event(db, event)
     return PreviewContext(
         event=event,
         sessions=sessions,
@@ -357,6 +362,9 @@ def preview_context(
         countdown=humanize_delta((first - now).total_seconds()) if first and first > now else None,
         title=preview_title_math(db, event),
         facts=trivia.for_preview(db, event, avoid_recent=avoid_recent),
+        weather=wx,
+        rain=weather_svc.rain_warnings(event, wx),
+        map_url=circuit_maps.map_url(event.circuit),
     )
 
 
@@ -391,6 +399,8 @@ def preview(
             for v in ctx.sessions
         ],
         "title_math": [{"kind": tm.kind, "lines": tm.summary()} for tm in ctx.title],
+        "rain_risk": ctx.rain,
+        "map_url": ctx.map_url,
         "facts": [{"type": f.type, "text": f.text, "key": f.key} for f in ctx.facts],
     }
     return Message(

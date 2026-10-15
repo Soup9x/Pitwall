@@ -103,6 +103,7 @@ class CachedClient:
         *,
         max_age: timedelta | None = timedelta(0),
         empty_on_404: bool = False,
+        store: bool = True,
     ) -> Any:
         """Fetch JSON. If a cached copy is younger than `max_age` it is used without a request
         (`max_age=None` means cached copies never expire). On failure, any cached copy is
@@ -128,6 +129,9 @@ class CachedClient:
             return self._failed(url, exc, cached_body)
 
         with session_scope() as db:
+            if not store:  # large one-off responses aren't worth keeping in the cache
+                self._record_success(db)
+                return data
             row = db.get(ApiCache, url)
             body = json.dumps(data)
             if row is None:

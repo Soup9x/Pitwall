@@ -8,12 +8,13 @@
 
 <h3 style="margin:16px 0 8px;">Sessions</h3>
 <table role="presentation" width="100%" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
-<tr style="background:#f3f4f6;text-align:left;"><th>Session</th><th>Your time</th><th>Track time</th></tr>
+<tr style="background:#f3f4f6;text-align:left;"><th>Session</th><th>Your time</th><th>Track time</th>{% if ctx.weather %}<th>Weather</th>{% endif %}</tr>
 {% for s in ctx.sessions %}
 <tr style="border-bottom:1px solid #e5e7eb;">
   <td>{{ s.emoji }} {{ s.label }}{% if s.status == "cancelled" %} <em>(cancelled)</em>{% endif %}</td>
   <td>{{ s.owner_time }} {{ s.owner_tz }}{% if s.odd %} <span title="odd hours">🌙</span>{% endif %}</td>
   <td style="color:#4b5563;">{{ s.local_time }} {{ s.local_tz }}</td>
+  {% if ctx.weather %}{% set wx = ctx.weather.get(s.id) %}<td style="color:#4b5563;">{% if wx %}{{ wx.short }}{% if wx.risk %} ☔{% endif %}{% else %}—{% endif %}</td>{% endif %}
 </tr>
 {% endfor %}
 </table>
@@ -21,6 +22,7 @@
 
 {% set st = ctx.stats %}
 <h3 style="margin:16px 0 8px;">Track</h3>
+{% if ctx.map_url %}<img src="{{ ctx.map_url }}" alt="{{ c.name }} layout" width="400" style="display:block;max-width:100%;height:auto;margin:0 0 8px;">{% endif %}
 <table role="presentation" cellpadding="3" cellspacing="0" style="font-size:14px;">
 {% if c.length_km %}<tr><td style="color:#6b7280;">Length</td><td>{{ "%.3f"|format(c.length_km) }} km{% if c.laps %} × {{ c.laps }} laps{% endif %}</td></tr>{% endif %}
 {% if c.turns %}<tr><td style="color:#6b7280;">Turns</td><td>{{ c.turns }}</td></tr>{% endif %}
@@ -54,6 +56,11 @@
 {% for f in ctx.form %}
 <p style="margin:2px 0;"><strong>{{ f.driver }}</strong>: {% if f.results %}{% for ev, pos in f.results %}{{ pos }} <span style="color:#6b7280;">({{ ev }})</span>{% if not loop.last %} · {% endif %}{% endfor %}{% else %}no results yet{% endif %}</p>
 {% endfor %}
+{% endif %}
+
+{% if ctx.weather %}
+<h3 style="margin:16px 0 8px;">Weather</h3>
+{% for w in ctx.rain %}<p style="margin:2px 0;color:#b45309;font-weight:600;">☔ {{ w }}</p>{% else %}<p style="margin:2px 0;">No significant rain risk for qualifying or the race (forecast from Open-Meteo).</p>{% endfor %}
 {% endif %}
 
 {% if ctx.facts %}

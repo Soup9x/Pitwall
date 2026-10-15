@@ -8,11 +8,13 @@
 <div class="grid">
   <div class="card">
     <h2>Sessions</h2>
-    {{ session_table(sessions) }}
+    {{ session_table(sessions, weather) }}
+    {% for w in rain %}<div class="odd" style="margin-top:6px;">☔ {{ w }}</div>{% endfor %}
+    {% if weather %}<p class="muted small">Forecast: Open-Meteo, updated every 3 hours.</p>{% endif %}
   </div>
   <div class="card">
     <h2>Track</h2>
-    {{ track_facts(event.circuit, stats) }}
+    {{ track_facts(event.circuit, stats, map_url) }}
   </div>
 
   {% if facts %}

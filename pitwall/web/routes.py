@@ -9,7 +9,13 @@ from typing import Any
 from zoneinfo import available_timezones
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+)
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session as DB
@@ -22,6 +28,7 @@ from pitwall.logging_setup import register_secrets
 from pitwall.models import (
     SESSION_LABELS,
     SESSION_TYPES,
+    Circuit,
     Driver,
     Event,
     FollowedDriver,
@@ -38,7 +45,9 @@ from pitwall.notify import targets as targets_svc
 from pitwall.notify.dispatch import mask_url
 from pitwall.notify.dispatch import notify as dispatch_notify
 from pitwall.services import (
+    circuit_maps,
     driver_stats,
+    exports,
     head_to_head,
     ics,
     reminders,
@@ -46,6 +55,7 @@ from pitwall.services import (
     title_math,
     track_stats,
     trivia,
+    weather,
 )
 from pitwall.services.presenters import (
     current_or_next_event,
@@ -58,6 +68,8 @@ from pitwall.settings_store import (
     ALERT_LABELS,
     ALERT_TYPES,
     CHANNELS,
+    DIGESTIBLE,
+    WEEKDAYS,
     get_kv,
     load_settings,
     parse_hhmm,
@@ -173,6 +185,16 @@ def calendar_feed(
     )
 
 
+@public.get("/circuit-maps/{circuit_id}")
+def circuit_map(circuit_id: str, db: DB = Depends(get_db)) -> Response:
+    """Public (no login) so email clients can load the image; maps aren't sensitive."""
+    circuit = db.get(Circuit, circuit_id)
+    path = circuit_maps.local_file(circuit) if circuit else None
+    if path is None:
+        raise HTTPException(status_code=404)
+    return FileResponse(path, headers={"Cache-Control": "public, max-age=86400"})
+
+
 @public.get("/login", response_class=HTMLResponse)
 def login_form(request: Request, next: str = "/") -> HTMLResponse:
     if is_logged_in(request):
@@ -259,6 +281,7 @@ def dashboard(request: Request, db: DB = Depends(get_db)) -> HTMLResponse:
         next_event=nxt.event if nxt else None,
         event=event,
         sessions=event_sessions(event, settings, now) if event else [],
+        weather=weather.for_event(db, event) if event else {},
         drivers=drivers,
         constructors=constructors,
         followed_rows=[r for r in (drivers.rows if drivers else []) if r.followed],
@@ -314,6 +337,9 @@ def event_page(request: Request, event_id: int, db: DB = Depends(get_db)) -> HTM
         sessions=event_sessions(event, settings),
         stats=track_stats.compute(db, event),
         facts=trivia.for_preview(db, event, avoid_recent=False),
+        weather=(wx := weather.for_event(db, event)),
+        rain=weather.rain_warnings(event, wx),
+        map_url=circuit_maps.map_url(event.circuit),
         results=results,
         followed=followed,
         watched=outbox.is_watched(db, event.id),
@@ -394,6 +420,37 @@ def standings_page(
         ],
         spoiler_hidden=_spoiler_hidden(db, last_completed_event(db)),
     )
+
+
+def _csv_response(body: str, filename: str) -> Response:
+    return Response(
+        body,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@private.get("/export/standings.csv")
+def export_standings(
+    season: int | None = None, kind: str = "driver", db: DB = Depends(get_db)
+) -> Response:
+    if kind not in ("driver", "constructor"):
+        raise HTTPException(404)
+    season = season or standings.latest_season_with_standings(db)
+    body = exports.standings_csv(db, season, kind) if season else None
+    if body is None:
+        raise HTTPException(404, "No standings stored for that season")
+    return _csv_response(body, f"pitwall-{kind}-standings-{season}.csv")
+
+
+@private.get("/export/drivers.csv")
+def export_drivers(
+    season: int | None = None, driver: str | None = None, db: DB = Depends(get_db)
+) -> Response:
+    season = season or utcnow().year
+    body = exports.drivers_csv(db, season, [driver] if driver else None)
+    name = driver or "followed-drivers"
+    return _csv_response(body, f"pitwall-{name}-{season}.csv")
 
 
 @private.get("/head-to-head", response_class=HTMLResponse)
@@ -548,6 +605,8 @@ def settings_page(request: Request, db: DB = Depends(get_db)) -> HTMLResponse:
         session_labels=SESSION_LABELS,
         offsets={t: fmt_offsets(settings.reminder_offsets.get(t, [])) for t in SESSION_TYPES},
         alert_types=ALERT_TYPES,
+        digestible=DIGESTIBLE,
+        weekdays=WEEKDAYS,
         alert_labels=ALERT_LABELS,
         channels=CHANNELS,
         targets={c: targets_svc.db_targets(db, c) for c in CHANNELS},
@@ -579,6 +638,12 @@ async def save_settings_route(request: Request, db: DB = Depends(get_db)) -> Res
             raise ValueError("Backfill start year must be between 1950 and this year")
         if not 0 <= auto_release <= 24 * 14:
             raise ValueError("Auto-release must be between 0 and 336 hours")
+        digest_day = str(form.get("digest_day", "mon"))
+        if digest_day not in WEEKDAYS:
+            raise ValueError("Pick a day for the weekly digest")
+        digest_time = str(form.get("digest_time", "08:00"))
+        parse_hhmm(digest_time)
+        digest_types = [t for t in DIGESTIBLE if form.get(f"digest_type_{t}")]
     except ValueError as exc:
         request.session["settings_error"] = str(exc)
         return back("/settings")
@@ -598,12 +663,17 @@ async def save_settings_route(request: Request, db: DB = Depends(get_db)) -> Res
             "odd_start": str(form.get("odd_start")),
             "odd_end": str(form.get("odd_end")),
             "backfill_start_year": start_year,
+            "digest_enabled": bool(form.get("digest_enabled")),
+            "digest_day": digest_day,
+            "digest_time": digest_time,
+            "digest_types": digest_types,
         },
     )
     db.commit()
     sched = scheduler.get_scheduler()
     if sched is not None:
-        if new.timezone != old.timezone:
+        schedule_keys = ("timezone", "digest_enabled", "digest_day", "digest_time")
+        if any(getattr(new, k) != getattr(old, k) for k in schedule_keys):
             scheduler.install_recurring_jobs(sched)
         reminders.reconcile(sched, db, new)
     flash(request, "Settings saved.")
