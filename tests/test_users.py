@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from pitwall import jobs, users
+from pitwall.db import utcnow
 from pitwall.models import (
     OWNER_ID,
     Event,
@@ -453,3 +454,107 @@ def test_login_cookie_secure_only_for_https_visits(client):
     with _behind_proxy("192.168.1.99") as c:  # LAN over plain http, even if it claims https
         cookie = login_cookie(c, {"x-forwarded-proto": "https"})
         assert "secure" not in cookie.lower()
+
+
+# ---------------------------------------------------------------------------- admin-made accounts
+
+
+def _shown_password(html: str) -> str:
+    return re.search(r"Password: (\S+)</pre>", html).group(1)
+
+
+def test_admin_creates_account_with_generated_password(client, db):
+    login(client)
+    r = client.post(
+        "/admin/users",
+        data={"csrf_token": csrf(client, "/admin/users"), "username": "Dave", "must_change": "on"},
+    )
+    assert r.status_code == 200 and "Account created for dave" in r.text
+    password = _shown_password(r.text)
+    assert re.fullmatch(r"[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}", password)
+    assert password not in client.get("/admin/users").text  # shown once only
+    dave = db.scalars(select(User).where(User.username == "dave")).one()
+    assert dave.must_change_password and not dave.is_admin
+    assert password not in dave.password_hash
+
+    other = TestClient(client.app)
+    login(other, "dave", password)
+    # Until they choose their own password, everything leads to the Account page.
+    for path in ("/", "/settings", "/standings"):
+        r = other.get(path, follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/account", path
+    assert "Choose your own below" in other.get("/account").text
+    r = other.post(
+        "/account/password",
+        data={
+            "csrf_token": csrf(other, "/account"),
+            "current": password,
+            "password": "orchid-lantern-42",
+            "password2": "orchid-lantern-42",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    r = other.get("/", follow_redirects=False)
+    assert r.status_code == 200, r.headers.get("location")
+    db.expire_all()
+    assert not db.get(User, dave.id).must_change_password
+
+
+def test_admin_creates_account_with_chosen_password(client, db):
+    login(client)
+    token = csrf(client, "/admin/users")
+    r = client.post(
+        "/admin/users",
+        data={"csrf_token": token, "username": "erin", "password": "staple-garden-77"},
+    )
+    assert "Password: staple-garden-77" in r.text
+    other = TestClient(client.app)
+    login(other, "erin", "staple-garden-77")
+    assert other.get("/", follow_redirects=False).status_code == 200  # no forced change
+    # Mistakes are shown on the form, keeping the username.
+    r = client.post("/admin/users", data={"csrf_token": token, "username": "erin", "password": "x"})
+    assert r.status_code == 400 and "That username is taken." in r.text
+    r = client.post(
+        "/admin/users", data={"csrf_token": token, "username": "frank", "password": "short"}
+    )
+    assert r.status_code == 400 and "at least 10 characters" in r.text
+    assert 'value="frank"' in r.text
+
+
+def test_temporary_password_unlocks_and_signs_out(client, db, bob):
+    other = TestClient(client.app)
+    login(other, "bob", BOB_PW)
+    db.get(User, bob.id).locked_until = utcnow() + timedelta(minutes=10)
+    db.commit()
+    login(client)
+    r = client.post(
+        f"/admin/users/{bob.id}/temp-password", data={"csrf_token": csrf(client, "/admin/users")}
+    )
+    assert "Temporary password for bob" in r.text
+    password = _shown_password(r.text)
+    assert other.get("/", follow_redirects=False).headers["location"].startswith("/login")
+    login(other, "bob", password)  # unlocked, new password works
+    assert other.get("/", follow_redirects=False).headers["location"] == "/account"
+    # Not for yourself (use Account), and not for non-admins.
+    r = client.post(
+        f"/admin/users/{OWNER_ID}/temp-password",
+        data={"csrf_token": csrf(client, "/admin/users")},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    login(client)  # admin's own password unchanged
+    r = other.post(
+        f"/admin/users/{OWNER_ID}/temp-password",
+        data={"csrf_token": csrf(other, "/account")},
+        follow_redirects=False,
+    )
+    assert r.status_code in (303, 403)
+    login(client)  # still unchanged
+
+
+def test_generated_passwords_are_valid_and_unambiguous():
+    for _ in range(50):
+        pw = users.generate_password("bob")
+        users.check_password(pw, "bob")
+        assert not set(pw) & set("0O1lI")

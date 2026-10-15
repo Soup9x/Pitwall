@@ -18,7 +18,9 @@ from pitwall.users import (
     admin_count,
     authenticate,
     create_invite,
+    create_user,
     find_invite,
+    generate_password,
     new_ics_token,
     set_password,
     verify_password,
@@ -234,9 +236,8 @@ def _invite_url(token: str) -> str:
     return f"{get_env().base_url.rstrip('/')}/invite/{token}"
 
 
-@router.get("/admin/users", response_class=HTMLResponse)
-def users_page(
-    request: Request, db: DB = Depends(get_db), user: User = Depends(require_admin)
+def _users_page(
+    request: Request, db: DB, user: User, status: int = 200, **extra: object
 ) -> HTMLResponse:
     now = utcnow()
     invites = list(
@@ -246,7 +247,7 @@ def users_page(
             .order_by(Invite.created_at.desc())
         )
     )
-    return page(
+    resp = page(
         request,
         "users.html",
         db,
@@ -256,7 +257,61 @@ def users_page(
         owner_id=OWNER_ID,
         now=now,
         new_link=request.session.pop("new_link", None),
+        login_url=get_env().base_url.rstrip("/"),
+        **extra,
     )
+    resp.status_code = status
+    return resp
+
+
+@router.get("/admin/users", response_class=HTMLResponse)
+def users_page(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_admin)
+) -> HTMLResponse:
+    return _users_page(request, db, user)
+
+
+# Credentials are shown in the response itself (never stored, not even in the session cookie).
+@router.post("/admin/users", response_class=HTMLResponse)
+async def create_account(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_admin)
+) -> HTMLResponse:
+    form = await checked_form(request)
+    username = str(form.get("username", ""))[:64]
+    password = str(form.get("password", "")) or generate_password(username.strip().lower())
+    try:
+        new = create_user(
+            db,
+            username,
+            password,
+            is_admin=bool(form.get("make_admin")),
+            must_change_password=bool(form.get("must_change")),
+        )
+    except AccountError as exc:
+        db.rollback()
+        return _users_page(request, db, user, 400, create_error=str(exc), create_name=username)
+    db.commit()
+    log.info("account created", extra={"user": new.username, "by": user.username})
+    creds = {"kind": "new", "username": new.username, "password": password}
+    return _users_page(request, db, user, new_creds=creds)
+
+
+@router.post("/admin/users/{user_id}/temp-password", response_class=HTMLResponse)
+async def temp_password(
+    request: Request, user_id: int, db: DB = Depends(get_db), user: User = Depends(require_admin)
+) -> Response:
+    await checked_form(request)
+    target = _other_user(db, user_id, user)
+    if target.id == user.id:
+        flash(request, "Change your own password under Account.")
+        return back("/admin/users")
+    password = generate_password(target.username)
+    set_password(db, target, password, temporary=True)  # also unlocks and signs them out
+    target.active = True
+    db.commit()
+    log.info("temporary password set", extra={"user": target.username, "by": user.username})
+    creds = {"kind": "temp", "username": target.username, "password": password}
+    return _users_page(request, db, user, new_creds=creds)
 
 
 @router.post("/admin/invites")

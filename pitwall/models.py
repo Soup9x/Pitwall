@@ -202,6 +202,8 @@ class User(Base):
     ics_token: Mapped[str | None] = mapped_column(String(80), unique=True, nullable=True)
     # Bumped on password change/reset so existing login cookies stop working.
     session_version: Mapped[int] = mapped_column(Integer, default=1)
+    # Set when an admin chose the password (new account or temporary password).
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False)
     failed_logins: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

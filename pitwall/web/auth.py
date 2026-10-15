@@ -23,6 +23,14 @@ class NotAuthenticated(Exception):
         self.next_path = next_path
 
 
+class PasswordChangeRequired(Exception):
+    """The user logged in with a password an admin gave them and must choose their own."""
+
+
+# What someone with a temporary password can still reach.
+PASSWORD_CHANGE_PATHS = {"/account", "/account/password", "/account/signout-everywhere"}
+
+
 class LoginRateLimiter:
     def __init__(self, max_failures: int = MAX_FAILURES, window: int = WINDOW_SECONDS) -> None:
         self.max_failures = max_failures
@@ -93,6 +101,8 @@ def require_user(request: Request) -> User:
         if request.url.query:
             path += f"?{request.url.query}"
         raise NotAuthenticated(path)
+    if user.must_change_password and request.url.path not in PASSWORD_CHANGE_PATHS:
+        raise PasswordChangeRequired()
     request.state.user = user
     return user
 

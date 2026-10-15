@@ -21,7 +21,7 @@ from pitwall.notify.targets import register_all_secrets
 from pitwall.services.circuits import merge_all
 from pitwall.users import bootstrap
 from pitwall.web import accounts, routes
-from pitwall.web.auth import NotAuthenticated
+from pitwall.web.auth import NotAuthenticated, PasswordChangeRequired
 from pitwall.web.security import SecurityHeadersMiddleware
 
 log = logging.getLogger(__name__)
@@ -78,6 +78,10 @@ def create_app(*, manage_db: bool = True, start_scheduler: bool | None = None) -
         from urllib.parse import quote
 
         return RedirectResponse(f"/login?next={quote(exc.next_path)}", status_code=303)
+
+    @app.exception_handler(PasswordChangeRequired)
+    async def _password_redirect(request: Request, exc: PasswordChangeRequired) -> RedirectResponse:
+        return RedirectResponse("/account", status_code=303)
 
     app.include_router(routes.public)
     app.include_router(accounts.router)

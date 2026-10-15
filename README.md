@@ -304,14 +304,22 @@ Everyone shares the F1 data. Each person has their own:
 - reminder times, quiet hours, spoiler mode and weekly digest
 - calendar feed
 
-**Inviting someone (admins):**
-1. Open **Users → Create invite link** and send the link. It works once and expires after
-   7 days.
-2. The person opens it, picks a username and password, and lands on their own Settings page.
+**Creating an account (admins):**
+1. Open **Users → Create an account**, enter a username and either type a password or leave
+   it blank to generate one (like `k7Fp-3xQa-Wm9t`, with no look-alike characters).
+2. Pitwall shows the address, username and password once. Press **Copy login details** and
+   send them to the person.
+3. With "They choose their own password" ticked (the default), their first login takes them
+   to **Account**, and they can't use the rest of Pitwall until they pick their own password.
+
+**Inviting someone (admins):** alternatively, **Users → Create invite link** makes a one-time
+link (valid 7 days) where the person picks their own username and password.
 
 **Managing users (admins):**
-- **Forgotten password:** use **Reset link** next to the person, which creates a one-time
-  link valid for 48 hours.
+- **Forgotten password or locked out:** **Temporary password** next to the person gives them a
+  new generated password (shown once), unlocks the account and signs them out everywhere;
+  they choose their own at next login. **Reset link** instead creates a one-time link valid
+  for 48 hours.
 - You can also make someone an admin, or disable or delete their account.
 - Admins also see system settings (history download, data sync) and can view everyone's
   notification history.
@@ -331,8 +339,10 @@ cd /opt/pitwall
 sudo docker compose exec pitwall python -m pitwall set-password admin
 ```
 
-This also unlocks the account. To create another admin from the command line:
-`... python -m pitwall create-user NAME --admin`.
+This also unlocks the account. To create an account from the command line:
+`... python -m pitwall create-user NAME` (add `--admin` for an admin). For either command,
+press Enter at the password prompt to generate one; it's printed, and the person chooses their
+own at first login.
 
 ## Security notes
 
@@ -345,8 +355,9 @@ This also unlocks the account. To create another admin from the command line:
   - Logins are rate-limited per visitor (5 failures per 15 minutes).
   - Each account also locks for 15 minutes after 5 wrong passwords.
   - Error messages never reveal whether a username exists.
-- **Accounts:** there's no open sign-up. New accounts need an admin's one-time invite link,
-  and only a hash of that link is stored.
+- **Accounts:** there's no open sign-up. Admins create accounts or send one-time invite links
+  (only a hash of the link is stored). Passwords an admin chose or generated are shown once,
+  never stored in plain text, and (by default) replaced by the person at their first login.
 - **Public URLs:** `/calendar.ics` uses a per-user token instead of a login, so Google can fetch
   it. `/circuit-maps/*` is public, so email clients can show maps. `/health` tells internet
   visitors only `{"status": "ok"}`; details are for logged-in users and the local healthcheck.

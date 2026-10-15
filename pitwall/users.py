@@ -122,16 +122,41 @@ def authenticate(db: DB, username: str, password: str, now: datetime | None = No
     return user
 
 
-def set_password(db: DB, user: User, password: str) -> None:
+# No look-alike characters (0/O, 1/l/I), so a password read out or copied by hand works.
+_PW_ALPHABET = "abcdefghijkmnpqrstuvwxyzACDEFGHJKLMNPQRTUVWXY346789"
+
+
+def generate_password(username: str = "") -> str:
+    """A random password to hand to someone, like 'k7Fp-3xQa-Wm9t' (about 68 bits)."""
+    while True:
+        chunks = ("".join(secrets.choice(_PW_ALPHABET) for _ in range(4)) for _ in range(3))
+        password = "-".join(chunks)
+        try:
+            check_password(password, username)
+        except AccountError:
+            continue
+        return password
+
+
+def set_password(db: DB, user: User, password: str, *, temporary: bool = False) -> None:
+    """Set a password; `temporary` (chosen by an admin) makes them pick their own at next login."""
     check_password(password, user.username)
     user.password_hash = hash_password(password)
+    user.must_change_password = temporary
     user.session_version += 1  # signs out every other session
     user.failed_logins = 0
     user.locked_until = None
     db.flush()
 
 
-def create_user(db: DB, username: str, password: str, *, is_admin: bool = False) -> User:
+def create_user(
+    db: DB,
+    username: str,
+    password: str,
+    *,
+    is_admin: bool = False,
+    must_change_password: bool = False,
+) -> User:
     username = check_username(username)
     if db.scalars(select(User).where(User.username == username)).first():
         raise AccountError("That username is taken.")
@@ -140,6 +165,7 @@ def create_user(db: DB, username: str, password: str, *, is_admin: bool = False)
         username=username,
         password_hash=hash_password(password),
         is_admin=is_admin,
+        must_change_password=must_change_password,
         ics_token=new_ics_token(),
     )
     db.add(user)

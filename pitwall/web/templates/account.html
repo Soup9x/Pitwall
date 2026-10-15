@@ -3,13 +3,14 @@
 {% block content %}
 <h1>Account</h1>
 <p class="sub">Signed in as <strong>{{ user.username }}</strong>{% if user.is_admin %} (admin){% endif %}.</p>
+{% if user.must_change_password %}<div class="error">You're using a password someone else chose. Choose your own below to continue.</div>{% endif %}
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 <div class="grid">
   <div class="card">
     <h2>Change password</h2>
     <form method="post" action="/account/password">
       <input type="hidden" name="csrf_token" value="{{ csrf }}">
-      <label for="current">Current password</label>
+      <label for="current">{{ 'Password you were given' if user.must_change_password else 'Current password' }}</label>
       <input id="current" type="password" name="current" autocomplete="current-password" required>
       <label for="password">New password <span class="muted">(10+ characters)</span></label>
       <input id="password" type="password" name="password" autocomplete="new-password" required minlength="10">
