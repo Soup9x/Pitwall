@@ -8,8 +8,9 @@ services:
     environment:
       PITWALL_DATA_DIR: /app/data
     ports:
-      # Host port: PITWALL_PORT in .env (default 8080). Set PITWALL_BIND=127.0.0.1 to accept
-      # connections only from this machine (e.g. when a reverse proxy runs on the same host).
+      # Host port: PITWALL_PORT in .env (default 8080). Keep PITWALL_BIND=0.0.0.0 when a
+      # Cloudflare Tunnel (cloudflared) or reverse proxy on another LAN machine forwards to it;
+      # use 127.0.0.1 only if that proxy runs on this same host.
       - "${PITWALL_BIND:-0.0.0.0}:${PITWALL_PORT:-8080}:8080"
     volumes:
       - ./data:/app/data # SQLite database, cache and circuits.yaml
@@ -27,20 +28,3 @@ services:
       timeout: 10s
       start_period: 30s
       retries: 3
-
-  # Optional Cloudflare Tunnel: exposes Pitwall on the internet without opening any ports.
-  # Enabled by COMPOSE_PROFILES=tunnel and CLOUDFLARE_TUNNEL_TOKEN in .env (install.sh sets
-  # both). In the Cloudflare dashboard, point the tunnel's public hostname at http://pitwall:8080.
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: pitwall-tunnel
-    profiles: ["tunnel"]
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
-    depends_on:
-      - pitwall
-    read_only: true
-    security_opt:
-      - no-new-privileges:true

@@ -318,17 +318,11 @@ if ((configure)); then
   BIND="0.0.0.0"
   SECURE="false"
   FWD="127.0.0.1"
-  CF="false"
-  TUNNEL_TOKEN="$(env_get CLOUDFLARE_TUNNEL_TOKEN)"
-  PROFILES=""
   access_default=1
-  if [[ -n "$TUNNEL_TOKEN" ]]; then access_default=2
-  elif [[ "$(env_get PITWALL_SECURE_COOKIES)" == true || "$(env_get PITWALL_BIND)" == 127.0.0.1 ]]; then access_default=3
-  fi
+  [[ "$(env_get PITWALL_BASE_URL)" == https://* ]] && access_default=2
   access="$(choose "How will people reach Pitwall?" "$access_default" \
     "Only on my local network (http://$host_name:$PORT)" \
-    "From the internet through a Cloudflare Tunnel (recommended for sharing)" \
-    "Through my own reverse proxy (Caddy, nginx, Traefik, Nginx Proxy Manager...)")"
+    "From the internet through my existing Cloudflare Tunnel or reverse proxy")"
   case "$access" in
     1)
       prev_url="$(env_get PITWALL_BASE_URL)"
@@ -337,37 +331,6 @@ if ((configure)); then
       BASE_URL="${BASE_URL%/}"
       ;;
     2)
-      say ""
-      hint "In the Cloudflare dashboard: Zero Trust → Networks → Tunnels → Create a tunnel →"
-      hint "Cloudflared. Copy the token (the long text after --token in the install command)."
-      hint "Then add a Public Hostname, e.g. pitwall.yourdomain.com, with service type HTTP and"
-      hint "URL  pitwall:8080  (that's the Pitwall container on the tunnel's Docker network)."
-      if [[ -n "$TUNNEL_TOKEN" ]] && ask_yn "Keep the current tunnel token?" y; then
-        :
-      else
-        while :; do
-          TUNNEL_TOKEN="$(ask_secret "Tunnel token")"
-          TUNNEL_TOKEN="${TUNNEL_TOKEN//[[:space:]]/}"
-          TUNNEL_TOKEN="${TUNNEL_TOKEN#*--token}"
-          [[ ${#TUNNEL_TOKEN} -ge 40 && "$TUNNEL_TOKEN" =~ ^[A-Za-z0-9=_.-]+$ ]] && break
-          warn "That doesn't look like a tunnel token (a long string of letters and numbers)."
-        done
-      fi
-      prev_url="$(env_get PITWALL_BASE_URL)"
-      [[ "$prev_url" == https://* ]] || prev_url=""
-      while :; do
-        host="$(ask_required "Public hostname you set up (e.g. pitwall.example.com)" "${prev_url#https://}")"
-        host="${host#https://}"; host="${host#http://}"; host="${host%%/*}"
-        [[ "$host" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] && break
-        warn "Please enter just the hostname, like pitwall.example.com"
-      done
-      BASE_URL="https://$host"
-      BIND="127.0.0.1"   # only reachable via the tunnel (and this machine)
-      SECURE="true"
-      CF="true"
-      PROFILES="tunnel"
-      ;;
-    3)
       prev_url="$(env_get PITWALL_BASE_URL)"
       [[ "$prev_url" == https://* ]] || prev_url=""
       while :; do
@@ -376,16 +339,29 @@ if ((configure)); then
         warn "Please enter a full URL starting with https:// (or http://)."
       done
       BASE_URL="${BASE_URL%/}"
-      [[ "$BASE_URL" == https://* ]] && SECURE="true"
-      if ask_yn "Does the proxy run on this same machine?" y; then
+      if [[ "$BASE_URL" == https://* ]]; then
+        SECURE="true"
+        hint "Logins only work over https from now on, so use $BASE_URL (not the LAN address)."
+      fi
+      if ask_yn "Does the tunnel connector (cloudflared) or proxy run directly on this machine (not in Docker)?" n; then
         BIND="127.0.0.1"
-        FWD="*"
-        hint "Pitwall will only listen on 127.0.0.1:$PORT; point the proxy at http://127.0.0.1:$PORT"
+        FWD="*"   # only this machine can reach 127.0.0.1, so trusting its forwarded IPs is safe
+        hint "Pitwall will only listen on 127.0.0.1:$PORT. In Cloudflare, set the published"
+        hint "application's service to  HTTP  127.0.0.1:$PORT"
       else
-        hint "Point the proxy at http://$host_name:$PORT"
+        lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+        hint "In Cloudflare (Zero Trust → Networks → Tunnels → your tunnel → Published application"
+        hint "routes), set the service to  HTTP  ${lan_ip:-$host_name}:$PORT"
+        hint "Pitwall needs the IP address of the machine running cloudflared (or your proxy) so it"
+        hint "can see visitors' real IPs for login rate limiting, without letting anyone fake them."
         prev="$(env_get FORWARDED_ALLOW_IPS)"
-        [[ "$prev" == 127.0.0.1 ]] && prev=""
-        FWD="$(ask "IP address of the proxy (lets Pitwall see real client IPs; * = trust any)" "${prev:-*}")"
+        [[ "$prev" == 127.0.0.1 || "$prev" == "*" ]] && prev=""
+        while :; do
+          FWD="$(ask_required "IP address of the cloudflared/proxy machine (e.g. 192.168.1.20)" "$prev")"
+          FWD="${FWD//[[:space:]]/}"
+          [[ "$FWD" =~ ^[0-9A-Fa-f:./]+(,[0-9A-Fa-f:./]+)*$ ]] && break
+          warn "Please enter an IP address (several can be separated with commas)."
+        done
       fi
       ;;
   esac
@@ -446,8 +422,8 @@ if ((configure)); then
   say "  Install folder:   $INSTALL_DIR"
   say "  Timezone:         $TZ_VAL"
   say "  Web UI address:   $BASE_URL"
-  [[ "$CF" == true ]] && say "  Cloudflare:       tunnel enabled (token saved)"
   say "  Listens on:       $BIND:$PORT"
+  [[ "$access" == 2 ]] && say "  Trusted proxy:    $FWD"
   say "  Password:         $([[ -n "$GENERATED_PW" ]] && echo "(generated)" || echo "(set)")"
   [[ -n "$EMAIL_URLS" ]] && say "  Email (.env):     $(mask_urls "$EMAIL_URLS")"
   [[ -n "$HOOK_URLS" ]] && say "  Webhooks (.env):  $(mask_urls "$HOOK_URLS")"
@@ -485,11 +461,6 @@ PITWALL_LOG_LEVEL=$LOG_LEVEL
 PITWALL_SECURE_COOKIES=$SECURE
 FORWARDED_ALLOW_IPS=$(q "$FWD")
 
-# Cloudflare Tunnel (optional). COMPOSE_PROFILES=tunnel starts the cloudflared container.
-PITWALL_CLOUDFLARE=$CF
-CLOUDFLARE_TUNNEL_TOKEN=$(q "$TUNNEL_TOKEN")
-COMPOSE_PROFILES=$PROFILES
-
 PUID=$APP_UID
 PGID=$APP_GID
 EOF
@@ -504,11 +475,9 @@ step "Starting Pitwall"
 mkdir -p data
 puid="$(env_get PUID)" pgid="$(env_get PGID)"
 chown -R "${puid:-$APP_UID}:${pgid:-$APP_GID}" data
-if [[ "$(env_get COMPOSE_PROFILES)" != *tunnel* ]]; then
-  # Tunnel switched off (or never on): make sure no old cloudflared container is left running.
-  docker compose --profile tunnel rm -sf cloudflared >/dev/null 2>&1 || true
-fi
-docker compose up -d --build || die "docker compose failed — see the messages above."
+# Older versions could run their own cloudflared container; make sure it's gone.
+docker rm -f pitwall-tunnel >/dev/null 2>&1 || true
+docker compose up -d --build --remove-orphans || die "docker compose failed — see the messages above."
 
 PORT="$(env_get PITWALL_PORT)"; PORT="${PORT:-8080}"
 say "Waiting for Pitwall to come up…"
@@ -562,16 +531,10 @@ if [[ -n "${GENERATED_PW:-}" ]]; then
 else
   say "  Username:   ${B}admin${N}  (password: the one you chose)"
 fi
-if [[ "$(env_get PITWALL_CLOUDFLARE)" == true ]]; then
-  say ""
-  say "  Cloudflare: make sure the tunnel's Public Hostname points to  ${B}http://pitwall:8080${N}"
-  hint "  (Zero Trust → Networks → Tunnels → your tunnel → Public Hostname). It can take a"
-  hint "  minute to connect: sudo docker compose logs cloudflared"
-fi
 say ""
 say "  Calendar feed: log in, open ${B}Account${N} and copy your private link into Google Calendar"
 say "  (Other calendars → + → From URL)."
-hint "  Google must be able to reach it from the internet (e.g. through the Cloudflare tunnel),"
+hint "  Google must be able to reach it from the internet (e.g. through your Cloudflare Tunnel),"
 hint "  and it refreshes subscribed calendars slowly (up to ~24 h)."
 say ""
 say "  Next steps — log in, open Settings and:"
