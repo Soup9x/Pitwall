@@ -106,9 +106,7 @@ The installer:
 1. checks for Docker and offers to install it if it's missing,
 2. downloads Pitwall to `/opt/pitwall`,
 3. asks for:
-   - your timezone and port
-   - how people will reach Pitwall: local network only, or from the internet through your
-     existing **Cloudflare Tunnel** or reverse proxy (section 6)
+   - your timezone, port and the address you'll use on your network
    - a password for the `admin` account (or generates one)
    - how far back to download history
 4. writes `.env` (readable only by root) and starts Pitwall,
@@ -243,9 +241,10 @@ To subscribe in Google Calendar (on a computer):
 1. Next to **Other calendars**, click **+** → **From URL**.
 2. Paste the feed URL and click **Add calendar**.
 
-**Google must be able to reach the URL from the internet.** A `mh-flex-01` address only works
-inside your network, so publish Pitwall through a Cloudflare Tunnel or your reverse proxy
-(section 6) and use that address. The feed only answers with a valid token.
+**Google must be able to reach the URL from the internet.** A LAN address such as
+`http://mh-flex-01:8080` only works inside your network, so Google Calendar can't subscribe to
+it. Calendar apps on your network (e.g. Apple Calendar or Thunderbird on a home computer) can.
+The feed only answers with a valid token.
 
 > **Note:** Google refreshes subscribed calendars slowly, sometimes only once a day. Time
 > changes may take up to ~24 h to show in Google Calendar. That is why schedule changes are also
@@ -278,84 +277,12 @@ sudo docker compose start
 
 To restore, put `data/` and `.env` back in `/opt/pitwall` and run `sudo docker compose up -d`.
 
-## 6. Opening Pitwall to the internet
+## 6. Accessing Pitwall
 
-Pitwall doesn't run a tunnel of its own. Publish it through the Cloudflare Tunnel (or reverse
-proxy) you already have on your network, and Pitwall's own logins keep it locked down.
-
-**Direct port (no proxy).** This is the default. Browse to `http://mh-flex-01:8080`. Change
-the host port with `PITWALL_PORT` in `.env`.
-
-### Option A: your existing Cloudflare Tunnel (recommended)
-
-A tunnel connects your network to Cloudflare *outbound*, so you don't open any ports on your
-router, and Cloudflare provides the HTTPS certificate.
-
-1. In the [Cloudflare dashboard](https://one.dash.cloudflare.com/), go to **Zero Trust →
-   Networks → Tunnels**, open your tunnel and add a **Published application route**:
-   - **Subdomain / Domain:** e.g. `pitwall` . `yourdomain.com`
-   - **Service type:** HTTP
-   - **URL:** the Pitwall server's LAN address and port, e.g. `192.168.1.50:8080`
-2. Run `sudo ./install.sh` in `/opt/pitwall`, choose **Go through the questions again**, and
-   at "How will people reach Pitwall?" pick **From the internet through my existing Cloudflare
-   Tunnel or reverse proxy**. Enter `https://pitwall.yourdomain.com` and the IP address of the
-   machine running `cloudflared`.
-
-Pitwall then trusts the forwarded visitor details **only from the `cloudflared` machine**: login
-rate limiting works per person, nobody else can fake their IP, and the login cookie is
-HTTPS-only for visits that came in over HTTPS.
-
-To do it by hand, set these in `.env` and run `sudo docker compose up -d`:
-
-```
-PITWALL_BASE_URL=https://pitwall.yourdomain.com
-FORWARDED_ALLOW_IPS=192.168.1.20   # the cloudflared machine (several: comma separated)
-```
-
-Never set `FORWARDED_ALLOW_IPS` to `*` while Pitwall's port is reachable from other machines:
-anyone on your LAN could then fake their IP.
-
-**On your LAN.** Pitwall itself speaks plain HTTP; the HTTPS certificate lives at Cloudflare.
-So inside your network either:
-- use `http://<server LAN IP>:8080` (works as before, including logging in), or
-- use `https://pitwall.yourdomain.com` **without** a local DNS record pointing that name at the
-  server. With such a record your browser talks HTTPS straight to the server, which has no
-  certificate, and shows `ERR_SSL_PROTOCOL_ERROR`. Without it, the request goes out to
-  Cloudflare and back in through your tunnel.
-
-Recommended Cloudflare settings:
-- **SSL/TLS → Edge Certificates → Always Use HTTPS:** on.
-- **Security → Bots → Bot Fight Mode:** on.
-- **Optional extra lock:** a Cloudflare Access application (Zero Trust → Access) can ask for an
-  email code before anyone reaches Pitwall. If you add one, create **Bypass** policies for
-  `/calendar.ics`, `/circuit-maps/*` and `/invite/*`. Google Calendar and email clients can't
-  log in, and new users need to open their invite link.
-
-### Option B: your own reverse proxy
-
-Point the proxy at `http://mh-flex-01:8080`, then answer the installer the same way as for
-Option A, giving the proxy's IP address. By hand, `.env` needs the same two lines as above,
-with `FORWARDED_ALLOW_IPS` set to the proxy's IP. The proxy must send `X-Forwarded-For` and
-`X-Forwarded-Proto` (Caddy does by default; see the nginx example).
-
-Caddy example:
-
-```
-pitwall.example.com {
-    reverse_proxy mh-flex-01:8080
-}
-```
-
-nginx example:
-
-```nginx
-location / {
-    proxy_pass http://mh-flex-01:8080;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-}
-```
+Pitwall serves plain HTTP on port 8080 of the server. Browse to `http://<server IP>:8080` (or
+`http://mh-flex-01:8080`) from any device on your network. Change the host port with
+`PITWALL_PORT` in `.env`, and set `PITWALL_BASE_URL` to the address you use so links in alerts
+point to it.
 
 ## 7. Please check `data/circuits.yaml`
 

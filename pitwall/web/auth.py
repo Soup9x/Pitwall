@@ -54,10 +54,10 @@ limiter = LoginRateLimiter()
 
 
 def client_key(request: Request) -> str:
-    """The visitor's IP, for rate limiting. Behind a proxy or Cloudflare Tunnel, uvicorn has
-    already replaced the proxy's address with the real visitor's (from X-Forwarded-For) - but
-    only for requests from addresses listed in FORWARDED_ALLOW_IPS, so nobody else can fake
-    it by sending that header themselves."""
+    """The visitor's IP, for rate limiting. Behind a proxy, uvicorn has already replaced the
+    proxy's address with the real visitor's (from X-Forwarded-For) - but only for requests
+    from addresses listed in FORWARDED_ALLOW_IPS (default: only this machine), so nobody else
+    can fake it by sending that header themselves."""
     return request.client.host if request.client else "unknown"
 
 
