@@ -1,0 +1,106 @@
+{
+ "MRData": {
+  "xmlns": "",
+  "series": "f1",
+  "url": "https://api.jolpi.ca/ergast/f1/2025/3/qualifying.json",
+  "limit": "100",
+  "offset": "0",
+  "total": "3",
+  "RaceTable": {
+   "season": "2025",
+   "round": "3",
+   "Races": [
+    {
+     "season": "2025",
+     "round": "3",
+     "url": "https://en.wikipedia.org/wiki/2025_Mexico_City_Grand_Prix",
+     "raceName": "Mexico City Grand Prix",
+     "Circuit": {
+      "circuitId": "rodriguez",
+      "url": "https://en.wikipedia.org/wiki/rodriguez",
+      "circuitName": "Autódromo Hermanos Rodríguez",
+      "Location": {
+       "lat": "19.4042",
+       "long": "-99.0907",
+       "locality": "Mexico City",
+       "country": "Mexico"
+      }
+     },
+     "date": "2025-10-26",
+     "time": "20:00:00Z",
+     "QualifyingResults": [
+      {
+       "number": "4",
+       "position": "1",
+       "Driver": {
+        "driverId": "norris",
+        "permanentNumber": "4",
+        "code": "NOR",
+        "url": "https://en.wikipedia.org/wiki/Norris",
+        "givenName": "Lando",
+        "familyName": "Norris",
+        "dateOfBirth": "1999-11-13",
+        "nationality": "British"
+       },
+       "Constructor": {
+        "constructorId": "mclaren",
+        "url": "https://en.wikipedia.org/wiki/McLaren",
+        "name": "McLaren",
+        "nationality": "British"
+       },
+       "Q1": "1:16.1",
+       "Q2": "1:15.8",
+       "Q3": "1:15.586"
+      },
+      {
+       "number": "16",
+       "position": "2",
+       "Driver": {
+        "driverId": "leclerc",
+        "permanentNumber": "16",
+        "code": "LEC",
+        "url": "https://en.wikipedia.org/wiki/Leclerc",
+        "givenName": "Charles",
+        "familyName": "Leclerc",
+        "dateOfBirth": "1997-10-16",
+        "nationality": "Monegasque"
+       },
+       "Constructor": {
+        "constructorId": "ferrari",
+        "url": "https://en.wikipedia.org/wiki/Ferrari",
+        "name": "Ferrari",
+        "nationality": "Italian"
+       },
+       "Q1": "1:16.2",
+       "Q2": "1:16.0",
+       "Q3": "1:15.848"
+      },
+      {
+       "number": "44",
+       "position": "3",
+       "Driver": {
+        "driverId": "hamilton",
+        "permanentNumber": "44",
+        "code": "HAM",
+        "url": "https://en.wikipedia.org/wiki/Hamilton",
+        "givenName": "Lewis",
+        "familyName": "Hamilton",
+        "dateOfBirth": "1985-01-07",
+        "nationality": "British"
+       },
+       "Constructor": {
+        "constructorId": "ferrari",
+        "url": "https://en.wikipedia.org/wiki/Ferrari",
+        "name": "Ferrari",
+        "nationality": "Italian"
+       },
+       "Q1": "1:16.2",
+       "Q2": "1:16.0",
+       "Q3": "1:15.938"
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

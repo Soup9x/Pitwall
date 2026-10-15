@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "_macros.html" import session_table, track_facts %}
+{% block title %}{{ event.name }}{% endblock %}
+{% block content %}
+<h1>{{ event.name }} {% if event.is_sprint_weekend %}<span class="badge sprint">SPRINT WEEKEND</span>{% endif %}{% if event.status == 'cancelled' %} <span class="badge cancelled">CANCELLED</span>{% endif %}</h1>
+<p class="sub">{{ event.season }} · Round {{ event.round }} · {{ event.circuit.name }}, {{ event.circuit.locality }}, {{ event.circuit.country }}</p>
+
+<div class="grid">
+  <div class="card">
+    <h2>Sessions</h2>
+    {{ session_table(sessions) }}
+  </div>
+  <div class="card">
+    <h2>Track</h2>
+    {{ track_facts(event.circuit, stats) }}
+  </div>
+
+  <div class="card wide">
+    <div class="row" style="justify-content:space-between;align-items:center;">
+      <h2 style="margin:0;">Results</h2>
+      <div class="row">
+        <form class="inline" method="post" action="/events/{{ event.id }}/watched">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}">
+          {% if watched %}
+            <input type="hidden" name="watched" value="0"><button class="secondary">✓ Watched (undo)</button>
+          {% else %}
+            <input type="hidden" name="watched" value="1"><button>Watched</button>
+          {% endif %}
+        </form>
+        <a class="btn secondary" href="/events/{{ event.id }}/preview" target="_blank">View race-week preview</a>
+        <form class="inline" method="post" action="/events/{{ event.id }}/send-preview">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary">Send preview now</button>
+        </form>
+      </div>
+    </div>
+    {% if settings.spoiler_enabled %}<p class="muted small">Spoiler mode is on: results &amp; standings alerts for this event are held until you click <em>Watched</em>{% if settings.spoiler_auto_release_hours %} (or {{ settings.spoiler_auto_release_hours }}h pass){% endif %}.</p>{% endif %}
+    {% if not results %}
+      <p class="muted">No results yet.</p>
+    {% else %}
+      {% if spoiler_hidden %}<details class="spoiler"><summary>Results hidden (spoiler mode) — click to show anyway</summary>{% endif %}
+      <div class="grid">
+      {% for block in results|reverse %}
+        <div>
+          <h3>{{ block.label }}</h3>
+          <div class="table-scroll"><table>
+          {% if block.session.type == 'Q' %}
+            <tr><th class="num">Pos</th><th>Driver</th><th>Q1</th><th>Q2</th><th>Q3</th></tr>
+            {% for r in block.rows %}
+            <tr class="{{ 'followed' if r.driver_id in followed else '' }}"><td class="num">{{ r.position_text or r.position }}</td><td>{{ r.driver.full_name }} <span class="muted small">{{ r.constructor.name if r.constructor }}</span></td><td>{{ r.q1 or '' }}</td><td>{{ r.q2 or '' }}</td><td>{{ r.q3 or '' }}</td></tr>
+            {% endfor %}
+          {% else %}
+            <tr><th class="num">Pos</th><th>Driver</th><th class="num">Grid</th><th>Time/Status</th><th class="num">Pts</th></tr>
+            {% for r in block.rows %}
+            <tr class="{{ 'followed' if r.driver_id in followed else '' }}"><td class="num">{{ r.position_text or r.position }}</td><td>{{ r.driver.full_name }} <span class="muted small">{{ r.constructor.name if r.constructor }}</span>{% if r.fastest_lap_rank == 1 %} ⏱️{% endif %}</td><td class="num">{{ r.grid if r.grid else 'PL' }}</td><td>{{ r.time_text or r.status or '' }}</td><td class="num">{{ r.points|pts }}</td></tr>
+            {% endfor %}
+          {% endif %}
+          </table></div>
+        </div>
+      {% endfor %}
+      </div>
+      {% if spoiler_hidden %}</details>{% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

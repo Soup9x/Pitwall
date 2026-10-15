@@ -1,0 +1,105 @@
+{
+ "MRData": {
+  "xmlns": "",
+  "series": "f1",
+  "url": "https://api.jolpi.ca/ergast/f1/2024/qualifying.json",
+  "limit": "100",
+  "offset": "0",
+  "total": "3",
+  "RaceTable": {
+   "season": "2024",
+   "Races": [
+    {
+     "season": "2024",
+     "round": "20",
+     "url": "https://en.wikipedia.org/wiki/2024_Mexico_City_Grand_Prix",
+     "raceName": "Mexico City Grand Prix",
+     "Circuit": {
+      "circuitId": "rodriguez",
+      "url": "https://en.wikipedia.org/wiki/rodriguez",
+      "circuitName": "Autódromo Hermanos Rodríguez",
+      "Location": {
+       "lat": "19.4042",
+       "long": "-99.0907",
+       "locality": "Mexico City",
+       "country": "Mexico"
+      }
+     },
+     "date": "2024-10-27",
+     "time": "20:00:00Z",
+     "QualifyingResults": [
+      {
+       "number": "55",
+       "position": "1",
+       "Driver": {
+        "driverId": "sainz",
+        "permanentNumber": "55",
+        "code": "SAI",
+        "url": "https://en.wikipedia.org/wiki/Sainz",
+        "givenName": "Carlos",
+        "familyName": "Sainz",
+        "dateOfBirth": "1994-09-01",
+        "nationality": "Spanish"
+       },
+       "Constructor": {
+        "constructorId": "ferrari",
+        "url": "https://en.wikipedia.org/wiki/Ferrari",
+        "name": "Ferrari",
+        "nationality": "Italian"
+       },
+       "Q1": "1:16.5",
+       "Q2": "1:16.3",
+       "Q3": "1:15.946"
+      },
+      {
+       "number": "1",
+       "position": "2",
+       "Driver": {
+        "driverId": "max_verstappen",
+        "permanentNumber": "1",
+        "code": "VER",
+        "url": "https://en.wikipedia.org/wiki/Verstappen",
+        "givenName": "Max",
+        "familyName": "Verstappen",
+        "dateOfBirth": "1997-09-30",
+        "nationality": "Dutch"
+       },
+       "Constructor": {
+        "constructorId": "red_bull",
+        "url": "https://en.wikipedia.org/wiki/Red Bull",
+        "name": "Red Bull",
+        "nationality": "Austrian"
+       },
+       "Q1": "1:16.6",
+       "Q2": "1:16.4",
+       "Q3": "1:16.171"
+      },
+      {
+       "number": "4",
+       "position": "3",
+       "Driver": {
+        "driverId": "norris",
+        "permanentNumber": "4",
+        "code": "NOR",
+        "url": "https://en.wikipedia.org/wiki/Norris",
+        "givenName": "Lando",
+        "familyName": "Norris",
+        "dateOfBirth": "1999-11-13",
+        "nationality": "British"
+       },
+       "Constructor": {
+        "constructorId": "mclaren",
+        "url": "https://en.wikipedia.org/wiki/McLaren",
+        "name": "McLaren",
+        "nationality": "British"
+       },
+       "Q1": "1:16.6",
+       "Q2": "1:16.3",
+       "Q3": "1:16.260"
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

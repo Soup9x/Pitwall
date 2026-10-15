@@ -1,0 +1,13 @@
+.git
+.venv
+.env
+**/__pycache__
+.pytest_cache
+.ruff_cache
+tests
+scripts
+data/*
+!data/circuits.yaml
+*.egg-info
+build
+dist

@@ -1,0 +1,6 @@
+{% extends "email/_base.html" %}
+{% block body %}
+{% for line in lines %}
+<p style="margin:0 0 8px;">{{ line }}</p>
+{% endfor %}
+{% endblock %}

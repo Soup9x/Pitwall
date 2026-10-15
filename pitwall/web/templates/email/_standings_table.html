@@ -1,0 +1,12 @@
+<table role="presentation" width="100%" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:14px;margin-bottom:12px;">
+<tr style="background:#f3f4f6;text-align:left;"><th>#</th><th>{{ heading }}</th><th style="text-align:right;">Pts</th><th style="text-align:right;">Gap</th><th style="text-align:center;">±</th></tr>
+{% for r in rows %}
+<tr style="border-bottom:1px solid #e5e7eb;{% if r.followed %}background:#fef3c7;{% endif %}">
+  <td>{{ r.position }}</td>
+  <td>{{ r.name }}{% if r.team %} <span style="color:#6b7280;">{{ r.team }}</span>{% endif %}</td>
+  <td style="text-align:right;">{{ r.points|pts }}</td>
+  <td style="text-align:right;color:#6b7280;">{% if r.gap_leader %}-{{ r.gap_leader|pts }}{% else %}—{% endif %}</td>
+  <td style="text-align:center;color:{% if r.change and r.change > 0 %}#059669{% elif r.change and r.change < 0 %}#dc2626{% else %}#6b7280{% endif %};">{{ r.arrow }}</td>
+</tr>
+{% endfor %}
+</table>

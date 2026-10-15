@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+<p class="sub">Saved in the database. Values in <code>.env</code> are only the defaults.</p>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+<form method="post" action="/settings">
+<input type="hidden" name="csrf_token" value="{{ csrf }}">
+<div class="grid">
+  <div class="card">
+    <h2>Time</h2>
+    <label for="timezone">Your timezone</label>
+    <select id="timezone" name="timezone">
+      <optgroup label="Common">{% for z in common_zones %}<option value="{{ z }}" {{ 'selected' if z == settings.timezone else '' }}>{{ z }}</option>{% endfor %}</optgroup>
+      <optgroup label="All">{% for z in zones if z not in common_zones %}<option value="{{ z }}" {{ 'selected' if z == settings.timezone else '' }}>{{ z }}</option>{% endfor %}</optgroup>
+    </select>
+    <label>"Odd hours" — flag sessions starting between</label>
+    <div class="row"><input type="time" name="odd_start" value="{{ settings.odd_start }}"> and <input type="time" name="odd_end" value="{{ settings.odd_end }}"></div>
+  </div>
+
+  <div class="card">
+    <h2>Reminders</h2>
+    <p class="muted small">How long before each session to remind you, e.g. <code>24h, 1h</code> or <code>90m</code>. Leave blank for none.</p>
+    {% for t in session_types %}
+    <label for="offset_{{ t }}">{{ session_labels[t] }}</label>
+    <input id="offset_{{ t }}" type="text" name="offset_{{ t }}" value="{{ offsets[t] }}" placeholder="none">
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <h2>Routing</h2>
+    <p class="muted small">Which channels each alert type goes to.</p>
+    <table>
+      <tr><th>Alert</th>{% for c in channels %}<th>{{ c }}</th>{% endfor %}</tr>
+      {% for a in alert_types %}
+      <tr><td>{{ alert_labels[a] }}</td>{% for c in channels %}<td><input type="checkbox" name="route_{{ a }}_{{ c }}" {{ 'checked' if c in settings.routing.get(a, []) else '' }}></td>{% endfor %}</tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Quiet hours</h2>
+    <label><input type="checkbox" name="quiet_enabled" {{ 'checked' if settings.quiet_enabled else '' }}> Hold alerts during quiet hours</label>
+    <div class="row"><input type="time" name="quiet_start" value="{{ settings.quiet_start }}"> to <input type="time" name="quiet_end" value="{{ settings.quiet_end }}"></div>
+    <p class="muted small">Held alerts are delivered when the window ends. Reminders for sessions that have already started by then are dropped.</p>
+
+    <h2 style="margin-top:20px;">Spoiler mode</h2>
+    <label><input type="checkbox" name="spoiler_enabled" {{ 'checked' if settings.spoiler_enabled else '' }}> Hold results &amp; standings until I click "Watched"</label>
+    <label for="sar">Auto-release after (hours, 0 = never)</label>
+    <input id="sar" type="number" min="0" max="336" name="spoiler_auto_release_hours" value="{{ settings.spoiler_auto_release_hours }}">
+    <p class="muted small">Reminders and previews are never held.</p>
+  </div>
+
+  <div class="card">
+    <h2>History</h2>
+    <label for="bsy">Backfill seasons from</label>
+    <input id="bsy" type="number" min="1950" name="backfill_start_year" value="{{ settings.backfill_start_year }}">
+    <p class="muted small">Past seasons are fetched once (politely rate-limited) and used for track stats.</p>
+  </div>
+</div>
+<p><button type="submit">Save settings</button></p>
+</form>
+
+<div class="card" id="channels" style="margin-bottom:16px;">
+  <h2>Notification channels</h2>
+  <p class="muted small">Where alerts go. Choose which alert types use email and which use webhooks under <em>Routing</em> above. Passwords and tokens are stored in Pitwall's database and are never shown again after you save them.</p>
+  <div class="grid">
+  {% for c in channels %}
+    <div>
+      <h3>{{ "Email" if c == "email" else "Webhooks" }}</h3>
+      {% if targets[c] or env_targets[c] %}
+      <table>
+        {% for t in targets[c] %}
+        <tr class="{{ '' if t.enabled else 'past' }}">
+          <td>{{ t.label }}<div class="muted small"><code>{{ mask_url(t.url) }}</code>{% if not t.enabled %} · disabled{% endif %}</div></td>
+          <td class="num" style="white-space:nowrap;">
+            {% for action, text in [("test", "Test"), ("toggle", "Disable" if t.enabled else "Enable"), ("delete", "Remove")] %}
+            <form class="inline" method="post" action="/settings/targets/{{ t.id }}/{{ action }}"{% if action == "delete" %} onsubmit="return confirm('Remove {{ t.label|e }}?')"{% endif %}><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">{{ text }}</button></form>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% for u in env_targets[c] %}
+        <tr><td><code>{{ u }}</code><div class="muted small">from .env (edit the file to change)</div></td><td></td></tr>
+        {% endfor %}
+      </table>
+      {% if (targets[c]|length) + (env_targets[c]|length) > 1 %}
+      <form class="inline" method="post" action="/settings/test/{{ c }}"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small" style="margin-top:6px;">Test all {{ c }}</button></form>
+      {% endif %}
+      {% else %}
+      <p class="muted small">None yet.</p>
+      {% endif %}
+
+      <details style="margin-top:12px;" {{ 'open' if not (targets[c] or env_targets[c]) else '' }}>
+        <summary class="small" style="cursor:pointer;font-weight:600;">+ Add {{ "an email address" if c == "email" else "a webhook" }}</summary>
+        <form method="post" action="/settings/targets" class="target-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}">
+          <input type="hidden" name="channel" value="{{ c }}">
+          <label>Type</label>
+          <select name="kind" data-kind-select>
+            {% for k, name in target_kinds[c].items() %}<option value="{{ k }}">{{ name }}</option>{% endfor %}
+          </select>
+          {% if c == "email" %}
+          <div data-kind="gmail">
+            <p class="muted small">Needs an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">app password</a> (2-Step Verification must be on). Your normal Gmail password won't work.</p>
+          </div>
+          <div data-kind="m365">
+            <p class="muted small">Microsoft 365 needs "Authenticated SMTP" enabled for the mailbox (an admin setting).</p>
+          </div>
+          <div data-kind="gmail m365">
+            <label>Your email address</label><input type="text" name="address" autocomplete="off" placeholder="you@gmail.com">
+            <label>Password <span class="muted">(app password for Gmail)</span></label><input type="password" name="password" autocomplete="new-password">
+          </div>
+          <div data-kind="smtp">
+            <div class="row">
+              <div><label>SMTP server</label><input type="text" name="smtp_host" placeholder="smtp.example.com"></div>
+              <div><label>Port</label><input type="number" name="smtp_port" value="587" style="width:90px;"></div>
+            </div>
+            <label>Username</label><input type="text" name="username" autocomplete="off">
+            <label>Password</label><input type="password" name="password" autocomplete="new-password">
+            <label>From address</label><input type="text" name="from_addr" placeholder="pitwall@example.com">
+          </div>
+          <div data-kind="gmail m365 smtp">
+            <label>Send alerts to <span class="muted">(blank = same address)</span></label><input type="text" name="to_addr">
+          </div>
+          {% else %}
+          <div data-kind="ntfy">
+            <p class="muted small">Free push notifications: install the ntfy app and subscribe to the topic.</p>
+            <label>Server</label><input type="text" name="ntfy_server" value="ntfy.sh">
+            <label>Topic <span class="muted">(blank = a random, hard-to-guess name)</span></label><input type="text" name="ntfy_topic" autocomplete="off">
+          </div>
+          <div data-kind="discord">
+            <p class="muted small">Discord: Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL.</p>
+            <label>Discord webhook URL</label><input type="password" name="discord_url" autocomplete="off" placeholder="https://discord.com/api/webhooks/…">
+          </div>
+          <div data-kind="json">
+            <p class="muted small">Pitwall POSTs JSON: <code>{"type", "title", "text", "url", "data"}</code>.</p>
+            <label>Webhook URL</label><input type="text" name="json_url" placeholder="https://example.com/hook">
+          </div>
+          {% endif %}
+          <div data-kind="apprise">
+            <p class="muted small">Any <a href="https://github.com/caronc/apprise/wiki" target="_blank" rel="noopener">Apprise URL</a>.</p>
+            <label>Apprise URL</label><input type="password" name="apprise_url" autocomplete="off">
+          </div>
+          <label>Name <span class="muted">(optional)</span></label><input type="text" name="label" placeholder="e.g. My phone">
+          <div style="margin-top:10px;"><button>Add</button></div>
+        </form>
+      </details>
+    </div>
+  {% endfor %}
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card" id="followed">
+    <h2>Followed drivers</h2>
+    <table>
+    {% for f in followed %}
+      <tr><td>{{ f.driver.full_name }}</td><td class="num">
+        <form class="inline" method="post" action="/settings/followed"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="action" value="remove"><input type="hidden" name="driver_id" value="{{ f.driver_id }}"><button class="secondary small">Remove</button></form>
+      </td></tr>
+    {% else %}<tr><td class="muted">None yet.</td></tr>{% endfor %}
+    </table>
+    {% if season_drivers %}
+    <form method="post" action="/settings/followed" class="row" style="margin-top:10px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="action" value="add">
+      <select name="driver_id">{% for d in season_drivers %}<option value="{{ d.id }}">{{ d.family_name }}, {{ d.given_name }}</option>{% endfor %}</select>
+      <button class="secondary">Follow</button>
+    </form>
+    {% else %}<p class="muted small">Drivers appear after the first data sync.</p>{% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Calendar feed (ICS)</h2>
+    {% if ics_token_masked %}
+    <p class="small">Subscribe in Google Calendar via <em>Other calendars → + → From URL</em>:</p>
+    <p><code>{{ ics_base }}?token={{ ics_token_masked }}</code></p>
+    <p class="muted small">The token is masked here; use the full <code>PITWALL_ICS_TOKEN</code> value from your <code>.env</code>. Add <code>&amp;sessions=race,q</code> for races and qualifying only (also: <code>sprint</code>, <code>sq</code>, <code>practice</code>).</p>
+    {% else %}
+    <p class="muted">Disabled — set <code>PITWALL_ICS_TOKEN</code> in <code>.env</code>.</p>
+    {% endif %}
+  </div>
+
+  <div class="card" id="ops">
+    <h2>Data sync</h2>
+    <p class="muted small">These run automatically; use the buttons to run one now.</p>
+    {% for job, label in [("schedule", "Sync schedule"), ("results", "Check results"), ("backfill", "Run backfill")] %}
+    <form class="inline" method="post" action="/admin/run/{{ job }}"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">{{ label }}</button></form>
+    {% endfor %}
+    {% if backfill %}<p class="muted small">Backfill: {{ backfill.done }}/{{ backfill.total }} seasons{% if backfill.finished_at %}, last finished {{ backfill.finished_at[:16].replace('T', ' ') }} UTC{% endif %}{% if backfill.errors %} — {{ backfill.errors|length }} error(s), will retry tonight{% endif %}.</p>{% endif %}
+    <p class="small"><a href="/health" target="_blank">/health</a></p>
+  </div>
+</div>
+{% endblock %}

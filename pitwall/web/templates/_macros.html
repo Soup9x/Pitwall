@@ -1,0 +1,52 @@
+{% macro session_table(sessions, show_status=True) %}
+<div class="table-scroll"><table>
+<tr><th>Session</th><th>Your time</th><th>Track time</th></tr>
+{% for s in sessions %}
+<tr class="{{ 'cancelled' if s.status == 'cancelled' else ('past' if s.is_past else '') }}">
+  <td>{{ s.emoji }} {{ s.label }}{% if s.status == 'cancelled' %} <span class="badge cancelled">cancelled</span>{% endif %}</td>
+  <td>{{ s.owner_time }} <span class="muted small">{{ s.owner_tz }}</span>
+    {% if s.odd %}<div class="odd">🌙 {{ s.label }} starts at {{ s.owner_clock }} your time</div>{% endif %}</td>
+  <td>{% if s.local_time %}{{ s.local_time }} <span class="muted small">{{ s.local_tz }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+</tr>
+{% endfor %}
+</table></div>
+{% endmacro %}
+
+{% macro standings_table(table, limit=None, heading="Driver") %}
+<div class="table-scroll"><table>
+<tr><th class="num">#</th><th>{{ heading }}</th><th class="num">Pts</th><th class="num">Wins</th><th class="num">Leader</th><th class="num">Ahead</th><th>±</th></tr>
+{% for r in (table.rows[:limit] if limit else table.rows) %}
+<tr class="{{ 'followed' if r.followed else '' }}">
+  <td class="num">{{ r.position }}</td>
+  <td>{{ r.name }}{% if r.team %} <span class="muted small">{{ r.team }}</span>{% endif %}</td>
+  <td class="num">{{ r.points|pts }}</td>
+  <td class="num">{{ r.wins }}</td>
+  <td class="num muted">{% if r.gap_leader is not none %}-{{ r.gap_leader|pts }}{% else %}—{% endif %}</td>
+  <td class="num muted">{% if r.gap_ahead is not none %}-{{ r.gap_ahead|pts }}{% else %}—{% endif %}</td>
+  <td class="{{ 'up' if r.change and r.change > 0 else ('down' if r.change and r.change < 0 else 'same') }}">{{ r.arrow }}</td>
+</tr>
+{% endfor %}
+</table></div>
+{% endmacro %}
+
+{% macro track_facts(c, st) %}
+<dl class="facts">
+  <dt>Circuit</dt><dd>{{ c.name }}</dd>
+  <dt>Location</dt><dd>{{ c.locality }}{% if c.country %}, {{ c.country }}{% endif %}</dd>
+  {% if c.tz_name %}<dt>Track timezone</dt><dd>{{ c.tz_name }}</dd>{% endif %}
+  {% if c.length_km %}<dt>Length</dt><dd>{{ "%.3f"|format(c.length_km) }} km{% if c.laps %} × {{ c.laps }} laps{% endif %}</dd>{% endif %}
+  {% if c.turns %}<dt>Turns</dt><dd>{{ c.turns }}</dd>{% endif %}
+  {% if c.drs_zones %}<dt>DRS zones (2025)</dt><dd>{{ c.drs_zones }}</dd>{% endif %}
+  {% if c.first_gp_year %}<dt>First GP</dt><dd>{{ c.first_gp_year }}</dd>{% endif %}
+  {% if c.lap_record_time %}<dt>Lap record</dt><dd>{{ c.lap_record_time }} — {{ c.lap_record_driver }} ({{ c.lap_record_year }})</dd>{% endif %}
+  {% if st %}
+  {% if st.last_winner %}<dt>{{ st.last_winner.season }} winner</dt><dd>{{ st.last_winner.driver }}{% if st.last_winner.constructor %} <span class="muted">{{ st.last_winner.constructor }}</span>{% endif %}</dd>{% endif %}
+  {% if st.last_pole %}<dt>{{ st.last_pole.season }} pole</dt><dd>{{ st.last_pole.driver }}{% if st.last_pole.constructor %} <span class="muted">{{ st.last_pole.constructor }}</span>{% endif %}</dd>{% endif %}
+  {% if st.winningest_driver %}<dt>Most wins (active driver)</dt><dd>{{ st.winningest_driver.name }} ({{ st.winningest_driver.wins }})</dd>{% endif %}
+  {% if st.winningest_constructor %}<dt>Most wins (active team)</dt><dd>{{ st.winningest_constructor.name }} ({{ st.winningest_constructor.wins }})</dd>{% endif %}
+  {% if st.pole_to_win_pct is not none %}<dt>Pole → win</dt><dd>{{ st.pole_to_win_pct }}% <span class="muted small">({{ st.pole_to_win[0] }} of {{ st.pole_to_win[1] }} races, {{ st.seasons[0] }}–{{ st.seasons[1] }})</span></dd>{% endif %}
+  {% if st.winner_avg_gain %}<dt>Winner's avg. gain</dt><dd>+{{ st.winner_avg_gain[0] }} places from grid <span class="muted small">({{ st.winner_avg_gain[1] }} races)</span></dd>{% endif %}
+  {% endif %}
+</dl>
+{% if not c.facts_verified and (c.length_km or c.lap_record_time) %}<p class="muted small">Curated facts not yet verified (see data/circuits.yaml).</p>{% endif %}
+{% endmacro %}

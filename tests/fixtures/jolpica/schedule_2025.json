@@ -1,0 +1,120 @@
+{
+ "MRData": {
+  "xmlns": "",
+  "series": "f1",
+  "url": "https://api.jolpi.ca/ergast/f1/2025.json",
+  "limit": "100",
+  "offset": "0",
+  "total": "3",
+  "RaceTable": {
+   "season": "2025",
+   "Races": [
+    {
+     "season": "2025",
+     "round": "1",
+     "url": "https://en.wikipedia.org/wiki/2025_Australian_Grand_Prix",
+     "raceName": "Australian Grand Prix",
+     "Circuit": {
+      "circuitId": "albert_park",
+      "url": "https://en.wikipedia.org/wiki/albert_park",
+      "circuitName": "Albert Park Grand Prix Circuit",
+      "Location": {
+       "lat": "-37.8497",
+       "long": "144.968",
+       "locality": "Melbourne",
+       "country": "Australia"
+      }
+     },
+     "date": "2025-03-16",
+     "time": "04:00:00Z",
+     "FirstPractice": {
+      "date": "2025-03-14",
+      "time": "01:30:00Z"
+     },
+     "SecondPractice": {
+      "date": "2025-03-14",
+      "time": "05:00:00Z"
+     },
+     "ThirdPractice": {
+      "date": "2025-03-15",
+      "time": "01:30:00Z"
+     },
+     "Qualifying": {
+      "date": "2025-03-15",
+      "time": "05:00:00Z"
+     }
+    },
+    {
+     "season": "2025",
+     "round": "2",
+     "url": "https://en.wikipedia.org/wiki/2025_Chinese_Grand_Prix",
+     "raceName": "Chinese Grand Prix",
+     "Circuit": {
+      "circuitId": "shanghai",
+      "url": "https://en.wikipedia.org/wiki/shanghai",
+      "circuitName": "Shanghai International Circuit",
+      "Location": {
+       "lat": "31.3389",
+       "long": "121.22",
+       "locality": "Shanghai",
+       "country": "China"
+      }
+     },
+     "date": "2025-03-23",
+     "time": "07:00:00Z",
+     "FirstPractice": {
+      "date": "2025-03-21",
+      "time": "03:30:00Z"
+     },
+     "SprintQualifying": {
+      "date": "2025-03-21",
+      "time": "07:30:00Z"
+     },
+     "Sprint": {
+      "date": "2025-03-22",
+      "time": "03:00:00Z"
+     },
+     "Qualifying": {
+      "date": "2025-03-22",
+      "time": "07:00:00Z"
+     }
+    },
+    {
+     "season": "2025",
+     "round": "3",
+     "url": "https://en.wikipedia.org/wiki/2025_Mexico_City_Grand_Prix",
+     "raceName": "Mexico City Grand Prix",
+     "Circuit": {
+      "circuitId": "rodriguez",
+      "url": "https://en.wikipedia.org/wiki/rodriguez",
+      "circuitName": "Autódromo Hermanos Rodríguez",
+      "Location": {
+       "lat": "19.4042",
+       "long": "-99.0907",
+       "locality": "Mexico City",
+       "country": "Mexico"
+      }
+     },
+     "date": "2025-10-26",
+     "time": "20:00:00Z",
+     "FirstPractice": {
+      "date": "2025-10-24",
+      "time": "18:30:00Z"
+     },
+     "SecondPractice": {
+      "date": "2025-10-24",
+      "time": "22:00:00Z"
+     },
+     "ThirdPractice": {
+      "date": "2025-10-25",
+      "time": "17:30:00Z"
+     },
+     "Qualifying": {
+      "date": "2025-10-25",
+      "time": "21:00:00Z"
+     }
+    }
+   ]
+  }
+ }
+}

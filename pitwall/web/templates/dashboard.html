@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "_macros.html" import session_table, standings_table %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="grid">
+  <div class="card">
+    <h2>Next session</h2>
+    {% if next_session %}
+      <div class="muted">{{ next_session.emoji }} {{ next_session.label }} — <a href="/events/{{ next_event.id }}">{{ next_event.name }}</a></div>
+      <div class="countdown" data-countdown="{{ next_session.start_utc.isoformat() }}">…</div>
+      <div>{{ next_session.owner_time }} <span class="muted small">{{ next_session.owner_tz }}</span></div>
+      {% if next_session.local_time %}<div class="muted small">Track time: {{ next_session.local_time }} {{ next_session.local_tz }}</div>{% endif %}
+      {% if next_session.odd %}<div class="odd">🌙 {{ next_session.label }} starts at {{ next_session.owner_clock }} your time</div>{% endif %}
+    {% else %}
+      <p class="muted">No upcoming sessions yet. The schedule syncs every 6 hours (first sync runs a few seconds after start).</p>
+    {% endif %}
+  </div>
+
+  {% if event %}
+  <div class="card">
+    <h2><a href="/events/{{ event.id }}">{{ event.name }}</a> {% if event.is_sprint_weekend %}<span class="badge sprint">SPRINT</span>{% endif %}</h2>
+    <p class="sub">{{ event.circuit.name }} · {{ event.circuit.locality }}, {{ event.circuit.country }} · Round {{ event.round }}</p>
+    {{ session_table(sessions) }}
+  </div>
+  {% endif %}
+
+  {% if followed_rows or form %}
+  <div class="card">
+    <h2>Followed drivers</h2>
+    <table>
+    {% for r in followed_rows %}
+      <tr class="followed"><td>P{{ r.position }}</td><td>{{ r.name }}</td><td class="num">{{ r.points|pts }} pts</td><td class="num muted">{% if r.gap_leader %}-{{ r.gap_leader|pts }}{% endif %}</td></tr>
+    {% endfor %}
+    </table>
+    {% if form %}<h3>Last 3 races</h3>
+      {% for f in form %}<div><strong>{{ f.driver }}</strong>: {% for ev, pos in f.results %}{{ pos }} <span class="muted small">{{ ev }}</span>{% if not loop.last %} · {% endif %}{% else %}<span class="muted">no results yet</span>{% endfor %}</div>{% endfor %}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="card wide">
+    <h2>Standings{% if drivers %} <span class="muted small">after round {{ drivers.round }}</span>{% endif %}</h2>
+    {% if not drivers %}
+      <p class="muted">No standings yet — they appear after the first sync/backfill.</p>
+    {% else %}
+      {% if spoiler_hidden %}<details class="spoiler"><summary>Hidden by spoiler mode until you mark {{ last_event.name }} as watched — click to show anyway</summary>{% endif %}
+      <div class="grid">
+        <div>{{ standings_table(drivers, 10) }}<p class="small"><a href="/standings">Full standings →</a></p></div>
+        {% if constructors %}<div>{{ standings_table(constructors, 10, "Team") }}</div>{% endif %}
+      </div>
+      {% if spoiler_hidden %}</details>{% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
