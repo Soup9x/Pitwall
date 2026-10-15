@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import spoiler_notice %}
 {% block title %}{{ driver.full_name }}{% endblock %}
 {% block content %}
 <div class="row" style="justify-content:space-between;">
@@ -12,10 +13,11 @@
   </select></form>
   {% endif %}
 </div>
-{% if not data or not data.rows %}
+{% if held_event %}
+<div class="card">{{ spoiler_notice(held_event, "/drivers/" ~ driver.id ~ "?season=" ~ season ~ "&reveal=1") }}</div>
+{% elif not data or not data.rows %}
 <div class="card"><p class="muted">No race results stored for {{ season or 'this driver' }}.</p></div>
 {% else %}
-{% if spoiler_hidden %}<details class="spoiler"><summary>Hidden by spoiler mode — click to show anyway</summary>{% endif %}
 <div class="grid">
   <div class="card">
     <h2>{{ season }} season</h2>
@@ -58,6 +60,5 @@
   <p class="small"><a href="/export/drivers.csv?season={{ season }}&amp;driver={{ driver.id }}">Download as CSV</a></p>
   {% if not data.has_openf1 %}<p class="muted small">Best laps, tyre stints and pit stops come from OpenF1 (2023 onwards) for drivers you follow; they're fetched in the background after each race.</p>{% endif %}
 </div>
-{% if spoiler_hidden %}</details>{% endif %}
 {% endif %}
 {% endblock %}

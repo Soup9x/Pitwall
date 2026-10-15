@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import spoiler_notice %}
 {% block title %}Head-to-head {{ season or '' }}{% endblock %}
 {% block content %}
 <div class="row" style="justify-content:space-between;">
@@ -10,10 +11,11 @@
   {% endif %}
 </div>
 <p class="sub">Qualifying: who qualified ahead. Race: who finished ahead (races where both retired don't count). Points include sprints.</p>
-{% if not pairs %}
+{% if held_event %}
+<div class="card">{{ spoiler_notice(held_event, "/head-to-head?season=" ~ season ~ "&reveal=1") }}</div>
+{% elif not pairs %}
 <div class="card"><p class="muted">No results stored for this season yet.</p></div>
 {% else %}
-{% if spoiler_hidden %}<details class="spoiler"><summary>Hidden by spoiler mode — click to show anyway</summary>{% endif %}
 <div class="grid">
 {% for p in pairs %}
   <div class="card">
@@ -34,6 +36,5 @@
   </div>
 {% endfor %}
 </div>
-{% if spoiler_hidden %}</details>{% endif %}
 {% endif %}
 {% endblock %}

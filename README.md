@@ -21,8 +21,8 @@ and trivia, and weather, maps, digest and CSV export.
   and the gap to the leader and to the car ahead.
 - **Track stats** from history: winningest active driver/team, pole-to-win rate, and the
   winner's average positions gained.
-- **Spoiler mode** holds results and standings alerts until you click **Watched**. It can also
-  release them automatically after N hours.
+- **Spoiler mode** holds results and standings alerts until you click **Watched**, and hides
+  the same results on the pages. It can also release them automatically after N hours.
 - **Quiet hours** hold alerts until morning. Reminders for sessions that started in the
   meantime are dropped.
 - **ICS calendar feed** for Google Calendar, with stable event IDs, so a moved session
@@ -222,6 +222,19 @@ Under **Settings → Routing**, you choose which channels each alert type uses. 
 previews by email, reminders/results/standings by webhook, and schedule changes on both.
 Quiet hours and spoiler mode are in Settings too.
 
+**How spoiler mode works.** With it on, the latest event's results stay hidden until you mark
+that event **Watched** on its page. If you set "Auto-release after N hours", they also come out
+N hours after the event's latest results arrived. Each new session restarts that clock, so a
+race isn't revealed early by its qualifying. Alerts and pages follow the same rule. While an
+event is held:
+- its results, and the standings, recent form, head-to-head, driver season pages, title maths
+  and trivia (which all include the latest results) are left out of the pages entirely, not
+  just collapsed, so they aren't in the page source either;
+- the race-week preview email and weekly digest leave out standings, recent form and trivia;
+- CSV exports for that season answer "hidden by spoiler mode".
+
+Each hidden section has a **Show anyway** link, which reveals it for that one page view only.
+
 ## 3. Google Calendar (ICS feed)
 
 Every user has a private feed link under **Account** in the web UI. It looks like this:
@@ -292,6 +305,13 @@ Values we weren't sure about were left `null` on purpose, and Pitwall hides thos
 of guessing. Please spot-check the file against formula1.com, fix anything wrong, and set
 `verified: true`. Edits are picked up at the next schedule sync (every 6 h) or on restart
 (`sudo docker compose restart`).
+
+Facts are keyed by circuit, not Grand Prix name. The 2026 Bahrain GP ran at Sepang, so there's
+a `sepang` entry next to `bahrain`. Its race laps and lap record are left empty because they
+depend on the 2026 race; fill them in once you've checked them.
+
+If you've edited `circuits.yaml` yourself, `git pull` may stop with a conflict on it. Keep your
+copy with `sudo git stash`, `sudo git pull`, then `sudo git stash pop`, and fix any conflict.
 
 ---
 

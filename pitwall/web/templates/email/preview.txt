@@ -23,6 +23,10 @@ TRACK
 {% endif %}
 {% if st.last_pole %}- {{ st.last_pole.season }} pole: {{ st.last_pole.driver }}
 {% endif %}
+{% if ctx.held_event %}
+
+Standings, recent form and trivia are left out until you mark {{ ctx.held_event.name }} as watched (spoiler mode).
+{% endif %}
 {% if ctx.drivers %}
 
 STANDINGS (after round {{ ctx.drivers.round }})
