@@ -30,6 +30,7 @@ from pitwall.models import (
     Driver,
     Event,
     FollowedDriver,
+    NewsFeed,
     NotificationLog,
     NotificationTarget,
     Outbox,
@@ -49,7 +50,9 @@ from pitwall.services import (
     exports,
     head_to_head,
     ics,
+    news,
     reminders,
+    session_data,
     spoilers,
     standings,
     title_math,
@@ -239,12 +242,14 @@ def dashboard(
         event=event,
         sessions=event_sessions(event, settings, now) if event else [],
         weather=weather.for_event(db, event, settings.temp_unit) if event else {},
+        last_year=session_data.last_year_conditions(db, event) if event else None,
         drivers=drivers,
         constructors=constructors,
         followed_rows=[r for r in (drivers.rows if drivers else []) if r.followed],
         form=form,
         held_event=held,
         has_standings=season is not None,
+        **racedata.news_context(db, user, settings, news.visible(db, user.id, settings, limit=6)),
     )
 
 
@@ -657,6 +662,10 @@ def settings_page(
         season_drivers=season_drivers,
         followed=followed,
         error=request.session.pop("settings_error", None),
+        news_feeds=list(db.scalars(select(NewsFeed).order_by(NewsFeed.name)))
+        if user.is_admin
+        else [],
+        track_keywords=news.track_keywords(db) if user.is_admin else [],
     )
 
 

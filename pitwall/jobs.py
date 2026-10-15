@@ -10,6 +10,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any, TypeVar
 
+import httpx
 from sqlalchemy import select
 
 from pitwall import scheduler as sched_mod
@@ -22,6 +23,7 @@ from pitwall.notify.message import Message
 from pitwall.services import (
     circuit_maps,
     digest,
+    news,
     openf1_sync,
     penalty_watch,
     reminders,
@@ -505,6 +507,33 @@ def penalty_watch_job(now: datetime | None = None, force: bool = False) -> None:
     finally:
         client.close()
     if changes and penalty_watch.send_alerts(changes, fan_out, now):
+        flush_job()
+
+
+_news_factory: Callable[[], httpx.Client] = news.make_http_client
+
+
+def set_news_factory(factory: Callable[[], httpx.Client]) -> None:
+    global _news_factory
+    _news_factory = factory
+
+
+@safe_job
+def news_job(now: datetime | None = None) -> None:
+    """Poll the RSS feeds (every 30 min) and alert on track-change news for the next race."""
+    now = now or utcnow()
+    client = _news_factory()
+    try:
+        new_ids = news.sync(client, now)
+    finally:
+        client.close()
+    queued = 0
+    with session_scope() as db:
+        for item_id in new_ids:
+            queued += fan_out(
+                db, lambda _s, uid, i=item_id: news.track_news_message(db, i, uid, now), now
+            )
+    if queued:
         flush_job()
 
 

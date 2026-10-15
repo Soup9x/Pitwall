@@ -147,6 +147,9 @@ def offline_clients():
     """No test may reach the network: by default every job gets clients whose transport
     answers 503 immediately (tests that need data install their own fixtures)."""
     from pitwall import jobs
+    from pitwall.services import news
+    from pitwall.sources.fia import FiaClient
+    from pitwall.sources.fia import make_client as fia_default
     from pitwall.sources.http import RateLimiter
     from pitwall.sources.jolpica import JolpicaClient
     from pitwall.sources.jolpica import make_client as jolpica_default
@@ -174,7 +177,12 @@ def offline_clients():
     )
     jobs.set_openf1_factory(offline(OpenF1Client))
     jobs.set_weather_factory(offline(OpenMeteoClient))
+    unavailable = httpx.MockTransport(lambda _r: httpx.Response(503))
+    jobs.set_fia_factory(lambda: FiaClient(limiter=RateLimiter(), transport=unavailable))
+    jobs.set_news_factory(lambda: news.make_http_client(transport=unavailable))
     yield
     jobs.set_client_factory(jolpica_default)
     jobs.set_openf1_factory(openf1_default)
     jobs.set_weather_factory(meteo_default)
+    jobs.set_fia_factory(fia_default)
+    jobs.set_news_factory(news.make_http_client)

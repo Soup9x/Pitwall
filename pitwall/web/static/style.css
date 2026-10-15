@@ -47,7 +47,7 @@ button.secondary, .btn.secondary { background: var(--panel-2); border: 1px solid
 button:hover { filter: brightness(1.1); }
 form.inline { display: inline; }
 label { display: block; margin: 8px 0 4px; color: var(--muted); font-size: 13px; }
-input[type=text], input[type=password], input[type=number], input[type=time], input[type=date], select {
+input[type=text], input[type=password], input[type=number], input[type=time], input[type=date], select, textarea {
   background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
   padding: 7px 10px; font-size: 14px; max-width: 100%; }
 input[type=checkbox] { transform: scale(1.15); margin-right: 6px; }
@@ -108,3 +108,13 @@ ol.rc-list li[hidden] { display: none; }
 .pu-limit { color: #facc15; font-weight: 700; }
 .pu-over { color: #ef4444; font-weight: 800; }
 table.pu td, table.pu th { white-space: nowrap; }
+
+/* Step 2: news */
+ul.news-list { list-style: none; margin: 0; padding: 0; }
+ul.news-list li { padding: 7px 0 7px 10px; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; }
+ul.news-list li.followed { border-left-color: var(--warn); background: var(--hl); }
+ul.news-list li a { color: var(--text); font-weight: 600; }
+.tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; background: var(--panel-2);
+  border: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+.tag-track { color: #fde68a; border-color: #78350f; }
+.tabs { gap: 8px; }

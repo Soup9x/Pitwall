@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import session_table, spoiler_notice, track_facts, tyre_summary %}
+{% from "_macros.html" import headline_list, news_hidden, session_table, spoiler_notice, track_facts, tyre_summary %}
 {% block title %}{{ event.name }}{% endblock %}
 {% block content %}
 <h1>{{ event.name }} {% if event.is_sprint_weekend %}<span class="badge sprint">SPRINT WEEKEND</span>{% endif %}{% if event.status == 'cancelled' %} <span class="badge cancelled">CANCELLED</span>{% endif %}</h1>
@@ -60,6 +60,14 @@
     {% endfor %}
     </table>
     <p class="small"><a href="/penalties#grid">Penalty watch →</a></p>
+  </div>
+  {% endif %}
+
+  {% if track_news.items or track_news.hidden %}
+  <div class="card" id="track-updates">
+    <h2>Track updates</h2>
+    {{ news_hidden(track_news, "/events/" ~ event.id ~ "?reveal=1#track-updates") }}
+    {{ headline_list(track_news.items, {}, [], news_tags, settings.tz, False) }}
   </div>
   {% endif %}
 

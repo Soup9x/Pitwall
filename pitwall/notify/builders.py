@@ -16,12 +16,22 @@ from pitwall.models import (
     SESSION_LABELS,
     Event,
     FollowedDriver,
+    NewsItem,
     Result,
     Session,
 )
 from pitwall.notify.message import Message
-from pitwall.services import circuit_maps, spoilers, title_math, track_stats, trivia
+from pitwall.services import (
+    circuit_maps,
+    news,
+    session_data,
+    spoilers,
+    title_math,
+    track_stats,
+    trivia,
+)
 from pitwall.services import standings as standings_svc
+from pitwall.services import tyres as tyres_svc
 from pitwall.services import weather as weather_svc
 from pitwall.services.presenters import (
     SessionView,
@@ -308,6 +318,10 @@ class PreviewContext:
     rain: list[str] = field(default_factory=list)
     map_url: str | None = None
     held_event: Event | None = None  # spoiler mode: standings, form and trivia left out
+    tyres: tyres_svc.TyreView | None = None
+    last_year: session_data.LastYear | None = None
+    track_news: list[NewsItem] = field(default_factory=list)
+    temp_unit: str = "both"
 
 
 def _form(
@@ -391,6 +405,10 @@ def preview_context(
         rain=weather_svc.rain_warnings(event, wx),
         map_url=circuit_maps.map_url(event.circuit),
         held_event=held,
+        tyres=tyres_svc.view(db, event),
+        last_year=session_data.last_year_conditions(db, event),
+        track_news=news.track_updates(db, event, user_id, settings, limit=5, now=now).items,
+        temp_unit=settings.temp_unit,
     )
 
 

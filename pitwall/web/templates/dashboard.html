@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import session_table, spoiler_notice, standings_table %}
+{% from "_macros.html" import headline_list, news_hidden, session_table, spoiler_notice, standings_table %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
 <div class="grid">
@@ -21,6 +21,9 @@
     <h2><a href="/events/{{ event.id }}">{{ event.name }}</a> {% if event.is_sprint_weekend %}<span class="badge sprint">SPRINT</span>{% endif %}</h2>
     <p class="sub">{{ event.circuit.name }} · {{ event.circuit.locality }}, {{ event.circuit.country }} · Round {{ event.round }}</p>
     {{ session_table(sessions, weather) }}
+    {% if last_year %}{% set ly = last_year.conditions %}
+    <p class="small">Last year here <span class="muted">({{ last_year.event.season }} race)</span>: track {{ ly.track_min|temp_range(ly.track_max, settings.temp_unit) }}{% if ly.rain is not none %}, {{ 'rain' if ly.rain else 'dry' }}{% endif %}</p>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -37,6 +40,13 @@
     {% endif %}
   </div>
   {% endif %}
+
+  <div class="card wide" id="news">
+    <h2>News <a class="small" href="/news" style="font-weight:normal;">all headlines →</a></h2>
+    {{ news_hidden(news, "/news?reveal=1") }}
+    {% if news.items %}{{ headline_list(news.items, news_labels, followed_tags, news_tags, settings.tz) }}
+    {% else %}<p class="muted small">No headlines yet. Feeds are checked every 30 minutes.</p>{% endif %}
+  </div>
 
   <div class="card wide">
     <h2>Standings{% if drivers %} <span class="muted small">after round {{ drivers.round }}</span>{% endif %}</h2>

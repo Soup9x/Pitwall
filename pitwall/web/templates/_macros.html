@@ -79,3 +79,21 @@
   <p class="small">{{ tv.last_year[0].season }} here: {{ tyre_chips(tv.last_year[1]) }}</p>
 {% endif %}
 {%- endmacro %}
+
+{# Headlines (title, source, date, tags only). `labels` maps tags to text; followed drivers
+   are marked with a star and the word "followed", not colour alone. #}
+{% macro headline_list(items, labels, followed_tags, tags_of, tz, show_tags=True) -%}
+<ul class="news-list">
+{% for n in items %}{% set tags = tags_of(n) %}{% set mine = tags|select('in', followed_tags)|list %}
+  <li class="{{ 'followed' if mine else '' }}">
+    <a href="{{ n.link }}" rel="noopener noreferrer" target="_blank">{{ n.title }}</a>
+    <div class="muted small">{{ n.source }}{% set when = n.published_at or n.fetched_at %} · {{ when.astimezone(tz).strftime('%d %b %H:%M') }}{% if mine %} · ★ followed{% endif %}
+    {% if show_tags %}{% for t in tags if t in labels %}<span class="tag{{ ' tag-track' if t == 'track' else '' }}">{{ '🛠 ' if t == 'track' else '' }}{{ labels[t] }}</span>{% endfor %}{% endif %}</div>
+  </li>
+{% endfor %}
+</ul>
+{%- endmacro %}
+
+{% macro news_hidden(view, reveal_url) -%}
+{% if view.hidden %}<p class="spoiler-notice small">🙈 {{ view.hidden }} headline{{ 's' if view.hidden != 1 }} hidden by spoiler mode{% if view.held_event %} until you mark {{ view.held_event.name }} as watched{% endif %}. <a href="{{ reveal_url }}" rel="nofollow">Show anyway</a></p>{% endif %}
+{%- endmacro %}

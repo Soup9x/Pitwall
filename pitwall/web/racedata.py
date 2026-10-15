@@ -19,15 +19,17 @@ from pitwall.models import (
     SESSION_LABELS,
     Driver,
     Event,
+    FollowedDriver,
     GridPenalty,
     LicencePoints,
+    NewsFeed,
     PuUsage,
     Result,
     Session,
     StandingsSnapshot,
     User,
 )
-from pitwall.services import penalties, penalty_watch, session_data, spoilers, tyres
+from pitwall.services import news, penalties, penalty_watch, session_data, spoilers, tyres
 from pitwall.services.presenters import current_or_next_event
 from pitwall.settings_store import AppSettings, get_kv, load_settings, set_kv
 from pitwall.units import c_to_f
@@ -97,6 +99,8 @@ def event_context(
         "kind": session_data.kind,
         "grid_penalties": penalties.grid_penalties(db, event, cut),
         "describe_grid": penalties.describe_grid,
+        "track_news": news.track_updates(db, event, user.id, settings, reveal=reveal),
+        "news_tags": news.tags_of,
     }
 
 
@@ -397,3 +401,108 @@ async def penalties_delete(
         db.commit()
         flash(request, "Manual entry removed.")
     return _admin_back(form.get("season"), f"#{kind}")
+
+
+# ---------------------------------------------------------------------------- news
+
+
+def news_context(db: DB, user: User, settings: AppSettings, view: news.NewsView) -> dict[str, Any]:
+    followed = {
+        f"driver:{f.driver_id}"
+        for f in db.scalars(select(FollowedDriver).where(FollowedDriver.user_id == user.id))
+    }
+    return {
+        "news": view,
+        "news_labels": news.tag_labels(db, view.items),
+        "followed_tags": followed,
+        "news_tags": news.tags_of,
+    }
+
+
+@router.get("/news", response_class=HTMLResponse)
+def news_page(
+    request: Request,
+    show: str = "all",
+    reveal: bool = False,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
+) -> HTMLResponse:
+    settings = load_settings(db, user.id)
+    followed = {
+        f"driver:{f.driver_id}"
+        for f in db.scalars(select(FollowedDriver).where(FollowedDriver.user_id == user.id))
+    }
+    matchers = {
+        "all": None,
+        "followed": lambda tags: bool(followed & set(tags)),
+        "track": lambda tags: "track" in tags,
+    }
+    if show not in matchers:
+        show = "all"
+    view = news.visible(db, user.id, settings, limit=100, match=matchers[show], reveal=reveal)
+    feeds = list(db.scalars(select(NewsFeed).order_by(NewsFeed.name)))
+    return page(
+        request,
+        "news.html",
+        db,
+        user,
+        show=show,
+        feeds=feeds,
+        **news_context(db, user, settings, view),
+    )
+
+
+def _settings_back(anchor: str = "#news") -> Response:
+    return back(f"/settings{anchor}")
+
+
+@router.post("/admin/news/feeds")
+async def news_add_feed(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_admin)
+) -> Response:
+    form = await checked_form(request)
+    try:
+        news.add_feed(db, str(form.get("url", "")), str(form.get("name", "")))
+    except ValueError as exc:
+        db.rollback()
+        flash(request, f"Feed not added: {exc}")
+        return _settings_back()
+    db.commit()
+    flash(request, "Feed added. It's checked within 30 minutes.")
+    return _settings_back()
+
+
+@router.post("/admin/news/feeds/{feed_id}/{action}")
+async def news_feed_action(
+    request: Request,
+    feed_id: int,
+    action: str,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> Response:
+    await checked_form(request)
+    feed = db.get(NewsFeed, feed_id)
+    if feed is None or action not in ("toggle", "delete"):
+        raise HTTPException(404)
+    if action == "toggle":
+        feed.enabled = not feed.enabled
+    else:
+        db.delete(feed)  # its headlines stay until they age out
+    db.commit()
+    return _settings_back()
+
+
+@router.post("/admin/news/keywords")
+async def news_keywords(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_admin)
+) -> Response:
+    form = await checked_form(request)
+    words = []
+    for line in str(form.get("keywords", "")).replace(",", "\n").splitlines():
+        w = " ".join(line.split())[:60]
+        if w and w.lower() not in {x.lower() for x in words}:
+            words.append(w)
+    set_kv(db, news.KEYWORDS_KEY, words[:50])
+    db.commit()
+    flash(request, "Track-change keywords saved (they apply to newly fetched headlines).")
+    return _settings_back()

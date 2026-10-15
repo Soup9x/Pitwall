@@ -116,6 +116,15 @@ def install_recurring_jobs(sched: Any) -> None:
         name="FIA documents during race week (2h Wed-Sun, 30 min Fri/Sat)",
     )
     sched.add_job(
+        "pitwall.jobs:news_job",
+        "interval",
+        minutes=30,
+        id="news",
+        replace_existing=True,
+        next_run_time=now + timedelta(minutes=2),
+        name="News headlines from RSS feeds (every 30 min)",
+    )
+    sched.add_job(
         "pitwall.jobs:weather_sync_job",
         "interval",
         hours=3,

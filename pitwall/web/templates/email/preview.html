@@ -61,9 +61,25 @@
 {% endfor %}
 {% endif %}
 
-{% if ctx.weather %}
+{% if ctx.tyres %}
+<h3 style="margin:16px 0 8px;">Tyres</h3>
+{% if ctx.tyres.nomination %}{% set t = ctx.tyres.nomination %}
+<p style="margin:2px 0;">Hard <strong>{{ t.hard }}</strong> · Medium <strong>{{ t.medium }}</strong> · Soft <strong>{{ t.soft }}</strong></p>
+{% else %}<p style="margin:2px 0;">Not announced yet.</p>{% endif %}
+{% if ctx.tyres.last_year %}{% set ly = ctx.tyres.last_year[1] %}<p style="margin:2px 0;color:#6b7280;font-size:13px;">{{ ctx.tyres.last_year[0].season }} here: hard {{ ly.hard }}, medium {{ ly.medium }}, soft {{ ly.soft }}</p>{% endif %}
+{% endif %}
+
+{% if ctx.weather or ctx.last_year %}
 <h3 style="margin:16px 0 8px;">Weather</h3>
-{% for w in ctx.rain %}<p style="margin:2px 0;color:#b45309;font-weight:600;">☔ {{ w }}</p>{% else %}<p style="margin:2px 0;">No significant rain risk for qualifying or the race (forecast from Open-Meteo).</p>{% endfor %}
+{% if ctx.weather %}{% for w in ctx.rain %}<p style="margin:2px 0;color:#b45309;font-weight:600;">☔ {{ w }}</p>{% else %}<p style="margin:2px 0;">No significant rain risk for qualifying or the race (forecast from Open-Meteo).</p>{% endfor %}{% endif %}
+{% if ctx.last_year %}{% set c = ctx.last_year.conditions %}<p style="margin:2px 0;color:#6b7280;font-size:13px;">Last year here ({{ ctx.last_year.event.season }} race): track {{ c.track_min|temp_range(c.track_max, ctx.temp_unit) }}{% if c.rain is not none %}, {{ 'rain' if c.rain else 'dry' }}{% endif %}</p>{% endif %}
+{% endif %}
+
+{% if ctx.track_news %}
+<h3 style="margin:16px 0 8px;">Track updates</h3>
+<ul style="margin:0;padding-left:18px;">
+{% for n in ctx.track_news %}<li style="margin:3px 0;"><a href="{{ n.link }}" style="color:#1d4ed8;">{{ n.title }}</a> <span style="color:#6b7280;font-size:13px;">({{ n.source }})</span></li>{% endfor %}
+</ul>
 {% endif %}
 
 {% if ctx.facts %}
