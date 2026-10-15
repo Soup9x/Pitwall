@@ -27,3 +27,20 @@ services:
       timeout: 10s
       start_period: 30s
       retries: 3
+
+  # Optional Cloudflare Tunnel: exposes Pitwall on the internet without opening any ports.
+  # Enabled by COMPOSE_PROFILES=tunnel and CLOUDFLARE_TUNNEL_TOKEN in .env (install.sh sets
+  # both). In the Cloudflare dashboard, point the tunnel's public hostname at http://pitwall:8080.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: pitwall-tunnel
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - pitwall
+    read_only: true
+    security_opt:
+      - no-new-privileges:true

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<h1>Users</h1>
+<p class="sub">Everyone shares the F1 data; each person has their own settings, alert channels, followed drivers and calendar feed.</p>
+
+{% if new_link %}
+<div class="card" style="margin-bottom:16px;border-color:#1e40af;">
+  <h2>{% if new_link.kind == 'invite' %}Invite link created{% else %}Password reset link for {{ new_link.user }}{% endif %}</h2>
+  <p class="small">Send this to the person (it works once, and is only shown now). {% if new_link.kind == 'invite' %}It expires in 7 days.{% else %}It expires in 48 hours.{% endif %}</p>
+  <p><code id="new-link">{{ new_link.url }}</code></p>
+  <button type="button" class="secondary small" data-copy="new-link">Copy link</button>
+</div>
+{% endif %}
+
+<div class="grid">
+  <div class="card wide table-scroll">
+    <h2>Accounts</h2>
+    <table>
+      <tr><th>Username</th><th>Role</th><th>Status</th><th>Last login</th><th></th></tr>
+      {% for u in users %}
+      <tr class="{{ '' if u.active else 'past' }}">
+        <td>{{ u.username }}{% if u.id == user.id %} <span class="muted small">(you)</span>{% endif %}</td>
+        <td>{{ 'Admin' if u.is_admin else 'User' }}</td>
+        <td>{% if not u.active %}<span class="badge muted">disabled</span>{% elif u.locked_until and u.locked_until > now %}<span class="badge held">locked</span>{% elif u.password_hash == '!' %}<span class="badge held">no password</span>{% else %}<span class="badge ok">active</span>{% endif %}</td>
+        <td class="small">{{ u.last_login_at.astimezone(settings.tz).strftime('%d %b %Y %H:%M') if u.last_login_at else '—' }}</td>
+        <td class="num" style="white-space:nowrap;">
+          <form class="inline" method="post" action="/admin/users/{{ u.id }}/reset"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Reset link</button></form>
+          {% if u.id != user.id %}
+          <form class="inline" method="post" action="/admin/users/{{ u.id }}/toggle-admin"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">{{ 'Remove admin' if u.is_admin else 'Make admin' }}</button></form>
+          <form class="inline" method="post" action="/admin/users/{{ u.id }}/toggle-active"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">{{ 'Disable' if u.active else 'Enable' }}</button></form>
+          {% if u.id != owner_id %}
+          <form class="inline" method="post" action="/admin/users/{{ u.id }}/delete" data-confirm="Delete {{ u.username }} and all their settings?"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Delete</button></form>
+          {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Invite someone</h2>
+    <p class="small">Creates a one-time link (valid 7 days). The person picks their own username and password.</p>
+    <form method="post" action="/admin/invites">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <label><input type="checkbox" name="make_admin"> Make them an admin (can manage users and system settings)</label>
+      <p><button>Create invite link</button></p>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Open links</h2>
+    {% for i in invites %}
+    <div class="row" style="justify-content:space-between;align-items:center;margin:4px 0;">
+      <span class="small">{% if i.user_id %}Password reset{% else %}Invite{% if i.make_admin %} (admin){% endif %}{% endif %} · expires {{ i.expires_at.astimezone(settings.tz).strftime('%d %b %H:%M') }}</span>
+      <form class="inline" method="post" action="/admin/invites/{{ i.id }}/revoke"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Revoke</button></form>
+    </div>
+    {% else %}<p class="muted small">None.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

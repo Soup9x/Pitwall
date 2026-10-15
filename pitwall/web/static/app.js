@@ -32,3 +32,25 @@
     update();
   });
 })();
+
+// Season pickers submit on change; forms with data-confirm ask first. (No inline handlers:
+// the Content-Security-Policy only allows this file's scripts.)
+(function () {
+  document.querySelectorAll("select[data-autosubmit]").forEach(function (el) {
+    el.addEventListener("change", function () { el.form.submit(); });
+  });
+  document.querySelectorAll("form[data-confirm]").forEach(function (form) {
+    form.addEventListener("submit", function (e) {
+      if (!window.confirm(form.dataset.confirm)) e.preventDefault();
+    });
+  });
+  document.querySelectorAll("[data-copy]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      const target = document.getElementById(btn.dataset.copy);
+      if (!target) return;
+      navigator.clipboard.writeText(target.value || target.textContent).then(function () {
+        btn.textContent = "Copied ✓";
+      });
+    });
+  });
+})();

@@ -8,10 +8,11 @@ from datetime import time
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session as DB
 
 from pitwall.config import get_env
-from pitwall.models import Setting
+from pitwall.models import OWNER_ID, Setting, UserSetting
 
 ALERT_TYPES = ("reminder", "schedule_change", "preview", "results", "standings", "digest")
 ALERT_LABELS = {
@@ -102,9 +103,18 @@ def defaults() -> AppSettings:
     return AppSettings(timezone=env.tz, backfill_start_year=env.backfill_start_year)
 
 
-def load_settings(db: DB) -> AppSettings:
+# Settings that apply to the whole install (admin-only); everything else is per user.
+SYSTEM_KEYS = frozenset({"backfill_start_year"})
+
+
+def load_settings(db: DB, user_id: int | None = None) -> AppSettings:
+    """Defaults, then install-wide settings, then the user's own (default: the owner)."""
     s = defaults()
-    rows = {r.key: r.value for r in db.query(Setting).all()}
+    rows = {r.key: r.value for r in db.scalars(select(Setting).where(Setting.key.in_(SYSTEM_KEYS)))}
+    uid = user_id or OWNER_ID
+    rows.update(
+        {r.key: r.value for r in db.scalars(select(UserSetting).where(UserSetting.user_id == uid))}
+    )
     for key, raw in rows.items():
         if not hasattr(s, key):
             continue
@@ -124,19 +134,37 @@ def load_settings(db: DB) -> AppSettings:
     return s
 
 
-def save_settings(db: DB, updates: dict[str, Any]) -> AppSettings:
+def save_settings(db: DB, updates: dict[str, Any], user_id: int | None = None) -> AppSettings:
+    """Install-wide keys go to `setting`; the rest are saved for the user (default: owner)."""
     known = asdict(defaults())
+    uid = user_id or OWNER_ID
     for key, value in updates.items():
         if key not in known:
             raise KeyError(key)
-        row = db.get(Setting, key)
-        encoded = json.dumps(value)
-        if row is None:
-            db.add(Setting(key=key, value=encoded))
+        if key in SYSTEM_KEYS:
+            set_kv(db, key, value)
         else:
-            row.value = encoded
+            set_user_kv(db, uid, key, value)
     db.flush()
-    return load_settings(db)
+    return load_settings(db, uid)
+
+
+def get_user_kv(db: DB, user_id: int, key: str, default: Any = None) -> Any:
+    row = db.get(UserSetting, (user_id, key))
+    if row is None:
+        return default
+    try:
+        return json.loads(row.value)
+    except json.JSONDecodeError:
+        return default
+
+
+def set_user_kv(db: DB, user_id: int, key: str, value: Any) -> None:
+    row = db.get(UserSetting, (user_id, key))
+    if row is None:
+        db.add(UserSetting(user_id=user_id, key=key, value=json.dumps(value)))
+    else:
+        row.value = json.dumps(value)
 
 
 def get_kv(db: DB, key: str, default: Any = None) -> Any:

@@ -19,6 +19,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pitwall.db import Base, UTCDateTime, utcnow
 
 SESSION_TYPES = ("FP1", "FP2", "FP3", "SQ", "SPRINT", "Q", "RACE")
+# The first admin account. Created by migration 0005; single-user installs are this user.
+OWNER_ID = 1
 SESSION_LABELS = {
     "FP1": "Practice 1",
     "FP2": "Practice 2",
@@ -189,9 +191,59 @@ class StandingsSnapshot(Base):
     taken_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
 
+class User(Base):
+    __tablename__ = "user"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(40), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(200), default="!")  # "!" = can't log in
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    ics_token: Mapped[str | None] = mapped_column(String(80), unique=True, nullable=True)
+    # Bumped on password change/reset so existing login cookies stop working.
+    session_version: Mapped[int] = mapped_column(Integer, default=1)
+    failed_logins: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class Invite(Base):
+    """One-time link to create an account (user_id is None) or reset a password (user_id set).
+    Only a hash of the token is stored."""
+
+    __tablename__ = "invite"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), nullable=True
+    )
+    make_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("user.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    used_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class UserSetting(Base):
+    __tablename__ = "user_setting"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), primary_key=True
+    )
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)  # JSON-encoded
+
+
 class FollowedDriver(Base):
     __tablename__ = "followed_driver"
 
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), primary_key=True, default=OWNER_ID
+    )
     driver_id: Mapped[str] = mapped_column(ForeignKey("driver.id"), primary_key=True)
     driver: Mapped[Driver] = relationship(lazy="joined")
 
@@ -200,6 +252,9 @@ class NotificationLog(Base):
     __tablename__ = "notification_log"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, index=True, default=OWNER_ID
+    )
     type: Mapped[str] = mapped_column(String(40), index=True)
     channel: Mapped[str] = mapped_column(String(20))
     payload_hash: Mapped[str] = mapped_column(String(64), index=True)
@@ -217,6 +272,7 @@ class Outbox(Base):
     __tablename__ = "outbox"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True, default=OWNER_ID)  # recipient
     type: Mapped[str] = mapped_column(String(40), index=True)
     payload_hash: Mapped[str] = mapped_column(String(64), index=True)
     event_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -238,6 +294,9 @@ class Outbox(Base):
 class SpoilerState(Base):
     __tablename__ = "spoiler_state"
 
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), primary_key=True, default=OWNER_ID
+    )
     event_id: Mapped[int] = mapped_column(
         ForeignKey("event.id", ondelete="CASCADE"), primary_key=True
     )
@@ -278,6 +337,9 @@ class NotificationTarget(Base):
     __tablename__ = "notification_target"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"), index=True, default=OWNER_ID
+    )
     channel: Mapped[str] = mapped_column(String(20), index=True)  # email / webhook
     kind: Mapped[str] = mapped_column(String(20))  # gmail, m365, smtp, ntfy, discord, json, apprise
     label: Mapped[str] = mapped_column(String(200))

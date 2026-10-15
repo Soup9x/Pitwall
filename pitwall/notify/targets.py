@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session as DB
 from pitwall.config import get_env, split_urls
 from pitwall.db import session_scope
 from pitwall.logging_setup import register_secrets
-from pitwall.models import NotificationTarget
+from pitwall.models import OWNER_ID, NotificationTarget
 
 EMAIL_KINDS = {
     "gmail": "Gmail",
@@ -175,22 +175,30 @@ def env_urls(channel: str) -> list[str]:
     return split_urls(env.apprise_urls_email if channel == "email" else env.apprise_urls_webhook)
 
 
-def db_targets(db: DB, channel: str | None = None) -> list[NotificationTarget]:
+def db_targets(
+    db: DB, channel: str | None = None, user_id: int | None = OWNER_ID
+) -> list[NotificationTarget]:
+    """A user's targets (user_id=None: everyone's)."""
     q = select(NotificationTarget).order_by(NotificationTarget.channel, NotificationTarget.id)
+    if user_id is not None:
+        q = q.where(NotificationTarget.user_id == user_id)
     if channel:
         q = q.where(NotificationTarget.channel == channel)
     return list(db.scalars(q))
 
 
-def channel_urls(channel: str, db: DB | None = None) -> list[str]:
-    """Every enabled destination for a channel: UI-added targets plus .env URLs."""
+def channel_urls(channel: str, db: DB | None = None, user_id: int | None = None) -> list[str]:
+    """Every enabled destination of a user on a channel. URLs from .env belong to the owner."""
+    uid = user_id or OWNER_ID
     if db is None:
         with session_scope() as s:
-            return channel_urls(channel, s)
-    urls = [t.url for t in db_targets(db, channel) if t.enabled]
-    return urls + [u for u in env_urls(channel) if u not in urls]
+            return channel_urls(channel, s, uid)
+    urls = [t.url for t in db_targets(db, channel, uid) if t.enabled]
+    if uid == OWNER_ID:
+        urls += [u for u in env_urls(channel) if u not in urls]
+    return urls
 
 
 def register_all_secrets(db: DB) -> None:
-    for t in db_targets(db):
+    for t in db_targets(db, user_id=None):
         register_secrets(url_secrets(t.url))

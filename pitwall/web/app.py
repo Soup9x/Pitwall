@@ -16,10 +16,13 @@ from pitwall import scheduler
 from pitwall.config import get_env
 from pitwall.db import init_engine, session_scope
 from pitwall.logging_setup import configure_logging
+from pitwall.models import OWNER_ID, User
 from pitwall.notify.targets import register_all_secrets
 from pitwall.services.circuits import merge_all
-from pitwall.web import routes
+from pitwall.users import bootstrap
+from pitwall.web import accounts, routes
 from pitwall.web.auth import NotAuthenticated
+from pitwall.web.security import SecurityHeadersMiddleware
 
 log = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -38,11 +41,14 @@ def create_app(*, manage_db: bool = True, start_scheduler: bool | None = None) -
             from pitwall.migrate import upgrade
 
             upgrade(engine)
-            if not env.admin_password:
-                log.warning("PITWALL_ADMIN_PASSWORD is not set; nobody can log in")
-            if not env.ics_token:
-                log.warning("PITWALL_ICS_TOKEN is not set; the calendar feed is disabled")
         with session_scope() as db:
+            bootstrap(db)
+            owner = db.get(User, OWNER_ID)
+            if owner is not None and owner.password_hash == "!":
+                log.warning(
+                    "the admin account has no password: set PITWALL_ADMIN_PASSWORD or "
+                    "run `python -m pitwall set-password admin`"
+                )
             merge_all(db)
             register_all_secrets(db)
         if run_scheduler:
@@ -64,6 +70,7 @@ def create_app(*, manage_db: bool = True, start_scheduler: bool | None = None) -
         same_site="lax",
         https_only=env.secure_cookies,
     )
+    app.add_middleware(SecurityHeadersMiddleware, hsts=env.secure_cookies)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.exception_handler(NotAuthenticated)
@@ -73,5 +80,7 @@ def create_app(*, manage_db: bool = True, start_scheduler: bool | None = None) -
         return RedirectResponse(f"/login?next={quote(exc.next_path)}", status_code=303)
 
     app.include_router(routes.public)
+    app.include_router(accounts.router)
     app.include_router(routes.private)
+    app.include_router(routes.admin)
     return app

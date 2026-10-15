@@ -34,7 +34,7 @@ def csrf(client, path="/login"):
 def login(client):
     r = client.post(
         "/login",
-        data={"password": PASSWORD, "csrf_token": csrf(client), "next": "/"},
+        data={"username": "admin", "password": PASSWORD, "csrf_token": csrf(client), "next": "/"},
         follow_redirects=False,
     )
     assert r.status_code == 303
@@ -73,30 +73,41 @@ def test_pages_require_login(client):
 def test_wrong_password_and_rate_limit(client):
     token = csrf(client)
     for _ in range(auth.MAX_FAILURES):
-        r = client.post("/login", data={"password": "nope", "csrf_token": token})
+        r = client.post(
+            "/login", data={"username": "admin", "password": "nope", "csrf_token": token}
+        )
         assert r.status_code == 401
-    r = client.post("/login", data={"password": PASSWORD, "csrf_token": token})
+    r = client.post("/login", data={"username": "admin", "password": PASSWORD, "csrf_token": token})
     assert r.status_code == 429  # even the right password is refused while limited
 
 
 def test_login_requires_csrf(client):
     client.get("/login")
-    r = client.post("/login", data={"password": PASSWORD})
+    r = client.post("/login", data={"username": "admin", "password": PASSWORD})
     assert r.status_code == 403
 
 
 def test_open_redirect_blocked(client):
     r = client.post(
         "/login",
-        data={"password": PASSWORD, "csrf_token": csrf(client), "next": "//evil.example"},
+        data={
+            "username": "admin",
+            "password": PASSWORD,
+            "csrf_token": csrf(client),
+            "next": "//evil.example",
+        },
         follow_redirects=False,
     )
     assert r.headers["location"] == "/"
 
 
 def test_health_is_public_and_secret_free(client, seeded):
+    # From the internet: status only.
+    r = client.get("/health", headers={"cf-connecting-ip": "203.0.113.9"})
+    assert r.status_code == 200 and r.json() == {"status": "ok"}
+    # Logged in: details (but still never secrets).
+    login(client)
     r = client.get("/health")
-    assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok" and body["db"] == "ok"
     assert body["scheduler"]["running"] is False
@@ -130,7 +141,9 @@ def test_all_pages_render(client, seeded):
     assert "▲1" in client.get("/standings").text
     s = client.get("/settings").text
     assert "Charles Leclerc" in s
-    assert "ics-test-token-123" not in s and "ics-…" in s  # masked
+    assert "ics-test-token-123" not in s  # the calendar link lives on the Account page
+    acct = client.get("/account").text
+    assert "/calendar.ics?token=ics-test-token-123" in acct  # the owner keeps their old link
     assert "user:pass" not in s and "mailtos://smtp.example.com/…" in s
     assert client.get("/history").status_code == 200
     assert client.get("/events/99999").status_code == 404

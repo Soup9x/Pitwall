@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{{ 'Reset password' if reset_user else 'Join' }} · Pitwall</title><link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏁</text></svg>"></head>
+<body>
+<div class="login card">
+  <div class="brand" style="font-size:1.4rem;">Pit<span>wall</span></div>
+  {% if not valid %}
+    <div class="error">This link has expired or was already used. Ask for a new one.</div>
+    <p><a href="/login">Go to the login page</a></p>
+  {% else %}
+    <h2>{% if reset_user %}Choose a new password for {{ reset_user.username }}{% else %}Create your account{% endif %}</h2>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="post" action="/invite/{{ token }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      {% if not reset_user %}
+      <label for="username">Username</label>
+      <input id="username" type="text" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" style="width:100%;" required>
+      <p class="muted small">2–32 characters: letters, numbers, ".", "-" or "_".</p>
+      {% endif %}
+      <label for="password">Password</label>
+      <input id="password" type="password" name="password" autocomplete="new-password" style="width:100%;" required minlength="10">
+      <label for="password2">Password again</label>
+      <input id="password2" type="password" name="password2" autocomplete="new-password" style="width:100%;" required minlength="10">
+      <p class="muted small">At least 10 characters.</p>
+      <div style="margin-top:14px;"><button type="submit">{{ 'Set password' if reset_user else 'Create account' }}</button></div>
+    </form>
+  {% endif %}
+</div>
+</body></html>

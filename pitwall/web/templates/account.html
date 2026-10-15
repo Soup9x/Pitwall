@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Account{% endblock %}
+{% block content %}
+<h1>Account</h1>
+<p class="sub">Signed in as <strong>{{ user.username }}</strong>{% if user.is_admin %} (admin){% endif %}.</p>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+<div class="grid">
+  <div class="card">
+    <h2>Change password</h2>
+    <form method="post" action="/account/password">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <label for="current">Current password</label>
+      <input id="current" type="password" name="current" autocomplete="current-password" required>
+      <label for="password">New password <span class="muted">(10+ characters)</span></label>
+      <input id="password" type="password" name="password" autocomplete="new-password" required minlength="10">
+      <label for="password2">New password again</label>
+      <input id="password2" type="password" name="password2" autocomplete="new-password" required minlength="10">
+      <p><button>Change password</button></p>
+    </form>
+    <p class="muted small">Changing your password signs out your other devices.</p>
+  </div>
+
+  <div class="card" id="calendar">
+    <h2>Your calendar feed</h2>
+    <p class="small">Subscribe in Google Calendar via <em>Other calendars → + → From URL</em>. Times in the event descriptions use your timezone.</p>
+    {% if ics_url %}
+    <details>
+      <summary class="small" style="cursor:pointer;">Show my private link</summary>
+      <p><code id="ics-url">{{ ics_url }}</code></p>
+      <button type="button" class="secondary small" data-copy="ics-url">Copy</button>
+      <p class="muted small">Anyone with this link can see the F1 calendar it shows (nothing else). Add <code>&amp;sessions=race,q</code> for races and qualifying only.</p>
+    </details>
+    {% endif %}
+    <form method="post" action="/account/ics" data-confirm="Create a new link? The current one will stop working." style="margin-top:10px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Create a new link</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Sessions</h2>
+    <p class="small">Lost a phone or used a shared computer? Sign out everywhere, including here.</p>
+    <form method="post" action="/account/signout-everywhere"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary">Sign out everywhere</button></form>
+  </div>
+</div>
+{% endblock %}

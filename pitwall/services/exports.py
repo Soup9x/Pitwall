@@ -8,7 +8,7 @@ import io
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DB
 
-from pitwall.models import FollowedDriver
+from pitwall.models import OWNER_ID, FollowedDriver
 from pitwall.services import driver_stats, standings
 
 
@@ -43,10 +43,15 @@ def standings_csv(db: DB, season: int, kind: str) -> str | None:
     return _csv(header, rows)
 
 
-def drivers_csv(db: DB, season: int, driver_ids: list[str] | None = None) -> str:
-    """One row per race for each driver (default: followed drivers)."""
+def drivers_csv(
+    db: DB, season: int, driver_ids: list[str] | None = None, user_id: int = OWNER_ID
+) -> str:
+    """One row per race for each driver (default: the user's followed drivers)."""
     if driver_ids is None:
-        driver_ids = [f.driver_id for f in db.scalars(select(FollowedDriver))]
+        driver_ids = [
+            f.driver_id
+            for f in db.scalars(select(FollowedDriver).where(FollowedDriver.user_id == user_id))
+        ]
     header = [
         "season",
         "round",

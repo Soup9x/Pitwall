@@ -318,58 +318,104 @@ if ((configure)); then
   BIND="0.0.0.0"
   SECURE="false"
   FWD="127.0.0.1"
-  prev_proxy=n
-  [[ "$(env_get PITWALL_SECURE_COOKIES)" == true || "$(env_get PITWALL_BIND)" == 127.0.0.1 ]] && prev_proxy=y
-  hint "A reverse proxy (Caddy, nginx, Traefik, Nginx Proxy Manager…) is also how Google Calendar"
-  hint "can reach the calendar feed from the internet."
-  if ask_yn "Will Pitwall sit behind a reverse proxy?" "$prev_proxy"; then
-    prev_url="$(env_get PITWALL_BASE_URL)"
-    [[ "$prev_url" == https://* ]] || prev_url=""
-    while :; do
-      BASE_URL="$(ask_required "Public URL you'll use (e.g. https://pitwall.example.com)" "$prev_url")"
-      [[ "$BASE_URL" =~ ^https?://[^/[:space:]]+ ]] && break
-      warn "Please enter a full URL starting with https:// (or http://)."
-    done
-    BASE_URL="${BASE_URL%/}"
-    [[ "$BASE_URL" == https://* ]] && SECURE="true"
-    if ask_yn "Does the proxy run on this same machine?" y; then
-      BIND="127.0.0.1"
-      FWD="*"
-      hint "Pitwall will only listen on 127.0.0.1:$PORT; point the proxy at http://127.0.0.1:$PORT"
-    else
-      hint "Point the proxy at http://$host_name:$PORT"
-      prev="$(env_get FORWARDED_ALLOW_IPS)"
-      [[ "$prev" == 127.0.0.1 ]] && prev=""
-      FWD="$(ask "IP address of the proxy (lets Pitwall see real client IPs; * = trust any)" "${prev:-*}")"
-    fi
-  else
-    prev_url="$(env_get PITWALL_BASE_URL)"
-    [[ -z "$prev_url" || "$prev_url" == https://* ]] && prev_url="http://$host_name:$PORT"
-    BASE_URL="$(ask "Address you'll type in the browser" "$prev_url")"
-    BASE_URL="${BASE_URL%/}"
+  CF="false"
+  TUNNEL_TOKEN="$(env_get CLOUDFLARE_TUNNEL_TOKEN)"
+  PROFILES=""
+  access_default=1
+  if [[ -n "$TUNNEL_TOKEN" ]]; then access_default=2
+  elif [[ "$(env_get PITWALL_SECURE_COOKIES)" == true || "$(env_get PITWALL_BIND)" == 127.0.0.1 ]]; then access_default=3
   fi
+  access="$(choose "How will people reach Pitwall?" "$access_default" \
+    "Only on my local network (http://$host_name:$PORT)" \
+    "From the internet through a Cloudflare Tunnel (recommended for sharing)" \
+    "Through my own reverse proxy (Caddy, nginx, Traefik, Nginx Proxy Manager...)")"
+  case "$access" in
+    1)
+      prev_url="$(env_get PITWALL_BASE_URL)"
+      [[ -z "$prev_url" || "$prev_url" == https://* ]] && prev_url="http://$host_name:$PORT"
+      BASE_URL="$(ask "Address you'll type in the browser" "$prev_url")"
+      BASE_URL="${BASE_URL%/}"
+      ;;
+    2)
+      say ""
+      hint "In the Cloudflare dashboard: Zero Trust → Networks → Tunnels → Create a tunnel →"
+      hint "Cloudflared. Copy the token (the long text after --token in the install command)."
+      hint "Then add a Public Hostname, e.g. pitwall.yourdomain.com, with service type HTTP and"
+      hint "URL  pitwall:8080  (that's the Pitwall container on the tunnel's Docker network)."
+      if [[ -n "$TUNNEL_TOKEN" ]] && ask_yn "Keep the current tunnel token?" y; then
+        :
+      else
+        while :; do
+          TUNNEL_TOKEN="$(ask_secret "Tunnel token")"
+          TUNNEL_TOKEN="${TUNNEL_TOKEN//[[:space:]]/}"
+          TUNNEL_TOKEN="${TUNNEL_TOKEN#*--token}"
+          [[ ${#TUNNEL_TOKEN} -ge 40 && "$TUNNEL_TOKEN" =~ ^[A-Za-z0-9=_.-]+$ ]] && break
+          warn "That doesn't look like a tunnel token (a long string of letters and numbers)."
+        done
+      fi
+      prev_url="$(env_get PITWALL_BASE_URL)"
+      [[ "$prev_url" == https://* ]] || prev_url=""
+      while :; do
+        host="$(ask_required "Public hostname you set up (e.g. pitwall.example.com)" "${prev_url#https://}")"
+        host="${host#https://}"; host="${host#http://}"; host="${host%%/*}"
+        [[ "$host" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] && break
+        warn "Please enter just the hostname, like pitwall.example.com"
+      done
+      BASE_URL="https://$host"
+      BIND="127.0.0.1"   # only reachable via the tunnel (and this machine)
+      SECURE="true"
+      CF="true"
+      PROFILES="tunnel"
+      ;;
+    3)
+      prev_url="$(env_get PITWALL_BASE_URL)"
+      [[ "$prev_url" == https://* ]] || prev_url=""
+      while :; do
+        BASE_URL="$(ask_required "Public URL you'll use (e.g. https://pitwall.example.com)" "$prev_url")"
+        [[ "$BASE_URL" =~ ^https?://[^/[:space:]]+ ]] && break
+        warn "Please enter a full URL starting with https:// (or http://)."
+      done
+      BASE_URL="${BASE_URL%/}"
+      [[ "$BASE_URL" == https://* ]] && SECURE="true"
+      if ask_yn "Does the proxy run on this same machine?" y; then
+        BIND="127.0.0.1"
+        FWD="*"
+        hint "Pitwall will only listen on 127.0.0.1:$PORT; point the proxy at http://127.0.0.1:$PORT"
+      else
+        hint "Point the proxy at http://$host_name:$PORT"
+        prev="$(env_get FORWARDED_ALLOW_IPS)"
+        [[ "$prev" == 127.0.0.1 ]] && prev=""
+        FWD="$(ask "IP address of the proxy (lets Pitwall see real client IPs; * = trust any)" "${prev:-*}")"
+      fi
+      ;;
+  esac
 
   # --- password
-  step "3/5 Web UI password"
+  step "3/5 Admin password"
+  hint "You log in as the user 'admin'. Invite other people later from Users in the web UI."
   ADMIN_PW="$(env_get PITWALL_ADMIN_PASSWORD)"
   GENERATED_PW=""
+  PW_CHANGED=0
   if [[ -n "$ADMIN_PW" && "$ADMIN_PW" != change-me* ]] && ask_yn "Keep your current password?" y; then
     :
   else
-    hint "At least 8 characters. Leave blank to generate a strong one."
+    hint "At least 10 characters. Leave blank to generate a strong one."
     while :; do
       pw1="$(ask_secret "Password")"
       if [[ -z "$pw1" ]]; then
         ADMIN_PW="$(random_hex 12)"
         GENERATED_PW="$ADMIN_PW"
+        PW_CHANGED=1
         ok "Generated a password (shown at the end)"
         break
       fi
-      if ((${#pw1} < 8)); then warn "Too short."; continue; fi
+      if ((${#pw1} < 10)); then warn "Too short."; continue; fi
+      if [[ "${pw1,,}" == *admin* ]]; then warn "Please don't include the word 'admin'."; continue; fi
       if [[ "$pw1" == *"'"* ]]; then warn "Please don't use the ' character."; continue; fi
       pw2="$(ask_secret "Type it again")"
       [[ "$pw1" == "$pw2" ]] || { warn "They don't match."; continue; }
       ADMIN_PW="$pw1"
+      PW_CHANGED=1
       break
     done
   fi
@@ -400,6 +446,7 @@ if ((configure)); then
   say "  Install folder:   $INSTALL_DIR"
   say "  Timezone:         $TZ_VAL"
   say "  Web UI address:   $BASE_URL"
+  [[ "$CF" == true ]] && say "  Cloudflare:       tunnel enabled (token saved)"
   say "  Listens on:       $BIND:$PORT"
   say "  Password:         $([[ -n "$GENERATED_PW" ]] && echo "(generated)" || echo "(set)")"
   [[ -n "$EMAIL_URLS" ]] && say "  Email (.env):     $(mask_urls "$EMAIL_URLS")"
@@ -438,6 +485,11 @@ PITWALL_LOG_LEVEL=$LOG_LEVEL
 PITWALL_SECURE_COOKIES=$SECURE
 FORWARDED_ALLOW_IPS=$(q "$FWD")
 
+# Cloudflare Tunnel (optional). COMPOSE_PROFILES=tunnel starts the cloudflared container.
+PITWALL_CLOUDFLARE=$CF
+CLOUDFLARE_TUNNEL_TOKEN=$(q "$TUNNEL_TOKEN")
+COMPOSE_PROFILES=$PROFILES
+
 PUID=$APP_UID
 PGID=$APP_GID
 EOF
@@ -452,6 +504,10 @@ step "Starting Pitwall"
 mkdir -p data
 puid="$(env_get PUID)" pgid="$(env_get PGID)"
 chown -R "${puid:-$APP_UID}:${pgid:-$APP_GID}" data
+if [[ "$(env_get COMPOSE_PROFILES)" != *tunnel* ]]; then
+  # Tunnel switched off (or never on): make sure no old cloudflared container is left running.
+  docker compose --profile tunnel rm -sf cloudflared >/dev/null 2>&1 || true
+fi
 docker compose up -d --build || die "docker compose failed — see the messages above."
 
 PORT="$(env_get PITWALL_PORT)"; PORT="${PORT:-8080}"
@@ -467,6 +523,16 @@ if ((!healthy)); then
   die "Start-up failed. Fix the problem above and run this script again."
 fi
 ok "Pitwall is running"
+
+# Passwords live in Pitwall's database; PITWALL_ADMIN_PASSWORD is only used the very first time.
+if [[ "${PW_CHANGED:-0}" == 1 ]]; then
+  if printf '%s\n' "$(env_get PITWALL_ADMIN_PASSWORD)" |
+     docker compose exec -T pitwall python -m pitwall set-password admin >/dev/null 2>&1; then
+    ok "Admin password set"
+  else
+    warn "Couldn't set the admin password; run: sudo docker compose exec pitwall python -m pitwall set-password admin"
+  fi
+fi
 
 # ------------------------------------------------------------------------------ 5. test
 
@@ -491,20 +557,28 @@ say "${B}${G}🏁  Pitwall is installed.${N}"
 say ""
 say "  Web UI:     ${B}$BASE_URL${N}"
 if [[ -n "${GENERATED_PW:-}" ]]; then
-  say "  Password:   ${B}$GENERATED_PW${N}   ${Y}← write this down; it's also in $INSTALL_DIR/.env${N}"
+  say "  Username:   ${B}admin${N}"
+  say "  Password:   ${B}$GENERATED_PW${N}   ${Y}← write this down${N}"
 else
-  say "  Password:   the one you chose (stored in $INSTALL_DIR/.env)"
+  say "  Username:   ${B}admin${N}  (password: the one you chose)"
+fi
+if [[ "$(env_get PITWALL_CLOUDFLARE)" == true ]]; then
+  say ""
+  say "  Cloudflare: make sure the tunnel's Public Hostname points to  ${B}http://pitwall:8080${N}"
+  hint "  (Zero Trust → Networks → Tunnels → your tunnel → Public Hostname). It can take a"
+  hint "  minute to connect: sudo docker compose logs cloudflared"
 fi
 say ""
-say "  Calendar feed for Google Calendar (Other calendars → + → From URL):"
-say "    ${B}$BASE_URL/calendar.ics?token=$ICS_TOKEN${N}"
-hint "    Google must be able to reach this address from the internet (use your proxy's URL),"
-hint "    and it refreshes subscribed calendars slowly (up to ~24 h)."
+say "  Calendar feed: log in, open ${B}Account${N} and copy your private link into Google Calendar"
+say "  (Other calendars → + → From URL)."
+hint "  Google must be able to reach it from the internet (e.g. through the Cloudflare tunnel),"
+hint "  and it refreshes subscribed calendars slowly (up to ~24 h)."
 say ""
 say "  Next steps — log in, open Settings and:"
 say "    • add where alerts should go under ${B}Notification channels${N} (email: Gmail,"
 say "      Microsoft 365 or SMTP; webhooks: ntfy, Discord or JSON) and press Test,"
-say "    • pick the drivers you follow."
+say "    • pick the drivers you follow,"
+say "    • invite family or friends under Users (each gets their own settings and alerts)."
 say "    • Past seasons download in the background (progress bar in the UI)."
 say "    • Spot-check $INSTALL_DIR/data/circuits.yaml (see README section 7)."
 say ""

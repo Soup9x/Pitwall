@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DB
 
 from pitwall.models import (
+    OWNER_ID,
     Constructor,
     Driver,
     Event,
@@ -67,7 +68,9 @@ def _driver_teams(db: DB, season: int) -> dict[str, str]:
     return {r[0]: r[1] for r in rows}  # latest round wins
 
 
-def table(db: DB, season: int, kind: str, rnd: int | None = None) -> StandingsTable | None:
+def table(
+    db: DB, season: int, kind: str, rnd: int | None = None, *, user_id: int = OWNER_ID
+) -> StandingsTable | None:
     rounds = list(
         db.scalars(
             select(StandingsSnapshot.round)
@@ -103,7 +106,10 @@ def table(db: DB, season: int, kind: str, rnd: int | None = None) -> StandingsTa
             .order_by(StandingsSnapshot.position)
         )
     )
-    followed = {f.driver_id for f in db.scalars(select(FollowedDriver))}
+    followed = {
+        f.driver_id
+        for f in db.scalars(select(FollowedDriver).where(FollowedDriver.user_id == user_id))
+    }
     teams = _driver_teams(db, season) if kind == "driver" else {}
 
     rows: list[StandingRow] = []

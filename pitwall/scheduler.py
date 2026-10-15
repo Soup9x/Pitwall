@@ -66,16 +66,17 @@ def install_recurring_jobs(sched: Any) -> None:
         name="Deliver queued alerts (every minute)",
     )
     sched.add_job(
-        "pitwall.jobs:preview_job",
-        "cron",
-        day_of_week="mon",
-        hour=9,
-        minute=0,
-        timezone=tz,
-        id="race_week_preview",
+        "pitwall.jobs:personal_job",
+        "interval",
+        minutes=5,
+        id="personal",
         replace_existing=True,
-        name="Race-week preview (Mon 09:00 local)",
+        next_run_time=now + timedelta(minutes=1),
+        name="Previews and digests due in each user's timezone (every 5 min)",
     )
+    for old_job in ("race_week_preview", "weekly_digest"):  # replaced by personal_job
+        if sched.get_job(old_job) is not None:
+            sched.remove_job(old_job)
     sched.add_job(
         "pitwall.jobs:backfill_job",
         "cron",
@@ -116,22 +117,6 @@ def install_recurring_jobs(sched: Any) -> None:
         misfire_grace_time=6 * 3600,
         name="Draw missing circuit maps (nightly)",
     )
-    if settings.digest_enabled:
-        hh, mm = settings.digest_time.split(":")
-        sched.add_job(
-            "pitwall.jobs:digest_job",
-            "cron",
-            day_of_week=settings.digest_day,
-            hour=int(hh),
-            minute=int(mm),
-            timezone=tz,
-            id="weekly_digest",
-            replace_existing=True,
-            misfire_grace_time=6 * 3600,
-            name="Weekly digest",
-        )
-    elif sched.get_job("weekly_digest") is not None:
-        sched.remove_job("weekly_digest")
     if not backfill_done:
         sched.add_job(
             "pitwall.jobs:backfill_job",

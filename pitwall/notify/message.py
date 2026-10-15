@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from pitwall.models import OWNER_ID
+
 
 @dataclass
 class Message:
@@ -23,10 +25,18 @@ class Message:
     expires_at: datetime | None = None
     # Content key used for dedup; defaults to the title + text.
     dedup_content: str | None = None
+    # Recipient. None means the owner account (single-user installs).
+    user_id: int | None = None
 
     def payload_hash(self) -> str:
+        fields: dict[str, Any] = {}
+        if self.user_id not in (None, OWNER_ID):
+            # The owner's fingerprints stay as before multi-user support, so nothing already
+            # sent is re-sent after upgrading.
+            fields["user"] = self.user_id
         blob = json.dumps(
             {
+                **fields,
                 "type": self.type,
                 "event": self.event_id,
                 "session": self.session_id,

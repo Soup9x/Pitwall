@@ -16,6 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DB
 
 from pitwall.models import (
+    OWNER_ID,
     Constructor,
     Driver,
     Event,
@@ -27,7 +28,7 @@ from pitwall.models import (
 )
 from pitwall.services.results_util import classified, dnf, started
 from pitwall.services.standings import fmt_points
-from pitwall.settings_store import get_kv, set_kv
+from pitwall.settings_store import get_user_kv, set_user_kv
 
 MAX_DEBUT_AGE = 25
 RECENT_KEY = "trivia_recent"
@@ -127,7 +128,7 @@ class Context:
         return _age(driver.dob, first_date)[0] <= MAX_DEBUT_AGE
 
 
-def build_context(db: DB, event: Event) -> Context | None:
+def build_context(db: DB, event: Event, user_id: int = OWNER_ID) -> Context | None:
     data_from = db.scalar(
         select(func.min(Event.season)).join(Session).join(Result, Result.session_id == Session.id)
     )
@@ -159,7 +160,10 @@ def build_context(db: DB, event: Event) -> Context | None:
         backfilled={s.year for s in db.scalars(select(Season).where(Season.backfilled))},
         drivers=drivers,
         constructors=cons,
-        followed={f.driver_id for f in db.scalars(select(FollowedDriver))},
+        followed={
+            f.driver_id
+            for f in db.scalars(select(FollowedDriver).where(FollowedDriver.user_id == user_id))
+        },
     )
     rows = db.execute(
         select(Result, Event)
@@ -538,8 +542,8 @@ def rookie_veteran(db: DB, ctx: Context) -> list[Fact]:
 GENERATORS = (milestones, streaks, on_this_day, home_race, rookie_veteran)
 
 
-def generate(db: DB, event: Event) -> list[Fact]:
-    ctx = build_context(db, event)
+def generate(db: DB, event: Event, user_id: int = OWNER_ID) -> list[Fact]:
+    ctx = build_context(db, event, user_id)
     if ctx is None:
         return []
     facts: list[Fact] = []
@@ -551,14 +555,14 @@ def generate(db: DB, event: Event) -> list[Fact]:
     return facts
 
 
-def recent_keys(db: DB) -> set[str]:
-    return {k for batch in (get_kv(db, RECENT_KEY, []) or []) for k in batch}
+def recent_keys(db: DB, user_id: int = OWNER_ID) -> set[str]:
+    return {k for batch in (get_user_kv(db, user_id, RECENT_KEY, []) or []) for k in batch}
 
 
-def remember_keys(db: DB, keys: list[str]) -> None:
+def remember_keys(db: DB, keys: list[str], user_id: int = OWNER_ID) -> None:
     """Record the facts used in a preview; the last RECENT_PREVIEWS previews are avoided."""
-    batches = (get_kv(db, RECENT_KEY, []) or [])[-(RECENT_PREVIEWS - 1) :]
-    set_kv(db, RECENT_KEY, [*batches, keys])
+    batches = (get_user_kv(db, user_id, RECENT_KEY, []) or [])[-(RECENT_PREVIEWS - 1) :]
+    set_user_kv(db, user_id, RECENT_KEY, [*batches, keys])
 
 
 def pick(
@@ -578,5 +582,7 @@ def pick(
     return chosen
 
 
-def for_preview(db: DB, event: Event, *, avoid_recent: bool = True) -> list[Fact]:
-    return pick(generate(db, event), recent_keys(db) if avoid_recent else set())
+def for_preview(
+    db: DB, event: Event, *, avoid_recent: bool = True, user_id: int = OWNER_ID
+) -> list[Fact]:
+    return pick(generate(db, event, user_id), recent_keys(db, user_id) if avoid_recent else set())

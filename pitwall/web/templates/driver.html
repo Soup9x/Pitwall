@@ -7,7 +7,7 @@
     <p class="sub">{% if driver.code %}{{ driver.code }} · {% endif %}{% if driver.number %}#{{ driver.number }} · {% endif %}{{ driver.nationality or '' }}{% if data and data.rows %} · {{ data.rows[-1].team }}{% endif %}</p>
   </div>
   {% if seasons|length > 1 %}
-  <form method="get"><select name="season" onchange="this.form.submit()">
+  <form method="get"><select name="season" data-autosubmit>
     {% for y in seasons %}<option value="{{ y }}" {{ 'selected' if y == season else '' }}>{{ y }}</option>{% endfor %}
   </select></form>
   {% endif %}

@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Notifications{% endblock %}
 {% block content %}
-<h1>Notifications</h1>
-<p class="sub">Every delivery attempt, newest first. Alerts are never sent twice.</p>
+<div class="row" style="justify-content:space-between;">
+  <h1>Notifications</h1>
+  {% if user.is_admin %}<a class="small" href="/history{{ '' if show_all else '?all=1' }}">{{ 'Show only mine' if show_all else "Show everyone's" }}</a>{% endif %}
+</div>
+<p class="sub">{{ "Everyone's" if show_all else 'Your' }} delivery attempts, newest first. Alerts are never sent twice.</p>
 {% if held %}
 <div class="card" style="margin-bottom:16px;">
   <h2>Queued / held</h2>

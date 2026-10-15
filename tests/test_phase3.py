@@ -253,9 +253,9 @@ def test_disabling_digest_releases_held_alerts(db, world, sent):
 
 
 def test_routing_saved_before_digest_existed_gets_default(db):
-    from pitwall.models import Setting
+    from pitwall.models import UserSetting
 
-    db.add(Setting(key="routing", value=json.dumps({"results": ["email"]})))
+    db.add(UserSetting(user_id=1, key="routing", value=json.dumps({"results": ["email"]})))
     db.flush()
     s = load_settings(db)
     assert s.routing["digest"] == ["email"] and s.routing["results"] == ["email"]
@@ -288,7 +288,10 @@ def client(engine):
 
 def login(c):
     token = re.search(r'name="csrf_token" value="([^"]+)"', c.get("/login").text).group(1)
-    c.post("/login", data={"password": "correct horse battery", "csrf_token": token})
+    c.post(
+        "/login",
+        data={"username": "admin", "password": "correct horse battery", "csrf_token": token},
+    )
 
 
 def test_routes(client, db, world):

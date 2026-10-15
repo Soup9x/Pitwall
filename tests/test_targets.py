@@ -158,7 +158,10 @@ def client(engine):
     auth.limiter._failures.clear()
     with TestClient(create_app(manage_db=False, start_scheduler=False)) as c:
         token = re.search(r'name="csrf_token" value="([^"]+)"', c.get("/login").text).group(1)
-        c.post("/login", data={"password": "correct horse battery", "csrf_token": token})
+        c.post(
+            "/login",
+            data={"username": "admin", "password": "correct horse battery", "csrf_token": token},
+        )
         c.csrf = re.search(
             r'name="csrf_token" value="([^"]+)"',  # type: ignore[attr-defined]
             c.get("/settings").text,
