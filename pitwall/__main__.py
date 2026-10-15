@@ -16,8 +16,8 @@ def _ask_password() -> str:
 
     if not sys.stdin.isatty():  # e.g. `echo "pw" | docker compose exec -T pitwall ...`
         return sys.stdin.readline().rstrip("\n")
-    first = getpass.getpass("New password (10+ characters): ")
-    if first != getpass.getpass("Again: "):
+    first = getpass.getpass("New password (10+ characters, blank = generate one): ")
+    if first and first != getpass.getpass("Again: "):
         raise SystemExit("The passwords don't match.")
     return first
 
@@ -27,13 +27,22 @@ def manage_user(args: argparse.Namespace) -> int:
 
     from pitwall.db import session_scope
     from pitwall.models import User
-    from pitwall.users import AccountError, create_user, set_password
+    from pitwall.users import AccountError, create_user, generate_password, set_password
 
     password = _ask_password()
+    generated = not password
+    if generated:  # they'll be asked to choose their own at first login
+        password = generate_password(args.username.strip().lower())
     try:
         with session_scope() as db:
             if args.cmd == "create-user":
-                user = create_user(db, args.username, password, is_admin=args.admin)
+                user = create_user(
+                    db,
+                    args.username,
+                    password,
+                    is_admin=args.admin,
+                    must_change_password=generated,
+                )
                 print(f"Created {user.username}{' (admin)' if user.is_admin else ''}.")
             else:
                 user = db.scalars(
@@ -42,9 +51,11 @@ def manage_user(args: argparse.Namespace) -> int:
                 if user is None:
                     print(f"No user called {args.username!r}.")
                     return 1
-                set_password(db, user, password)
+                set_password(db, user, password, temporary=generated)
                 user.active = True
                 print(f"Password set for {user.username}; the account is unlocked.")
+            if generated:
+                print(f"Password: {password}  (they choose their own when they log in)")
     except AccountError as exc:
         print(f"Error: {exc}")
         return 1

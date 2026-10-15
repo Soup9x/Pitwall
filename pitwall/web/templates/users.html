@@ -4,6 +4,17 @@
 <h1>Users</h1>
 <p class="sub">Everyone shares the F1 data; each person has their own settings, alert channels, followed drivers and calendar feed.</p>
 
+{% if new_creds %}
+<div class="card" style="margin-bottom:16px;border-color:#1e40af;">
+  <h2>{% if new_creds.kind == 'new' %}Account created for {{ new_creds.username }}{% else %}Temporary password for {{ new_creds.username }}{% endif %}</h2>
+  <p class="small">Send these login details to the person. The password is only shown now{% if new_creds.kind == 'temp' %}; they'll be asked to choose their own when they log in{% endif %}.</p>
+<pre id="new-creds" style="white-space:pre-wrap;">Pitwall: {{ login_url }}
+Username: {{ new_creds.username }}
+Password: {{ new_creds.password }}</pre>
+  <button type="button" class="secondary small" data-copy="new-creds">Copy login details</button>
+</div>
+{% endif %}
+
 {% if new_link %}
 <div class="card" style="margin-bottom:16px;border-color:#1e40af;">
   <h2>{% if new_link.kind == 'invite' %}Invite link created{% else %}Password reset link for {{ new_link.user }}{% endif %}</h2>
@@ -22,11 +33,12 @@
       <tr class="{{ '' if u.active else 'past' }}">
         <td>{{ u.username }}{% if u.id == user.id %} <span class="muted small">(you)</span>{% endif %}</td>
         <td>{{ 'Admin' if u.is_admin else 'User' }}</td>
-        <td>{% if not u.active %}<span class="badge muted">disabled</span>{% elif u.locked_until and u.locked_until > now %}<span class="badge held">locked</span>{% elif u.password_hash == '!' %}<span class="badge held">no password</span>{% else %}<span class="badge ok">active</span>{% endif %}</td>
+        <td>{% if not u.active %}<span class="badge muted">disabled</span>{% elif u.locked_until and u.locked_until > now %}<span class="badge held">locked</span>{% elif u.password_hash == '!' %}<span class="badge held">no password</span>{% elif u.must_change_password %}<span class="badge held">temporary password</span>{% else %}<span class="badge ok">active</span>{% endif %}</td>
         <td class="small">{{ u.last_login_at.astimezone(settings.tz).strftime('%d %b %Y %H:%M') if u.last_login_at else '—' }}</td>
         <td class="num" style="white-space:nowrap;">
           <form class="inline" method="post" action="/admin/users/{{ u.id }}/reset"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Reset link</button></form>
           {% if u.id != user.id %}
+          <form class="inline" method="post" action="/admin/users/{{ u.id }}/temp-password" data-confirm="Give {{ u.username }} a new temporary password? Their current password stops working."><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Temporary password</button></form>
           <form class="inline" method="post" action="/admin/users/{{ u.id }}/toggle-admin"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">{{ 'Remove admin' if u.is_admin else 'Make admin' }}</button></form>
           <form class="inline" method="post" action="/admin/users/{{ u.id }}/toggle-active"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">{{ 'Disable' if u.active else 'Enable' }}</button></form>
           {% if u.id != owner_id %}
@@ -37,6 +49,22 @@
       </tr>
       {% endfor %}
     </table>
+  </div>
+
+  <div class="card" id="create">
+    <h2>Create an account</h2>
+    <p class="small">Set up a login yourself and send the person their username and password.</p>
+    {% if create_error %}<div class="error">{{ create_error }}</div>{% endif %}
+    <form method="post" action="/admin/users#create">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <label for="new-username">Username</label>
+      <input id="new-username" type="text" name="username" value="{{ create_name or '' }}" required autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="32">
+      <label for="new-password">Password <span class="muted">(leave blank to generate one)</span></label>
+      <input id="new-password" type="text" name="password" autocomplete="off" spellcheck="false" minlength="10">
+      <label><input type="checkbox" name="must_change" checked> They choose their own password when they first log in</label>
+      <label><input type="checkbox" name="make_admin"> Make them an admin</label>
+      <p><button>Create account</button></p>
+    </form>
   </div>
 
   <div class="card">

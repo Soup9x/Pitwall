@@ -48,9 +48,21 @@
     btn.addEventListener("click", function () {
       const target = document.getElementById(btn.dataset.copy);
       if (!target) return;
-      navigator.clipboard.writeText(target.value || target.textContent).then(function () {
-        btn.textContent = "Copied ✓";
-      });
+      const text = target.value || target.textContent;
+      const done = function () { btn.textContent = "Copied ✓"; };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done);
+        return;
+      }
+      // Plain http (e.g. on the LAN) has no clipboard API: copy via a hidden text box.
+      const box = document.createElement("textarea");
+      box.value = text;
+      box.setAttribute("readonly", "");
+      box.style.position = "fixed";
+      box.style.opacity = "0";
+      document.body.appendChild(box);
+      box.select();
+      try { if (document.execCommand("copy")) done(); } finally { box.remove(); }
     });
   });
 })();
