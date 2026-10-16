@@ -7,7 +7,7 @@
   <p class="empty">No qualifying times yet.</p>
 {% else %}{% set b = quali %}{% set segs = b.names[:b.segments] %}
   <div class="section-head"><h2>{{ b.label }}</h2>{{ fresh_badge(fresh.jolpica) }}</div>
-  {% if b.pole %}<p class="q-pole">Pole: <strong>{{ b.pole.driver.full_name }}</strong> <span class="muted">{{ b.pole.team or '' }}</span> <span class="mono">{{ b.pole.texts[b.pole.reached - 1] or '' }}</span></p>{% endif %}
+  {% if b.pole %}<p class="q-pole">Pole: <strong>{{ b.pole.driver.full_name }}</strong> {% if b.pole.team %}<a class="muted" href="/constructors/{{ b.pole.team_id }}?season={{ event.season }}">{{ b.pole.team }}</a>{% endif %} <span class="mono">{{ b.pole.texts[b.pole.reached - 1] or '' }}</span></p>{% endif %}
   <p class="muted small"><span class="q-fast">◆</span> fastest time in that segment. Gaps to pole use each driver's best lap from any segment; teammates are compared in the last segment they both set a time in.</p>
   <div class="table-scroll"><table class="quali">
     <thead><tr>

@@ -5,7 +5,7 @@
 <div class="row" style="justify-content:space-between;">
   <div>
     <h1>{{ driver.full_name }}{% if followed %} <span class="badge sprint">FOLLOWING</span>{% endif %}</h1>
-    <p class="sub">{% if driver.code %}{{ driver.code }} · {% endif %}{% if driver.number %}#{{ driver.number }} · {% endif %}{{ driver.nationality or '' }}{% if data and data.rows %} · {{ data.rows[-1].team }}{% endif %}</p>
+    <p class="sub">{% if driver.code %}{{ driver.code }} · {% endif %}{% if driver.number %}#{{ driver.number }} · {% endif %}{{ driver.nationality or '' }}{% if data and data.rows and data.rows[-1].team %} · {% if data.rows[-1].team_id %}<a href="/constructors/{{ data.rows[-1].team_id }}?season={{ season }}">{{ data.rows[-1].team }}</a>{% else %}{{ data.rows[-1].team }}{% endif %}{% endif %}</p>
   </div>
   {% if seasons|length > 1 %}
   <form method="get"><select name="season" data-autosubmit>

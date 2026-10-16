@@ -79,6 +79,7 @@ class CachedClient:
         self.max_retries = max_retries
         self.backoff_base = backoff_base
         self.sleep = sleep
+        self.requests_made = 0  # real HTTP requests (cache hits don't count)
         self._client = httpx.Client(
             headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
             timeout=timeout,
@@ -160,6 +161,7 @@ class CachedClient:
         attempt = 0
         while True:
             self.limiter.acquire()
+            self.requests_made += 1
             try:
                 resp = self._client.get(url)
             except httpx.TransportError as exc:

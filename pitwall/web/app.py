@@ -20,7 +20,7 @@ from pitwall.models import OWNER_ID, User
 from pitwall.notify.targets import register_all_secrets
 from pitwall.services.circuits import merge_all
 from pitwall.users import bootstrap
-from pitwall.web import accounts, racedata, routes
+from pitwall.web import accounts, kiosk, racedata, routes
 from pitwall.web.auth import NotAuthenticated, PasswordChangeRequired
 from pitwall.web.security import SecurityHeadersMiddleware
 
@@ -84,6 +84,7 @@ def create_app(*, manage_db: bool = True, start_scheduler: bool | None = None) -
         return RedirectResponse("/account", status_code=303)
 
     app.include_router(routes.public)
+    app.include_router(kiosk.router)
     app.include_router(accounts.router)
     app.include_router(routes.private)
     app.include_router(routes.admin)

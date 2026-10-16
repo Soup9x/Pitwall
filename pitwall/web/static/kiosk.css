@@ -1,0 +1,113 @@
+/* Kiosk: dark only, large type, never scrolls. Sizes are in vmin so the same layout fits
+   1920x1080, 1280x720 and portrait screens. Colours match the app's dark theme. */
+:root {
+  color-scheme: dark;
+  --bg: #0E1014; --surface: #171A21; --surface-2: #1E222B; --border: #262B36;
+  --text: #E8EAED; --muted: #9AA3AF; --accent: #E8322F;
+  --good: #4ADE80; --warn: #FACC15; --bad: #F87171; --hl: rgba(250, 204, 21, 0.10);
+  --tyre-soft: #E8322F; --tyre-medium: #FACC15; --tyre-hard: #E8EAED;
+  --font-ui: "Titillium Web", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --gap: 1.6vmin;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); }
+body { font: 400 2.1vmin/1.3 var(--font-ui); cursor: none; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+h2 { margin: 0 0 .6vmin; font-size: 1.6vmin; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+[hidden] { display: none !important; }
+
+.k-stage {
+  height: 100vh; padding: 2vmin 2.4vmin; display: grid; gap: var(--gap);
+  grid-template-columns: 1.1fr 1fr;
+  grid-template-rows: auto 1.45fr 1fr;
+  grid-template-areas: "head head" "count drivers" "trivia cons";
+  transition: transform 2s ease;
+}
+.k-stage[data-view="weekend"] {
+  grid-template-rows: auto auto 1fr auto;
+  grid-template-areas: "head head" "count drivers" "timeline drivers" "cond cons";
+}
+.k-stage[data-view="normal"] [data-only="weekend"],
+.k-stage[data-view="weekend"] [data-only="normal"] { display: none; }
+
+.k-head { grid-area: head; display: flex; align-items: center; gap: 2vmin; padding-bottom: 1vmin; border-bottom: .3vmin solid var(--accent); }
+.k-brand { display: flex; align-items: center; gap: 1vmin; font-weight: 800; font-size: 2.6vmin; letter-spacing: .14em; text-transform: uppercase; }
+.k-brand svg { width: 3.6vmin; height: 3.6vmin; }
+.k-brand .w { color: var(--accent); }
+.k-event { flex: 1; font-size: 2.6vmin; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-event .k-sub { color: var(--muted); font-weight: 400; }
+.k-status { display: flex; align-items: center; gap: 1.6vmin; }
+.k-clock { font-size: 3vmin; font-weight: 700; }
+.k-offline { background: #713F12; color: #FEF08A; padding: .3vmin 1.2vmin; border-radius: 99px; font-size: 1.7vmin; font-weight: 700; }
+
+.k-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 1vmin; padding: 1.6vmin 2vmin; min-height: 0; overflow: hidden; }
+.k-countdown { grid-area: count; display: flex; flex-direction: column; justify-content: center; }
+.k-label { font-size: 2.4vmin; color: var(--muted); }
+.k-label strong { color: var(--text); }
+.k-digits { font-size: 13vmin; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; white-space: nowrap; }
+.k-digits .u { font-size: .32em; color: var(--muted); font-weight: 600; margin: 0 .35em 0 .08em; letter-spacing: 0; }
+.k-digits.live { color: var(--good); font-size: 9vmin; }
+.k-when { font-size: 2.6vmin; }
+.k-forecast { font-size: 2.2vmin; color: var(--muted); }
+.k-stage[data-view="weekend"] .k-digits { font-size: 9vmin; }
+
+.k-drivers { grid-area: drivers; display: flex; flex-direction: column; }
+.k-constructors { grid-area: cons; display: flex; flex-direction: column; }
+.k-sub { color: var(--muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
+ol.k-table { list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+ol.k-table li { flex: 0 1 6.2vmin; min-height: 0; display: grid; grid-template-columns: 3.4vmin 8vmin 1fr 7vmin 7.5vmin 4vmin; align-items: center; gap: 1vmin; font-size: 2.5vmin; padding: .2vmin 0; border-bottom: 1px solid var(--border); }
+ol.k-table li:last-child { border-bottom: 0; }
+ol.k-table li.followed { background: var(--hl); }
+.k-pos { text-align: right; color: var(--muted); }
+.k-star { color: var(--warn); font-size: .7em; margin-left: .4vmin; }
+.k-code { font-weight: 800; padding-left: 1vmin; box-shadow: inset .5vmin 0 0 var(--team, var(--border)); }
+.k-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.k-pts { text-align: right; font-weight: 700; }
+.k-gap { text-align: right; color: var(--muted); font-size: .85em; }
+.k-chg { text-align: right; font-size: .8em; }
+.k-chg.up { color: var(--good); } .k-chg.down { color: var(--bad); } .k-chg.same { color: var(--muted); }
+.k-constructors ol.k-table li { grid-template-columns: 3.4vmin 1fr 7.5vmin 7vmin 4vmin; }
+
+.k-trivia { grid-area: trivia; display: flex; flex-direction: column; }
+.k-trivia p { margin: 0; font-size: 3vmin; line-height: 1.35; flex: 1; display: flex; align-items: center; transition: opacity .6s; }
+.k-trivia p.fade { opacity: 0; }
+
+.k-timeline { grid-area: timeline; }
+ol.k-sessions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4vmin; }
+ol.k-sessions li { display: grid; grid-template-columns: 3vmin 1fr auto; gap: 1vmin; align-items: baseline; font-size: 2.5vmin; padding: .3vmin .8vmin; border-radius: .6vmin; }
+ol.k-sessions li.done { color: var(--muted); }
+ol.k-sessions li.live { background: rgba(74, 222, 128, .12); color: var(--good); font-weight: 700; }
+ol.k-sessions li.next { background: var(--surface-2); font-weight: 700; }
+ol.k-sessions li.cancelled { color: var(--muted); text-decoration: line-through; }
+.k-conditions { grid-area: cond; display: grid; grid-template-columns: 1.2fr .8fr 1.2fr; gap: 2vmin; }
+ul.k-list { list-style: none; margin: 0; padding: 0; font-size: 2.1vmin; }
+ul.k-list li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+ul.k-list .k-muted, .k-muted { color: var(--muted); }
+.k-tyres { display: flex; gap: 1vmin; flex-wrap: wrap; }
+.k-tyre { display: inline-flex; align-items: center; gap: .6vmin; font-size: 2.2vmin; }
+.k-tyre b { width: 3.4vmin; height: 3.4vmin; border-radius: 50%; border: .5vmin solid; display: inline-flex; align-items: center; justify-content: center; font-size: 1.5vmin; }
+.k-tyre.h b { border-color: var(--tyre-hard); } .k-tyre.m b { border-color: var(--tyre-medium); } .k-tyre.s b { border-color: var(--tyre-soft); }
+.k-held { color: var(--warn); font-size: 2.2vmin; }
+
+/* Portrait: one column. Both `?layout=portrait` and a tall screen get it. */
+html.portrait .k-stage {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto 1.5fr 1fr auto;
+  grid-template-areas: "head" "count" "drivers" "cons" "trivia";
+}
+html.portrait .k-stage[data-view="weekend"] {
+  grid-template-rows: auto auto auto auto 1.4fr 1fr;
+  grid-template-areas: "head" "count" "timeline" "cond" "drivers" "cons";
+}
+@media (orientation: portrait) {
+  .k-stage { grid-template-columns: 1fr; grid-template-rows: auto auto 1.5fr 1fr auto; grid-template-areas: "head" "count" "drivers" "cons" "trivia"; }
+  .k-stage[data-view="weekend"] { grid-template-rows: auto auto auto auto 1.4fr 1fr; grid-template-areas: "head" "count" "timeline" "cond" "drivers" "cons"; }
+}
+html.portrait .k-trivia p { font-size: 2.6vmin; }
+html.portrait .k-digits { font-size: 11vmin; }
+html.portrait .k-stage[data-view="weekend"] .k-digits { font-size: 8vmin; }
+
+@media (prefers-reduced-motion: reduce) {
+  .k-stage, .k-trivia p { transition: none; }
+}

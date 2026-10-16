@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import asdict
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import available_timezones
@@ -28,6 +30,7 @@ from pitwall.models import (
     SESSION_LABELS,
     SESSION_TYPES,
     Circuit,
+    Constructor,
     Driver,
     Event,
     FollowedDriver,
@@ -41,15 +44,16 @@ from pitwall.models import (
     StandingsSnapshot,
     User,
 )
-from pitwall.notify import builders, outbox
+from pitwall.notify import builders, mailserver, outbox
 from pitwall.notify import targets as targets_svc
 from pitwall.notify.dispatch import mask_url
 from pitwall.notify.dispatch import notify as dispatch_notify
 from pitwall.services import (
     circuit_maps,
+    circuits_explorer,
+    constructor_stats,
     driver_stats,
     exports,
-    head_to_head,
     ics,
     news,
     progression,
@@ -72,16 +76,20 @@ from pitwall.settings_store import (
     CHANNELS,
     DIGESTIBLE,
     WEEKDAYS,
+    AppSettings,
     get_kv,
     load_settings,
     parse_hhmm,
     save_settings,
+    set_kv,
 )
 from pitwall.units import TEMP_UNITS
 from pitwall.web import dashboard as dashboard_view
 from pitwall.web import racedata
 from pitwall.web.auth import checked_form, require_admin, require_user, safe_next, session_user
 from pitwall.web.common import back, flash, page
+
+BACKFILL_SOON = timedelta(seconds=30)
 
 log = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -268,6 +276,74 @@ def events_list(
         rows.append({"event": ev, "race": session_view(race, settings) if race else None})
     return page(
         request, "events.html", db, user, rows=rows, season=season, seasons=seasons, now=utcnow()
+    )
+
+
+def _hidden_events(db: DB, user: User, reveal: bool) -> tuple[set[int], Event | None]:
+    """Events spoiler mode holds back for this user: the latest results event while it's held,
+    and an event whose competitive sessions have started but that isn't released yet."""
+    if reveal:
+        return set(), None
+    settings = load_settings(db, user.id)
+    held = spoilers.held_event(db, user.id, settings)
+    cut = spoilers.cutoff(db, user.id, settings)
+    ids = {e.id for e in (held, cut[0] if cut else None) if e is not None}
+    return ids, held or (cut[0] if cut else None)
+
+
+def _backfill_next(db: DB, settings: AppSettings) -> str | None:
+    """When the next history batch starts (local time), while a long backfill is paused."""
+    progress = get_kv(db, "backfill_progress") or {}
+    if not progress.get("paused") or not progress.get("next_at"):
+        return None
+    try:
+        at = datetime.fromisoformat(progress["next_at"])
+    except ValueError:
+        return None
+    return at.astimezone(settings.tz).strftime("%H:%M")
+
+
+@private.get("/circuits", response_class=HTMLResponse)
+def circuits_list(
+    request: Request,
+    q: str = "",
+    show: str = "all",
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
+) -> HTMLResponse:
+    show = show if show in circuits_explorer.FILTERS else "all"
+    now = utcnow()
+    hidden, _ = _hidden_events(db, user, False)
+    rows = circuits_explorer.listing(
+        db, racedata._current_season(db), now, query=q[:80], which=show, hidden=hidden
+    )
+    return page(request, "circuits.html", db, user, rows=rows, q=q[:80], show=show)
+
+
+@private.get("/circuits/{circuit_id}", response_class=HTMLResponse)
+def circuit_page(
+    request: Request,
+    circuit_id: str,
+    reveal: bool = False,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
+) -> HTMLResponse:
+    hidden, held = _hidden_events(db, user, reveal)
+    data = circuits_explorer.detail(
+        db, circuit_id, racedata._current_season(db), utcnow(), hidden=hidden
+    )
+    if data is None:
+        raise HTTPException(404)
+    held_here = held if held is not None and held.circuit_id == circuit_id else None
+    return page(
+        request,
+        "circuit.html",
+        db,
+        user,
+        c=data,
+        map_url=circuit_maps.map_url(data.circuit),
+        held_here=held_here,
+        unit=load_settings(db, user.id).temp_unit,
     )
 
 
@@ -523,34 +599,50 @@ def export_drivers(
     return _csv_response(body, f"pitwall-{name}-{season}.csv")
 
 
-@private.get("/head-to-head", response_class=HTMLResponse)
-def head_to_head_page(
+@private.get("/constructors/{constructor_id}", response_class=HTMLResponse)
+def constructor_page(
     request: Request,
+    constructor_id: str,
     season: int | None = None,
     reveal: bool = False,
     db: DB = Depends(get_db),
     user: User = Depends(require_user),
 ) -> HTMLResponse:
-    seasons = list(
-        db.scalars(
-            select(Event.season)
-            .join(Session)
-            .join(Result, Result.session_id == Session.id)
-            .distinct()
-            .order_by(Event.season.desc())
-        )
-    )
+    team = db.get(Constructor, constructor_id)
+    if team is None:
+        raise HTTPException(404)
+    seasons = constructor_stats.seasons_for(db, constructor_id)
     season = season or (seasons[0] if seasons else None)
+    if season and season not in seasons:
+        seasons = sorted({*seasons, season}, reverse=True)
     held = _held_event(db, user, reveal)
+    # Same rule as driver pages: a season containing held results is hidden as a whole.
     hide = held is not None and season is not None and season >= held.season
+    data = constructor_stats.season(db, constructor_id, season) if season and not hide else None
+    chart, legend = "", []
+    if data and data.rounds:
+        labels = [(r.event.circuit.locality or r.event.short_name)[:3].upper() for r in data.rounds]
+        series = [(team.name, [r.cumulative for r in data.rounds])] + [
+            (d.driver.full_name, d.cumulative) for d in data.drivers if d.races
+        ]
+        chart = driver_stats.trend_svg(series, labels)
+        colors = driver_stats.TREND_COLORS
+        legend = [(name, colors[i % len(colors)]) for i, (name, _) in enumerate(series)]
     return page(
         request,
-        "head_to_head.html",
+        "constructor.html",
         db,
         user,
+        team=team,
         season=season,
         seasons=seasons,
-        pairs=head_to_head.season(db, season) if season and not hide else [],
+        data=data,
+        chart=chart,
+        legend=legend,
+        history=constructor_stats.history(
+            db, constructor_id, upto_season=held.season - 1 if held is not None else None
+        ),
+        followed={f.driver_id for f in _followed(db, user)},
         held_event=held if hide else None,
     )
 
@@ -703,6 +795,19 @@ def settings_page(
         else None,
         season_drivers=season_drivers,
         followed=followed,
+        this_year=utcnow().year,
+        backfill_next=_backfill_next(db, settings),
+        mail_server=mailserver.describe(mailserver.load(db)),
+        mail_providers=mailserver.PROVIDERS,
+        mail_form=(request.session.pop("mail_form", None) or {}) if user.is_admin else {},
+        email_error=request.session.pop("email_error", None),
+        convertible={
+            t.id
+            for t in targets_svc.db_targets(db, "email", user.id)
+            if mailserver.from_target_url(t.url) is not None
+        }
+        if user.is_admin
+        else set(),
         error=request.session.pop("settings_error", None),
         channel_form=request.session.pop("channel_form", None) or {},
         smtp_security=targets_svc.SMTP_SECURITY,
@@ -773,6 +878,8 @@ async def save_settings_route(
     if sched is not None:
         if user.id == OWNER_ID and new.timezone != old.timezone:
             scheduler.install_recurring_jobs(sched)  # nightly jobs follow the owner's timezone
+        if new.backfill_start_year < old.backfill_start_year:
+            jobs.schedule_backfill(BACKFILL_SOON)  # fetch the extra seasons soon
         reminders.reconcile(sched, db)
     flash(request, "Settings saved.")
     return back("/settings")
@@ -822,6 +929,9 @@ async def add_target(
     form = await checked_form(request)
     channel = str(form.get("channel", ""))
     kind = str(form.get("kind", ""))
+    if channel == "email" and not user.is_admin:
+        # Email goes through the server's mail account; users just enter their address.
+        raise HTTPException(403)
     fields: dict[str, str] = {}
     for k, v in form.multi_items():  # first non-empty value wins (fields repeat across types)
         if k != "csrf_token" and isinstance(v, str) and v.strip() and k not in fields:
@@ -948,6 +1058,139 @@ async def test_channel(
     db.commit()
     flash(request, f"Test {channel}: {'sent ✅' if ok else 'failed ❌ — ' + detail}")
     return back("/settings#channels")
+
+
+def _log_test(db: DB, user: User, msg: Any, title: str, ok: bool, detail: str) -> None:
+    db.add(
+        NotificationLog(
+            user_id=user.id,
+            type="test",
+            channel="email",
+            payload_hash=msg.payload_hash(),
+            title=title,
+            status="sent" if ok else "failed",
+            detail=detail[:1000],
+        )
+    )
+
+
+async def _send_test_email(db: DB, user: User, url: str, to: str) -> tuple[bool, str]:
+    msg = builders.test_message("email")
+    msg.user_id = user.id
+    ok, detail = await run_in_threadpool(dispatch_notify, "email", msg, [url])
+    _log_test(db, user, msg, f"{msg.title} ({to})", ok, detail)
+    db.commit()
+    return ok, detail
+
+
+def _test_flash(to: str, ok: bool, detail: str) -> str:
+    if ok:
+        return f"Test email sent to {to} ✅ — check that it arrived (and the spam folder)."
+    return f"Test email to {to} failed ❌ — {detail}"
+
+
+@private.post("/settings/email")
+async def my_email(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
+    """A user's own alert address. The server's mail account (admin) does the sending."""
+    form = await checked_form(request)
+    try:
+        addresses = mailserver.parse_addresses(str(form.get("notify_email", "")))
+    except targets_svc.TargetError as exc:
+        request.session["email_error"] = str(exc)
+        return back("/settings#email-error")
+    routed = mailserver.set_user_addresses(db, user.id, addresses)
+    db.commit()
+    if not addresses:
+        flash(request, "Email alerts turned off: no address saved.")
+        return back("/settings#channels")
+    server = mailserver.load(db)
+    if form.get("action") == "test" and server is not None:
+        ok, detail = await _send_test_email(db, user, server.url(addresses), addresses[0])
+        flash(request, _test_flash(", ".join(addresses), ok, detail))
+        return back("/settings#channels")
+    note = (
+        " Reminders, results and standings will be emailed too, since you have no webhooks;"
+        " change that under Routing."
+        if routed
+        else ""
+    )
+    flash(request, f"Saved: email alerts go to {', '.join(addresses)}.{note}")
+    return back("/settings#channels")
+
+
+# Typed into the outgoing-email form and kept after an error (never the password).
+MAIL_FORM_KEEP = (
+    "provider",
+    "smtp_host",
+    "smtp_port",
+    "smtp_security",
+    "username",
+    "from_addr",
+    "from_name",
+)
+
+
+@admin.post("/admin/mail")
+async def mail_server(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_admin)
+) -> Response:
+    """The server's outgoing email account (admin only): save, test or remove."""
+    form = await checked_form(request)
+    action = str(form.get("action", "save"))
+    if action == "remove":
+        mailserver.clear(db)
+        db.commit()
+        flash(request, "Outgoing email removed. Nobody gets email alerts until it's set up again.")
+        return back("/settings#mail-server")
+    fields = {k: v for k, v in form.items() if isinstance(v, str)}
+    try:
+        server = mailserver.save(db, fields)
+    except targets_svc.TargetError as exc:
+        request.session["mail_form"] = {
+            "error": str(exc),
+            **{k: fields[k][:200] for k in MAIL_FORM_KEEP if k in fields},
+        }
+        return back("/settings#mail-error")
+    db.commit()
+    if action == "test":
+        to = load_settings(db, user.id).notify_email or server.from_addr
+        addresses = mailserver.parse_addresses(to)
+        ok, detail = await _send_test_email(db, user, server.url(addresses), addresses[0])
+        flash(request, "Saved. " + _test_flash(", ".join(addresses), ok, detail))
+    else:
+        flash(request, "Outgoing email saved. Use “Save and send a test” to check it works.")
+    return back("/settings#mail-server")
+
+
+@admin.post("/admin/mail/from-target/{target_id}")
+async def mail_from_target(
+    request: Request,
+    target_id: int,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> Response:
+    """Turn the admin's own email channel into the server's mail account, in one click."""
+    await checked_form(request)
+    target = _target(db, target_id, user)
+    parsed = mailserver.from_target_url(target.url) if target.channel == "email" else None
+    if parsed is None:
+        flash(request, "That channel can't be converted; set up outgoing email by hand below.")
+        return back("/settings#mail-server")
+    server, to = parsed
+    set_kv(db, mailserver.KEY, asdict(server))
+    mailserver.register(server)
+    if not load_settings(db, user.id).notify_email:
+        save_settings(db, {"notify_email": ", ".join(to[: mailserver.MAX_RECIPIENTS])}, user.id)
+    db.delete(target)
+    db.commit()
+    flash(
+        request,
+        f"Outgoing email now uses {server.host} (from {server.from_addr}) for everyone, and your "
+        "alerts go to your address below. Send a test to check.",
+    )
+    return back("/settings#mail-server")
 
 
 @admin.post("/admin/run/{job}")

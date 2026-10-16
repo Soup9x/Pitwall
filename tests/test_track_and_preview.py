@@ -182,3 +182,97 @@ def test_backfill_is_polite_and_resumable(db, api):
         jobs.backfill_job()
     new_calls = routes.calls[calls_before:]
     assert all(c.startswith("2025") for c in new_calls)  # completed seasons not re-fetched
+
+
+def _backfill_routes(routes, fail_year=None):
+    empty = {"MRData": {"total": "0", "limit": "100", "RaceTable": {"Races": []}}}
+    for y in (2022, 2023, 2024):
+        for kind in ("results", "qualifying", "sprint"):
+            routes.set(f"{y}/{kind}.json", 503 if y == fail_year else f"{kind}_{y}.json")
+        routes.set(f"{y}.json", f"schedule_{y}.json")
+    routes.set("2025.json", "schedule_2025.json")
+    for kind in ("results", "qualifying", "sprint"):
+        routes.set(f"2025/{kind}.json", empty)
+    for kind in ("driver", "constructor"):
+        routes.set(f"2025/{kind}Standings.json", f"{kind}_standings_2025_3.json")
+        routes.set(f"2025/2/{kind}Standings.json", f"{kind}_standings_2025_2.json")
+
+
+def test_backfill_works_in_batches_and_resumes(db, api, monkeypatch):
+    routes, _ = api
+    _backfill_routes(routes)
+    db.add(Season(year=2025))
+    from pitwall.settings_store import get_kv, save_settings
+
+    save_settings(db, {"backfill_start_year": 2022})
+    db.commit()
+    queued = []
+    monkeypatch.setattr(jobs, "schedule_backfill", lambda delay, **kw: queued.append(delay))
+    with time_machine.travel(dt("2025-11-15T08:00:00"), tick=False):
+        jobs.backfill_job(budget=9)  # this season (8 requests incl. its schedule), then 2024
+    db.expire_all()
+    done = {s.year for s in db.scalars(select(Season).where(Season.backfilled))}
+    assert done == {2024}  # newest first
+    prog = get_kv(db, "backfill_progress")
+    assert prog["paused"] is True and prog["finished_at"] is None and prog["next_at"]
+    assert (prog["done"], prog["total"]) == (2, 4)
+    assert queued == [jobs.BACKFILL_PAUSE]  # the next batch is booked
+    calls = len(routes.calls)
+    with time_machine.travel(dt("2025-11-15T09:10:00"), tick=False):
+        jobs.backfill_job(include_current=False)
+    new = routes.calls[calls:]
+    assert not any(c.startswith(("2024", "2025")) for c in new)  # finished work isn't redone
+    db.expire_all()
+    assert {s.year for s in db.scalars(select(Season).where(Season.backfilled))} == {
+        2022,
+        2023,
+        2024,
+    }
+    prog = get_kv(db, "backfill_progress")
+    assert prog["paused"] is False and prog["finished_at"] and prog["done"] == prog["total"]
+    assert len(queued) == 1
+
+
+def test_backfill_stops_when_jolpica_fails(db, api, monkeypatch):
+    routes, _ = api
+    _backfill_routes(routes, fail_year=2023)
+    db.add(Season(year=2025))
+    from pitwall.settings_store import get_kv, save_settings
+
+    save_settings(db, {"backfill_start_year": 2022})
+    db.commit()
+    queued = []
+    monkeypatch.setattr(jobs, "schedule_backfill", lambda delay, **kw: queued.append(delay))
+    with time_machine.travel(dt("2025-11-15T08:00:00"), tick=False):
+        jobs.backfill_job()
+    assert not any(c.startswith("2022") for c in routes.calls)  # didn't push on past the error
+    db.expire_all()
+    assert {s.year for s in db.scalars(select(Season).where(Season.backfilled))} == {2024}
+    assert get_kv(db, "backfill_progress")["errors"] and queued == [jobs.BACKFILL_PAUSE]
+
+
+def test_lowering_the_start_year_queues_a_backfill(engine, monkeypatch):
+    import re
+
+    from fastapi.testclient import TestClient
+
+    from pitwall.web import auth, routes
+    from pitwall.web.app import create_app
+
+    queued = []
+    monkeypatch.setattr(jobs, "schedule_backfill", lambda delay, **kw: queued.append(delay))
+    monkeypatch.setattr(routes.scheduler, "get_scheduler", lambda: object())
+    monkeypatch.setattr(routes.reminders, "reconcile", lambda *a, **k: None)
+    auth.limiter._failures.clear()
+    with TestClient(create_app(manage_db=False, start_scheduler=False)) as c:
+        token = re.search(r'name="csrf_token" value="([^"]+)"', c.get("/login").text)[1]
+        c.post(
+            "/login",
+            data={"username": "admin", "password": "correct horse battery", "csrf_token": token},
+        )
+        page = c.get("/settings").text
+        assert "back as far as 1950" in page
+        form = dict(re.findall(r'<input[^>]*name="([a-z_0-9]+)"[^>]*value="([^"]*)"', page))
+        form.update({"timezone": "America/New_York", "backfill_start_year": "1950"})
+        c.post("/settings", data=form)
+    assert queued == [routes.BACKFILL_SOON]

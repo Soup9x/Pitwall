@@ -28,12 +28,13 @@ Password: {{ new_creds.password }}</pre>
   <div class="card wide table-scroll">
     <h2>Accounts</h2>
     <table>
-      <tr><th>Username</th><th>Role</th><th>Status</th><th>Last login</th><th></th></tr>
+      <tr><th>Username</th><th>Role</th><th>Status</th><th>Email alerts to</th><th>Last login</th><th></th></tr>
       {% for u in users %}
       <tr class="{{ '' if u.active else 'past' }}">
         <td>{{ u.username }}{% if u.id == user.id %} <span class="muted small">(you)</span>{% endif %}</td>
         <td>{{ 'Admin' if u.is_admin else 'User' }}</td>
         <td>{% if not u.active %}<span class="badge muted">disabled</span>{% elif u.locked_until and u.locked_until > now %}<span class="badge held">locked</span>{% elif u.password_hash == '!' %}<span class="badge held">no password</span>{% elif u.must_change_password %}<span class="badge held">temporary password</span>{% else %}<span class="badge ok">active</span>{% endif %}</td>
+        <td class="small">{{ alert_emails.get(u.id) or '—' }}</td>
         <td class="small">{{ u.last_login_at.astimezone(settings.tz).strftime('%d %b %Y %H:%M') if u.last_login_at else '—' }}</td>
         <td class="num" style="white-space:nowrap;">
           <form class="inline" method="post" action="/admin/users/{{ u.id }}/reset"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Reset link</button></form>
@@ -61,6 +62,9 @@ Password: {{ new_creds.password }}</pre>
       <input id="new-username" type="text" name="username" value="{{ create_name or '' }}" required autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="32">
       <label for="new-password">Password <span class="muted">(leave blank to generate one)</span></label>
       <input id="new-password" type="text" name="password" autocomplete="off" spellcheck="false" minlength="10">
+      <label for="new-email">Email for alerts <span class="muted">(optional)</span></label>
+      <input id="new-email" type="text" name="email" autocomplete="off" inputmode="email" placeholder="them@example.com">
+      <p class="muted small">Their alerts are emailed here through the server's outgoing email{% if not mail_ready %} (<a href="/settings#mail-server">not set up yet</a>){% endif %}. They can change it in their settings.</p>
       <label><input type="checkbox" name="must_change" checked> They choose their own password when they first log in</label>
       <label><input type="checkbox" name="make_admin"> Make them an admin</label>
       <p><button>Create account</button></p>

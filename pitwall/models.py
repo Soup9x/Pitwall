@@ -200,6 +200,10 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     ics_token: Mapped[str | None] = mapped_column(String(80), unique=True, nullable=True)
+    # Read-only wall display link (/kiosk); None until the user creates one.
+    kiosk_token: Mapped[str | None] = mapped_column(
+        String(80), unique=True, index=True, nullable=True
+    )
     # Bumped on password change/reset so existing login cookies stop working.
     session_version: Mapped[int] = mapped_column(Integer, default=1)
     # Set when an admin chose the password (new account or temporary password).

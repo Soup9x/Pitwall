@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Circuits{% endblock %}
+{% block content %}
+<h1>Circuits</h1>
+<form method="get" action="/circuits" class="row card circuit-search" role="search">
+  <label for="cq" class="sr-only">Search circuits</label>
+  <input id="cq" type="search" name="q" value="{{ q }}" placeholder="Circuit, city or country" autocomplete="off">
+  <label for="cshow" class="sr-only">Show</label>
+  <select id="cshow" name="show" data-autosubmit>
+    {% for key, label in (('all', 'All circuits'), ('current', 'On this year\'s calendar'), ('historical', 'Historical only')) %}
+    <option value="{{ key }}" {{ 'selected' if show == key else '' }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <button>Search</button>
+</form>
+<div class="card table-scroll">
+<table>
+<tr><th>Circuit</th><th>Location</th><th class="num">Races</th><th>Years</th><th></th></tr>
+{% for r in rows %}{% set c = r.circuit %}
+<tr>
+  <td><a href="/circuits/{{ c.id }}">{{ c.name }}</a></td>
+  <td>{{ c.locality or '' }}{% if c.country %}, {{ c.country }}{% endif %}</td>
+  <td class="num">{{ r.races }}</td>
+  <td class="mono small">{% if r.first %}{{ r.first }}{% if r.last != r.first %}–{{ r.last }}{% endif %}{% endif %}</td>
+  <td>{% if r.current_round %}<span class="badge">Round {{ r.current_round }}</span>{% endif %}</td>
+</tr>
+{% else %}
+<tr><td colspan="5" class="muted">{% if q or show != 'all' %}No circuits match.{% else %}No circuits yet. They appear as the schedule and history sync.{% endif %}</td></tr>
+{% endfor %}
+</table>
+<p class="muted small">Race counts cover the seasons Pitwall has downloaded (Settings → History).</p>
+</div>
+{% endblock %}

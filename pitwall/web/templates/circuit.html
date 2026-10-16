@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% from "_macros.html" import track_facts %}
+{% block title %}{{ c.circuit.name }}{% endblock %}
+{% macro leader_list(items, empty, base="/drivers/") -%}
+{% if items %}<ol class="leaders">{% for l in items %}<li><span><a href="{{ base }}{{ l.id }}">{{ l.name }}</a>{% if l.active %} <span class="active-mark" title="Active">●</span><span class="sr-only"> (active)</span>{% endif %}</span><span class="mono">{{ l.count }}</span></li>{% endfor %}</ol>
+{% else %}<p class="empty small">{{ empty }}</p>{% endif %}
+{%- endmacro %}
+{% block content %}{% set ci = c.circuit %}
+<h1>{{ ci.name }}
+  {% if c.current %}<a class="badge" href="/events/{{ c.current.id }}">{{ c.current.season }} · Round {{ c.current.round }}</a>
+  {% elif c.last_held %}<span class="badge muted">Last held {{ c.last_held.season }}</span>{% endif %}</h1>
+<p class="sub">{{ ci.locality or '' }}{% if ci.country %}, {{ ci.country }}{% endif %}{% if c.races %} · {{ c.races|length }} Grand Prix{{ '' if c.races|length == 1 else ' races' }} in Pitwall's data{% endif %} · <a href="/circuits">All circuits</a></p>
+{% if held_here %}<p class="spoiler-notice small">🙈 The {{ held_here.season }} {{ held_here.name }} is left out of this page until you mark it as watched. <a href="/circuits/{{ ci.id }}?reveal=1" rel="nofollow">Show anyway</a> <span class="muted">(this page only)</span></p>{% endif %}
+
+<div class="grid">
+  <div class="card">
+    <div class="section-head"><h2>Track</h2>{% if not ci.facts_verified %}<span class="badge warn" title="From data/circuits.yaml, not yet checked against an official source">unverified</span>{% endif %}</div>
+    {{ track_facts(ci, None, map_url) }}
+  </div>
+
+  <div class="card">
+    <h2>Lap times</h2>
+    <dl class="facts">
+      <dt>Official race lap record</dt>
+      <dd>{% if ci.lap_record_time %}<span class="mono">{{ ci.lap_record_time }}</span> {{ ci.lap_record_driver or '' }}{% if ci.lap_record_year %} ({{ ci.lap_record_year }}){% endif %}{% else %}<span class="muted">not in circuits.yaml</span>{% endif %}</dd>
+      <dt>Fastest race lap in Pitwall's data</dt>
+      <dd>{% if c.fastest_lap %}<span class="mono">{{ c.fastest_lap.time }}</span> {{ c.fastest_lap.driver.full_name }} (<a href="/events/{{ c.fastest_lap.event.id }}">{{ c.fastest_lap.season }}</a>){% else %}<span class="muted">none stored</span>{% endif %}</dd>
+    </dl>
+    <p class="muted small">These can differ: the record only counts the current layout, while Pitwall's figure covers every race it has here (fastest-lap times exist from 2004 onwards), whatever the layout was at the time. It is never the record.</p>
+  </div>
+
+  <div class="card">
+    <h2>Race patterns</h2>
+    {% if c.pole_to_win_pct is none and not c.winner_grid and c.dnf_pct is none %}<p class="empty">No race results stored for this circuit yet.</p>{% else %}
+    <dl class="facts">
+      {% if c.pole_to_win_pct is not none %}<dt>Won from pole</dt><dd>{{ c.pole_to_win_pct }}% <span class="muted small">({{ c.pole_to_win[0] }} of {{ c.pole_to_win[1] }} races)</span></dd>{% endif %}
+      {% if c.winner_grid %}<dt>Winner's average grid</dt><dd>{{ c.winner_grid[0] }} <span class="muted small">({{ c.winner_grid[1] }} races)</span></dd>{% endif %}
+      {% if c.dnf_pct is not none %}<dt>Retirement rate</dt><dd>{{ c.dnf_pct }}% <span class="muted small">({{ c.dnf[0] }} of {{ c.dnf[1] }} starters)</span></dd>{% endif %}
+    </dl>{% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Most successful</h2>
+    <div class="leader-grid">
+      <div><h3>Wins</h3>{{ leader_list(c.wins, "No winners stored.") }}</div>
+      <div><h3>Poles</h3>{{ leader_list(c.poles, "No poles stored.") }}</div>
+      <div><h3>Podiums</h3>{{ leader_list(c.podiums, "No podiums stored.") }}</div>
+      <div><h3>Team wins</h3>{{ leader_list(c.team_wins, "No winners stored.", "/constructors/") }}</div>
+    </div>
+    <p class="muted small"><span class="active-mark">●</span> raced in the latest season.</p>
+  </div>
+
+  {% if c.sc %}
+  <div class="card">
+    <h2>Safety cars</h2>
+    <table>
+      <tr><th>Year</th><th class="num">Safety cars</th><th class="num">VSC</th><th class="num">Red flags</th></tr>
+      {% for s in c.sc %}<tr><td>{{ s.season }}</td><td class="num">{{ s.safety_cars }}</td><td class="num">{{ s.vscs }}</td><td class="num">{{ s.red_flags }}</td></tr>{% endfor %}
+    </table>
+    <p class="muted small">From the race control feed (OpenF1, 2023 onwards). Races without that data are left out, not counted as zero.</p>
+  </div>
+  {% endif %}
+
+  {% if c.weather %}
+  <div class="card">
+    <h2>Race-day conditions</h2>
+    <table>
+      <tr><th>Year</th><th>Track</th><th>Air</th><th>Rain</th></tr>
+      {% for w in c.weather %}{% set wc = w.conditions %}<tr><td>{{ w.season }}</td>
+        <td class="num">{{ wc.track_min|temp_range(wc.track_max, unit) }}</td>
+        <td class="num">{{ wc.air_min|temp_range(wc.air_max, unit) }}</td>
+        <td>{% if wc.rain is none %}<span class="muted">–</span>{% elif wc.rain %}☔ yes{% else %}no{% endif %}</td></tr>{% endfor %}
+    </table>
+    <p class="muted small">Measured at the track during the race (OpenF1, 2023 onwards).</p>
+  </div>
+  {% endif %}
+
+  <div class="card wide table-scroll" id="races">
+    <h2>Every race here</h2>
+    {% if not c.races %}<p class="empty">No races here in Pitwall's data yet.</p>{% else %}
+    <table>
+      <tr><th>Year</th><th>Grand Prix</th><th>Winner</th><th>Team</th><th>Pole</th><th>Fastest lap</th></tr>
+      {% for r in c.races %}<tr>
+        <td class="num">{{ r.event.season }}</td>
+        <td><a href="/events/{{ r.event.id }}">{{ r.event.name }}</a></td>
+        <td>{% if r.winner %}<a href="/drivers/{{ r.winner.driver_id }}?season={{ r.event.season }}">{{ r.winner.driver.full_name }}</a>{% else %}<span class="muted">–</span>{% endif %}</td>
+        <td>{% if r.winner and r.winner.constructor %}<a href="/constructors/{{ r.winner.constructor_id }}?season={{ r.event.season }}">{{ r.winner.constructor.name }}</a>{% endif %}</td>
+        <td>{{ r.pole.driver.full_name if r.pole else '' }}</td>
+        <td>{% if r.fastest %}{{ r.fastest.driver.full_name }}{% if r.fastest.fastest_lap_time %} <span class="mono muted small">{{ r.fastest.fastest_lap_time }}</span>{% endif %}{% endif %}</td>
+      </tr>{% endfor %}
+    </table>
+    <p class="muted small">Grouped by circuit, so races held here under a different Grand Prix name are included. Pole is the qualifying winner, or the driver who started first where no qualifying result is stored. Blank cells weren't in the data.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

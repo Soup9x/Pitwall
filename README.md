@@ -36,12 +36,21 @@ and trivia, and weather, maps, digest and CSV export.
   with P3 or better if Piastri doesn't win" (sprint weekends and the constructors' title use
   points margins instead). Conditions are always safe: the leader's own fastest-lap point is
   never assumed, and a tie only counts for the leader when the rival can't match their wins.
-- **Teammate head-to-head** (Head-to-head page): qualifying record, race record (races where
-  both retired don't count) and points split, including sprints.
 - **Driver pages** (click any driver name): race-by-race results, average grid and finish,
   positions gained, DNFs and a points-trend chart. For drivers you follow, best lap, tyre stints
   and pit stops come from [OpenF1](https://openf1.org) (2023 onwards), fetched in the
   background after each race.
+- **Team pages** (click any team name in the standings, results, driver or circuit pages):
+  - the championship position and official points;
+  - wins, podiums and one-twos, races where both cars scored, poles, front rows, cars in Q3
+    and retirements;
+  - each driver who raced for the team that season, with their points, wins, podiums, best
+    finish and average finish and qualifying position, linked to their driver page;
+  - a points trend (team and drivers) with a legend, and a race-by-race table with both
+    cars' results;
+  - a season-by-season history for every season Pitwall has downloaded.
+
+  While spoiler mode holds an event, its season is hidden on team pages, as on driver pages.
 - **"Did you know?" facts** on event pages and in previews, computed only from stored results:
   - milestones (50th/100th… start, first win or podium in reach, circuit records)
   - streaks (points, podiums, front rows, DNFs)
@@ -155,6 +164,36 @@ of pages and emails. Pages show "N headlines hidden" and a **Show anyway** link.
 Spoiler mode covers these too. While an event is held, the progression chart stops at the
 round before it, the qualifying tab shows only the "Show anyway" notice, and the driver
 page's season stats are hidden, as before.
+
+## Circuits and kiosk
+
+- **Circuit explorer** (Circuits in the menu, or the circuit name on an event page):
+  - The list puts this year's calendar first (in round order), then every other circuit in
+    the seasons Pitwall has downloaded. You can search by circuit, city or country, and filter
+    to this year's calendar or historical circuits only.
+  - Each circuit page shows "Round N" if it's on this year's calendar, otherwise "Last held
+    YEAR". It has the facts from `data/circuits.yaml`, with an **unverified** badge until you
+    set `verified: true`.
+  - The **official race lap record** (from `circuits.yaml`) and the **fastest race lap in
+    Pitwall's data** are shown separately. Layouts change over the years, so the computed lap
+    is never called the record.
+  - Every race held there, newest first: year, Grand Prix, winner, team, pole and fastest
+    lap. Races are grouped by circuit, not Grand Prix name, so a race held at a circuit under
+    another name still appears.
+  - Most wins, poles and podiums (drivers) and team wins. A ● marks drivers and teams in the
+    latest season.
+  - How often pole led to a win, the winner's average grid position, the retirement rate,
+    and safety car and race-day weather history. Those last two come from OpenF1, so they
+    start in 2023.
+  - While spoiler mode holds an event, that event is left out of its circuit's page entirely.
+- **How far back history goes:** Settings → History (admins). The default is 2000; you can go
+  back to 1950. Pitwall downloads in batches of about 250 requests an hour (half of what the
+  Jolpica API allows, so live results always get through), newest season first.
+  - 2000 onwards takes about an hour. 1950 onwards can take several hours.
+  - The download starts within a minute of lowering the year. Finished seasons are never
+    fetched twice, and it picks up where it left off after a restart or an API outage.
+  - Admins see a "paused between batches" note while it waits for the next batch.
+- **Kiosk mode** for a TV or wall screen: see [Kiosk display](#9-kiosk-display-eg-a-raspberry-pi).
 
 ## Look and feel
 
@@ -284,22 +323,52 @@ Then go to **Settings**, pick the drivers you follow, and press **Send test** fo
 
 ## 2. Notifications (email and webhooks)
 
-Each user adds their own destinations in the web UI under **Settings → Notification channels**. Choose a type and fill
-in the form, then press **Add** and **Test**. You can add as many as you like, and disable or
-remove them at any time. Pitwall builds the [Apprise](https://github.com/caronc/apprise/wiki) URL
-for you, and passwords are never shown again after you save them.
+**Email** is set up once, by an admin, for everyone. Each user then only types the address
+they want their alerts sent to. **Webhooks** (phone push via ntfy, Discord, JSON) are personal:
+each user adds their own under **Settings → Notification channels**, presses **Add** and then
+**Test**. Pitwall builds the [Apprise](https://github.com/caronc/apprise/wiki) URLs for you, and
+passwords are never shown again after you save them.
 
 ### Email
 
-| Type | What you need |
-|---|---|
-| **Gmail** | Your address and an **app password**. Turn on 2-Step Verification, then create one at <https://myaccount.google.com/apppasswords>. Your normal password won't work. Google Workspace addresses work too. |
-| **Microsoft 365 / Outlook.com** | Your address and password. For Microsoft 365, an admin must enable **Authenticated SMTP** for the mailbox. |
-| **Other SMTP server** | Server, a From address, and optionally port and security (STARTTLS on 587, SSL/TLS on 465, or none on 25 for a local relay; "Automatic" picks by port). Username and password are optional, for relays that don't need a login. You can type the server as `smtp.example.com:587`. |
-| **Apprise URL** | Anything else Apprise supports. |
+**1. An admin sets up outgoing email** (Settings → **Outgoing email**, admins only). Every
+user's email is sent through this one account.
 
-By default, alerts go to the sending address; fill in **Send alerts to** to use another one.
-Emails are HTML with a plain-text alternative part.
+| Send with | What you need |
+|---|---|
+| **Gmail / Google Workspace** | The Google account's address and an **app password**. Turn on 2-Step Verification, then create one at <https://myaccount.google.com/apppasswords>; your normal password won't work. Pitwall connects to `smtp.gmail.com`, port 587, with STARTTLS. |
+| **Microsoft 365 / Outlook.com** | The mailbox address and password. For Microsoft 365, an admin must enable **Authenticated SMTP** for the mailbox. |
+| **Other SMTP server** | Server, port and security (STARTTLS on 587, SSL/TLS on 465, or none on 25 for a local relay; "Automatic" picks by port). Username and password are optional, for relays without a login. |
+
+Then fill in the **From address** (e.g. `pitwall@yourdomain.com`) and **From name**, and press
+**Save and send a test**. The test goes to your own alert address, or to the From address if
+you haven't set one yet.
+
+**Sending from your own domain through Gmail:**
+- **Google Workspace** (your domain's mail is hosted by Google): sign in with that address, or
+  with any Workspace account that has it as an alias. Nothing else to do.
+- **Regular Gmail account:** first add the address in Gmail → Settings → **Accounts and
+  Import** → **Send mail as**, and confirm it with the code Google emails you. Without that,
+  Gmail replaces the From address with your Gmail address.
+- For best delivery, your domain's SPF record should include `include:_spf.google.com`.
+- Gmail allows about 500 emails a day (2,000 on Workspace), far more than Pitwall needs.
+
+Already added your own Gmail or SMTP channel in an earlier version? On Settings it now shows a
+**Use for everyone** button. It turns that channel into the server's outgoing email in one
+click, and your alerts keep going to the same address.
+
+**2. Each user enters their address:** Settings → **Send my email alerts to** → **Save and send
+me a test**. Up to 3 addresses, separated by commas; leave it empty to stop email.
+- Admins can also type a new user's address when creating the account (Users → Create an
+  account). Invited people can enter theirs on the sign-up page.
+- The Users page shows where each person's alerts go.
+- Someone who uses email only (no webhooks) gets every alert type by email when they first
+  add an address: reminders, results and standings too, not just previews and the digest.
+  They can change that under **Routing**.
+
+Normal users can't change the server's mail settings or add email accounts of their own.
+Admins can still add a separate email channel with its own login under "Add a separate email
+channel (advanced)". Emails are HTML with a plain-text alternative part.
 
 ### Webhooks
 
@@ -338,7 +407,7 @@ that event **Watched** on its page. If you set "Auto-release after N hours", the
 N hours after the event's latest results arrived. Each new session restarts that clock, so a
 race isn't revealed early by its qualifying. Alerts and pages follow the same rule. While an
 event is held:
-- its results, and the standings, recent form, head-to-head, driver season pages, title maths
+- its results, and the standings, recent form, driver season pages, title maths
   and trivia (which all include the latest results) are left out of the pages entirely, not
   just collapsed, so they aren't in the page source either;
 - race control, penalty decisions and news headlines published after the event's first
@@ -478,6 +547,60 @@ This also unlocks the account. To create an account from the command line:
 press Enter at the password prompt to generate one; it's printed, and the person chooses their
 own at first login.
 
+## 9. Kiosk display (e.g. a Raspberry Pi)
+
+`/kiosk` is a read-only, full-screen page for a TV or wall screen. It's dark only, uses large
+type and never scrolls. It's designed for 1920×1080, and also works at 1280×720 and on a
+screen turned to portrait.
+
+- **Normal view:** a big countdown to the next session, the top 10 drivers and top 5
+  constructors, and a "Did you know?" fact that changes every 30 seconds.
+- **Race weekend view** (Thursday to the end of the race, track time): the session timeline,
+  countdown, weather, tyres, grid penalties and standings.
+- It needs no login and has no links into the app. It always follows **your** spoiler
+  settings: while an event is held, the standings and trivia are hidden, and there's no "show
+  anyway".
+- It refreshes every 60 seconds and the countdown ticks every second. If the server can't be
+  reached, the last data stays up with an "Offline – last updated HH:MM" badge.
+- To avoid burn-in, the layout shifts a few pixels every 3 minutes. It also asks the browser
+  to keep the screen on (Screen Wake Lock). Browsers only allow that over HTTPS or on
+  `localhost`, so over plain `http://` on your LAN, turn screen blanking off on the device
+  (below).
+
+**Get the link:** Account → Kiosk display → **Create a kiosk link**. You can add options to the
+end of the link:
+
+| Option | What it does |
+| --- | --- |
+| `&layout=portrait` | Layout for a screen turned on its side. A tall screen gets it automatically. |
+| `&rotate=1` | On race weekends, alternate between the weekend view and the standings/trivia view. |
+| `&interval=30` | Seconds each view stays up when rotating (10–3600, default 30). |
+
+> **The kiosk link contains a secret.** Anyone who has it can see what your kiosk shows (but
+> nothing else: no settings, no other pages). Don't post it or put it in screenshots. If it
+> leaks, use **Create a new link** on the Account page (the old one stops working at once)
+> or **Turn off**. Pitwall never writes the token to its logs.
+
+**Raspberry Pi setup** (Raspberry Pi OS with desktop, Bookworm):
+
+1. Turn off screen blanking: `sudo raspi-config` → *Display Options* → *Screen Blanking* →
+   *No*.
+2. Install Chromium if it isn't already there: `sudo apt install -y chromium-browser`
+   (called `chromium` on some images).
+3. Start it in kiosk mode at login. Create `~/.config/autostart/pitwall-kiosk.desktop`:
+
+   ```ini
+   [Desktop Entry]
+   Type=Application
+   Name=Pitwall kiosk
+   Exec=chromium-browser --kiosk --noerrdialogs --disable-infobars --incognito --check-for-update-interval=31536000 "http://<server IP>:8080/kiosk?token=<your token>"
+   ```
+
+   This file now holds your secret link, so keep it private
+   (`chmod 600 ~/.config/autostart/pitwall-kiosk.desktop`).
+4. Reboot. To get out of kiosk mode, press `Alt+F4`, or connect over SSH and run
+   `pkill chromium`.
+
 ## Security notes
 
 - **Logins:**
@@ -492,8 +615,9 @@ own at first login.
 - **Accounts:** there's no open sign-up. Admins create accounts or send one-time invite links
   (only a hash of the link is stored). Passwords an admin chose or generated are shown once,
   never stored in plain text, and (by default) replaced by the person at their first login.
-- **Public URLs:** `/calendar.ics` uses a per-user token instead of a login, so Google can fetch
-  it. `/circuit-maps/*` is public, so email clients can show maps. `/health` tells internet
+- **Public URLs:** `/calendar.ics` and `/kiosk` use per-user tokens instead of a login (the
+  kiosk link is off until you create it), and a wrong token is a plain 404. Tokens are never
+  written to the logs. `/circuit-maps/*` is public, so email clients can show maps. `/health` tells internet
   visitors only `{"status": "ok"}`; details are for logged-in users and the local healthcheck.
 - **Browser hardening:**
   - Strict Content-Security-Policy with no inline scripts.

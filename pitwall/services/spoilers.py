@@ -90,7 +90,7 @@ def held_event(
     db: DB, user_id: int, settings: AppSettings, now: datetime | None = None
 ) -> Event | None:
     """The latest event with results, if it's held for this user. While it is, anything derived
-    from the latest results (standings, form, head-to-head, trivia) must stay hidden too."""
+    from the latest results (standings, form, trivia) must stay hidden too."""
     if not settings.spoiler_enabled:
         return None
     event = latest_results_event(db)

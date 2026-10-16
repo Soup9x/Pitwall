@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 from datetime import UTC, datetime
 
@@ -16,6 +17,8 @@ _STD_ATTRS = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
 
 _SECRETS: set[str] = set()
 _SORTED: list[str] = []
+# Calendar and kiosk links carry their secret as ?token=...; access logs must never show it.
+_URL_TOKEN = re.compile(r"(\btoken=)[^&\s\"']+")
 
 
 def register_secrets(values: list[str]) -> None:
@@ -38,15 +41,14 @@ class RedactingFilter(logging.Filter):
         for s in self.secrets:
             if s in text:
                 text = text.replace(s, "***")
-        return text
+        return _URL_TOKEN.sub(r"\1***", text) if "token=" in text else text
 
     def filter(self, record: logging.LogRecord) -> bool:
-        if self.secrets:
-            record.msg = self._scrub(record.getMessage())
-            record.args = None
-            for key, value in list(record.__dict__.items()):
-                if key not in _STD_ATTRS and isinstance(value, str):
-                    setattr(record, key, self._scrub(value))
+        record.msg = self._scrub(record.getMessage())
+        record.args = None
+        for key, value in list(record.__dict__.items()):
+            if key not in _STD_ATTRS and isinstance(value, str):
+                setattr(record, key, self._scrub(value))
         return True
 
 

@@ -186,7 +186,6 @@ svg.chart { width: 100%; height: auto; }
 svg.chart text { fill: var(--muted); font-size: 11px; font-family: var(--font-mono); }
 svg.chart line.grid { stroke: var(--border); stroke-width: 1; }
 img.track-map { width: 100%; max-width: 420px; height: auto; display: block; margin: 0 auto 12px; }
-table.h2h td.lead { color: var(--text); font-weight: 800; }
 .split { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; margin: 10px 0 4px; }
 .split > div { height: 100%; background: var(--accent); }
 ul.facts-list { margin: 0; padding-left: 18px; } ul.facts-list li { margin: 4px 0; }
@@ -346,3 +345,26 @@ table.quali .q-best { color: var(--timing-purple); font-weight: 700; }
   table.quali tr.q-group .q-gl { position: sticky; left: 8px; }
   table.quali tr.followed > td:nth-child(-n+2) { background: linear-gradient(var(--hl), var(--hl)), var(--surface); }
 }
+
+/* ---------------------------------------------------------------- circuits */
+.circuit-search { gap: 8px; align-items: center; margin-bottom: 16px; }
+.circuit-search input[type=search] { flex: 1; min-width: 180px; }
+.leader-grid { display: grid; gap: 12px 20px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.leader-grid h3 { margin: 0 0 4px; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+ol.leaders { margin: 0; padding-left: 20px; }
+ol.leaders li > span:first-child { display: inline-block; min-width: 0; }
+ol.leaders li { display: list-item; }
+ol.leaders li .mono { float: right; }
+.active-mark { color: var(--good); font-size: .7em; vertical-align: middle; }
+
+/* Settings → Outgoing email: setup steps */
+ol.steps { margin: 6px 0 8px; padding-left: 20px; }
+ol.steps li { margin: 4px 0; }
+ol.steps ul { margin: 4px 0; padding-left: 18px; }
+
+/* Constructor pages */
+h1.team-title { padding-left: 14px !important; }
+.team-car { display: inline-block; margin-right: 14px; white-space: nowrap; }
+tr.current td { background: var(--surface-2); font-weight: 700; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 0; }
+.chart-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }

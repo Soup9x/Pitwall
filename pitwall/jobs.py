@@ -670,18 +670,52 @@ def backfill_season(client: JolpicaClient, year: int, current_year: int, now: da
                 season.backfilled = True
 
 
+# Requests per backfill run: about half of Jolpica's hourly allowance, so live syncs always
+# have room. A longer history (back to 1950) is fetched over several runs, an hour apart.
+BACKFILL_BUDGET = 250
+BACKFILL_PAUSE = timedelta(minutes=65)
+
+
+def schedule_backfill(delay: timedelta, *, include_current: bool = False) -> None:
+    """Queue a backfill run (e.g. the next batch, or after the start year was lowered)."""
+    from pitwall import scheduler
+
+    sched = scheduler.get_scheduler()
+    if sched is None:
+        return
+    sched.add_job(
+        "pitwall.jobs:backfill_job",
+        "date",
+        run_date=utcnow() + delay,
+        kwargs={"include_current": include_current},
+        id="backfill_continue",
+        replace_existing=True,
+        name="Historical backfill (next batch)",
+    )
+
+
 @safe_job
-def backfill_job() -> None:
+def backfill_job(include_current: bool = True, budget: int = BACKFILL_BUDGET) -> None:
+    """Fetch past seasons back to the configured start year, newest first. Resumable: finished
+    seasons are marked and skipped, and every response for a completed season is cached, so an
+    interrupted season picks up where it stopped. Each run makes at most about `budget`
+    requests, then schedules the next batch."""
     now = utcnow()
     current = now.year
     with session_scope() as db:
         start_year = load_settings(db).backfill_start_year
         done_years = {s.year for s in db.scalars(select(Season).where(Season.backfilled))}
-    years = [current] + [y for y in range(current - 1, start_year - 1, -1) if y not in done_years]
+    past = [y for y in range(current - 1, start_year - 1, -1) if y not in done_years]
+    years = ([current] if include_current else []) + past
+    total = current - start_year + 1
+    # Seasons complete so far; the current season counts once this run has refreshed it.
+    done_before = total - 1 - len(past) + (0 if include_current else 1)
     _progress(
         running=True,
-        total=len(years),
-        done=0,
+        paused=False,
+        next_at=None,
+        total=total,
+        done=done_before,
         current=None,
         started_at=now.isoformat(),
         finished_at=None,
@@ -689,28 +723,58 @@ def backfill_job() -> None:
     )
     client = _client_factory()
     errors: list[str] = []
+    completed = 0  # past seasons finished in this run
+    refreshed = 0
+    stopped = False
     try:
         with session_scope() as db:
             have_current = db.scalar(select(Event.id).where(Event.season == current).limit(1))
         if have_current is None:
             sync_schedule(client, current, now)
-        for i, year in enumerate(years):
-            _progress(current=year, done=i)
+        for year in years:
+            if client.requests_made >= budget:
+                stopped = True
+                break
+            _progress(current=year)
             try:
                 backfill_season(client, year, current, now)
             except SourceUnavailable as exc:
+                # Jolpica is down or rate-limiting us: stop rather than push on, retry later.
                 errors.append(f"{year}: {exc}")
-                log.warning("backfill season skipped", extra={"year": year})
+                log.warning("backfill paused: source unavailable", extra={"year": year})
+                stopped = True
+                break
             except Exception as exc:
                 errors.append(f"{year}: {type(exc).__name__}")
                 log.exception("backfill season failed", extra={"year": year})
+                continue
+            if year == current:
+                refreshed = 1
+            else:
+                completed += 1
+            _progress(done=done_before + completed + refreshed)
     finally:
+        requests = client.requests_made
         client.close()
+        remaining = len(past) - completed
+        next_at = utcnow() + BACKFILL_PAUSE if remaining else None
         _progress(
             running=False,
-            done=len(years),
+            paused=bool(remaining),
+            next_at=next_at.isoformat() if next_at else None,
             current=None,
-            finished_at=utcnow().isoformat(),
+            finished_at=None if remaining else utcnow().isoformat(),
             errors=errors[-10:],
         )
-    log.info("backfill finished", extra={"years": len(years), "errors": len(errors)})
+        if remaining:
+            schedule_backfill(BACKFILL_PAUSE)
+    log.info(
+        "backfill run finished",
+        extra={
+            "seasons": completed,
+            "remaining": remaining,
+            "requests": requests,
+            "stopped_early": stopped,
+            "errors": len(errors),
+        },
+    )

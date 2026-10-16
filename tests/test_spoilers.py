@@ -111,7 +111,6 @@ def test_auto_release_clock_restarts_with_each_sessions_results(db, mexico):
         ("/", "Piastri"),
         # The chart still shows round 2; only the held round's numbers (Norris on 65) vanish.
         ("/standings?season=2025", ">65<"),
-        ("/head-to-head?season=2025", "Piastri"),
         ("/drivers/norris?season=2025", "Race by race"),
         ("/events/{event}", "Piastri"),
     ],

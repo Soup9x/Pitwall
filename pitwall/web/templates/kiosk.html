@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" data-theme="dark" class="kiosk{{ ' portrait' if portrait else '' }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0E1014">
+<title>Pitwall</title>
+<link rel="stylesheet" href="/static/fonts/fonts.css">
+<link rel="stylesheet" href="/static/kiosk.css">
+<link rel="icon" href="/static/icons/logo.svg" type="image/svg+xml">
+</head>
+<body>
+{# Read-only wall display. kiosk.js fills every [data-k] element from the JSON below and from
+   /kiosk/data every 60 s. There are deliberately no links anywhere on this page. #}
+<div id="stage" class="k-stage" data-view="normal">
+  <header class="k-head">
+    <div class="k-brand">{% include "_logo.svg" %}<span>Pit<span class="w">wall</span></span></div>
+    <div class="k-event" data-k="event"></div>
+    <div class="k-status"><span class="k-offline" data-k="offline" hidden></span><span class="k-clock mono" data-k="clock"></span></div>
+  </header>
+
+  <section class="k-panel k-countdown" aria-live="off">
+    <div class="k-label" data-k="next-label">Next session</div>
+    <div class="k-digits mono" data-k="countdown" role="timer"></div>
+    <div class="k-when" data-k="next-when"></div>
+    <div class="k-forecast" data-k="next-forecast"></div>
+  </section>
+
+  <section class="k-panel k-timeline" data-only="weekend">
+    <h2>Weekend</h2>
+    <ol class="k-sessions" data-k="timeline"></ol>
+  </section>
+
+  <section class="k-panel k-conditions" data-only="weekend">
+    <div><h2>Weather</h2><ul class="k-list" data-k="weather"></ul></div>
+    <div><h2>Tyres</h2><div class="k-tyres" data-k="tyres"></div></div>
+    <div><h2>Grid penalties</h2><ul class="k-list" data-k="penalties"></ul></div>
+  </section>
+
+  <section class="k-panel k-drivers">
+    <h2>Drivers <span class="k-sub" data-k="round"></span></h2>
+    <ol class="k-table" data-k="drivers"></ol>
+  </section>
+
+  <section class="k-panel k-constructors">
+    <h2>Constructors</h2>
+    <ol class="k-table" data-k="constructors"></ol>
+  </section>
+
+  <section class="k-panel k-trivia" data-only="normal">
+    <h2>Did you know?</h2>
+    <p data-k="trivia"></p>
+  </section>
+</div>
+<script type="application/json" id="kiosk-data">{{ data|safe }}</script>
+<script src="/static/kiosk.js"></script>
+</body>
+</html>

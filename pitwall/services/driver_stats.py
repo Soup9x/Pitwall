@@ -18,6 +18,7 @@ from pitwall.sources.openf1 import fmt_lap
 class RaceRow:
     event: Event
     team: str | None
+    team_id: str | None
     grid: int | None
     finish: str
     position: int | None
@@ -111,6 +112,7 @@ def season(db: DB, driver_id: str, year: int) -> DriverSeason | None:
         row = RaceRow(
             event=ev,
             team=res.constructor.name if res.constructor else None,
+            team_id=res.constructor_id,
             grid=res.grid or None,
             finish=f"P{res.position_text}" if classified(res) else (res.position_text or "?"),
             position=res.position if classified(res) else None,
@@ -139,6 +141,10 @@ def season(db: DB, driver_id: str, year: int) -> DriverSeason | None:
     return DriverSeason(driver, year, out)
 
 
+# Line colours in order; templates use the same list for a legend.
+TREND_COLORS = ["var(--accent)", "var(--flag-blue)", "var(--flag-yellow)", "var(--timing-purple)"]
+
+
 def trend_svg(
     series: list[tuple[str, list[float]]], labels: list[str], width: int = 640, height: int = 220
 ) -> str:
@@ -155,7 +161,7 @@ def trend_svg(
     def y(v: float) -> float:
         return pad_t + (height - pad_t - pad_b) * (1 - v / top)
 
-    colors = ["var(--accent)", "var(--flag-blue)", "var(--flag-yellow)", "var(--timing-purple)"]
+    colors = TREND_COLORS
     parts = [
         f'<svg viewBox="0 0 {width} {height}" class="chart" role="img" '
         f'aria-label="Cumulative points by round">'
