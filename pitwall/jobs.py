@@ -26,6 +26,7 @@ from pitwall.services import (
     news,
     openf1_sync,
     penalty_watch,
+    progression,
     reminders,
     session_data,
     trivia,
@@ -535,6 +536,32 @@ def news_job(now: datetime | None = None) -> None:
             )
     if queued:
         flush_job()
+
+
+@safe_job
+def progression_job(now: datetime | None = None) -> None:
+    """Fill in per-round standings for the season progression chart (current season and any
+    season someone opened), a few dozen requests per run to stay inside Jolpica's limits."""
+    now = now or utcnow()
+    with session_scope() as db:
+        seasons = [
+            s
+            for s in progression.pending_seasons(db, now)
+            if any(progression.missing_rounds(db, s, now).values())
+        ]
+    if not seasons:
+        return
+    client = _client_factory()
+    try:
+        budget = 60
+        for season in seasons:
+            budget -= progression.backfill(client, season, now, limit=budget)
+            with session_scope() as db:
+                progression.mark_done(db, season, now)
+            if budget <= 0:
+                break
+    finally:
+        client.close()
 
 
 # ---------------------------------------------------------------------------- reminders

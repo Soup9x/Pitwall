@@ -52,6 +52,7 @@ from pitwall.services import (
     head_to_head,
     ics,
     news,
+    progression,
     reminders,
     spoilers,
     standings,
@@ -384,10 +385,17 @@ def standings_page(
     db: DB = Depends(get_db),
     user: User = Depends(require_user),
 ) -> HTMLResponse:
-    seasons = list(
-        db.scalars(
-            select(StandingsSnapshot.season).distinct().order_by(StandingsSnapshot.season.desc())
-        )
+    seasons = sorted(
+        set(db.scalars(select(StandingsSnapshot.season).distinct()))
+        | set(
+            db.scalars(
+                select(Event.season)
+                .join(Session, Session.event_id == Event.id)
+                .where(Session.type == "RACE", Session.results_fetched_at.is_not(None))
+                .distinct()
+            )
+        ),
+        reverse=True,
     )
     season = season or (seasons[0] if seasons else None)
     held = _held_event(db, user, reveal)
@@ -396,6 +404,23 @@ def standings_page(
     if season and not hide:
         drivers = standings.table(db, season, "driver", user_id=user.id)
         constructors = standings.table(db, season, "constructor", user_id=user.id)
+    chart = None
+    missing: list[int] = []
+    if season:
+        # Spoiler mode: the chart stops at the round before the held event.
+        upto = held.round - 1 if held is not None and held.season == season else None
+        if held is not None and held.season < season:
+            upto = 0
+        data = {
+            kind: progression.build(db, season, kind, user_id=user.id, upto_round=upto)
+            for kind in progression.KINDS
+        }
+        missing = sorted(set(data["driver"]["missing"]) | set(data["constructor"]["missing"]))
+        if missing:
+            progression.request(db, season)
+            db.commit()
+        if data["driver"]["series"] or data["constructor"]["series"]:
+            chart = racedata.script_json(data)
     return page(
         request,
         "standings.html",
@@ -411,6 +436,9 @@ def standings_page(
             if season and not hide and (tm := title_math.for_season(db, season, k))
         ],
         held_event=held if hide else None,
+        progression_chart=chart,
+        progression_missing=missing,
+        chart_held=held if held is not None and held.season <= (season or 0) else None,
     )
 
 

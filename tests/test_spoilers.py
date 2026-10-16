@@ -109,7 +109,8 @@ def test_auto_release_clock_restarts_with_each_sessions_results(db, mexico):
     ("path", "marker"),
     [
         ("/", "Piastri"),
-        ("/standings?season=2025", "Piastri"),
+        # The chart still shows round 2; only the held round's numbers (Norris on 65) vanish.
+        ("/standings?season=2025", ">65<"),
         ("/head-to-head?season=2025", "Piastri"),
         ("/drivers/norris?season=2025", "Race by race"),
         ("/events/{event}", "Piastri"),
@@ -122,6 +123,7 @@ def test_held_data_is_not_in_the_page_source(db, client, mexico, path, marker):
     later = RACE_AT + timedelta(hours=2)
     html = _get(client, url, later).text
     assert marker not in html  # not merely collapsed: absent from the HTML
+    assert "65.0" not in html  # the progression chart stops before the held round
     assert "Hidden by spoiler mode" in html and "Mexico City Grand Prix" in html
     revealed = _get(client, url + ("&" if "?" in url else "?") + "reveal=1", later).text
     assert marker in revealed
