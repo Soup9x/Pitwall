@@ -169,12 +169,12 @@
           {% if block.session.type == 'Q' %}
             <tr><th class="num">Pos</th><th>Driver</th><th>Q1</th><th>Q2</th><th>Q3</th></tr>
             {% for r in block.rows %}
-            <tr class="{{ 'followed' if r.driver_id in followed else '' }}"><td class="num">{{ r.position_text or r.position }}</td><td>{{ r.driver.full_name }} <span class="muted small">{{ r.constructor.name if r.constructor }}</span></td><td>{{ r.q1 or '' }}</td><td>{{ r.q2 or '' }}</td><td>{{ r.q3 or '' }}</td></tr>
+            <tr class="{{ 'followed' if r.driver_id in followed else '' }}"><td class="num">{{ r.position_text or r.position }}</td><td><a href="/drivers/{{ r.driver_id }}?season={{ event.season }}">{{ r.driver.full_name }}</a>{% if r.constructor %} <a class="muted small" href="/constructors/{{ r.constructor_id }}?season={{ event.season }}">{{ r.constructor.name }}</a>{% endif %}</td><td>{{ r.q1 or '' }}</td><td>{{ r.q2 or '' }}</td><td>{{ r.q3 or '' }}</td></tr>
             {% endfor %}
           {% else %}
             <tr><th class="num">Pos</th><th>Driver</th><th class="num">Grid</th><th>Time/Status</th><th class="num">Pts</th></tr>
             {% for r in block.rows %}
-            <tr class="{{ 'followed' if r.driver_id in followed else '' }}"><td class="num">{{ r.position_text or r.position }}</td><td>{{ r.driver.full_name }} <span class="muted small">{{ r.constructor.name if r.constructor }}</span>{% if r.fastest_lap_rank == 1 %} ⏱️{% endif %}</td><td class="num">{{ r.grid if r.grid else 'PL' }}</td><td>{{ r.time_text or r.status or '' }}</td><td class="num">{{ r.points|pts }}</td></tr>
+            <tr class="{{ 'followed' if r.driver_id in followed else '' }}"><td class="num">{{ r.position_text or r.position }}</td><td><a href="/drivers/{{ r.driver_id }}?season={{ event.season }}">{{ r.driver.full_name }}</a>{% if r.constructor %} <a class="muted small" href="/constructors/{{ r.constructor_id }}?season={{ event.season }}">{{ r.constructor.name }}</a>{% endif %}{% if r.fastest_lap_rank == 1 %} ⏱️{% endif %}</td><td class="num">{{ r.grid if r.grid else 'PL' }}</td><td>{{ r.time_text or r.status or '' }}</td><td class="num">{{ r.points|pts }}</td></tr>
             {% endfor %}
           {% endif %}
           </table></div>

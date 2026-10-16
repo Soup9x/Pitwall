@@ -361,3 +361,10 @@ ol.leaders li .mono { float: right; }
 ol.steps { margin: 6px 0 8px; padding-left: 20px; }
 ol.steps li { margin: 4px 0; }
 ol.steps ul { margin: 4px 0; padding-left: 18px; }
+
+/* Constructor pages */
+h1.team-title { padding-left: 14px !important; }
+.team-car { display: inline-block; margin-right: 14px; white-space: nowrap; }
+tr.current td { background: var(--surface-2); font-weight: 700; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 0; }
+.chart-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }

@@ -40,6 +40,17 @@ and trivia, and weather, maps, digest and CSV export.
   positions gained, DNFs and a points-trend chart. For drivers you follow, best lap, tyre stints
   and pit stops come from [OpenF1](https://openf1.org) (2023 onwards), fetched in the
   background after each race.
+- **Team pages** (click any team name in the standings, results, driver or circuit pages):
+  - the championship position and official points;
+  - wins, podiums and one-twos, races where both cars scored, poles, front rows, cars in Q3
+    and retirements;
+  - each driver who raced for the team that season, with their points, wins, podiums, best
+    finish and average finish and qualifying position, linked to their driver page;
+  - a points trend (team and drivers) with a legend, and a race-by-race table with both
+    cars' results;
+  - a season-by-season history for every season Pitwall has downloaded.
+
+  While spoiler mode holds an event, its season is hidden on team pages, as on driver pages.
 - **"Did you know?" facts** on event pages and in previews, computed only from stored results:
   - milestones (50th/100th… start, first win or podium in reach, circuit records)
   - streaks (points, podiums, front rows, DNFs)

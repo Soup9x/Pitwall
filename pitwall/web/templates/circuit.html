@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% from "_macros.html" import track_facts %}
 {% block title %}{{ c.circuit.name }}{% endblock %}
-{% macro leader_list(items, empty) -%}
-{% if items %}<ol class="leaders">{% for l in items %}<li><span>{{ l.name }}{% if l.active %} <span class="active-mark" title="Active">●</span><span class="sr-only"> (active)</span>{% endif %}</span><span class="mono">{{ l.count }}</span></li>{% endfor %}</ol>
+{% macro leader_list(items, empty, base="/drivers/") -%}
+{% if items %}<ol class="leaders">{% for l in items %}<li><span><a href="{{ base }}{{ l.id }}">{{ l.name }}</a>{% if l.active %} <span class="active-mark" title="Active">●</span><span class="sr-only"> (active)</span>{% endif %}</span><span class="mono">{{ l.count }}</span></li>{% endfor %}</ol>
 {% else %}<p class="empty small">{{ empty }}</p>{% endif %}
 {%- endmacro %}
 {% block content %}{% set ci = c.circuit %}
@@ -45,7 +45,7 @@
       <div><h3>Wins</h3>{{ leader_list(c.wins, "No winners stored.") }}</div>
       <div><h3>Poles</h3>{{ leader_list(c.poles, "No poles stored.") }}</div>
       <div><h3>Podiums</h3>{{ leader_list(c.podiums, "No podiums stored.") }}</div>
-      <div><h3>Team wins</h3>{{ leader_list(c.team_wins, "No winners stored.") }}</div>
+      <div><h3>Team wins</h3>{{ leader_list(c.team_wins, "No winners stored.", "/constructors/") }}</div>
     </div>
     <p class="muted small"><span class="active-mark">●</span> raced in the latest season.</p>
   </div>
@@ -84,7 +84,7 @@
         <td class="num">{{ r.event.season }}</td>
         <td><a href="/events/{{ r.event.id }}">{{ r.event.name }}</a></td>
         <td>{% if r.winner %}<a href="/drivers/{{ r.winner.driver_id }}?season={{ r.event.season }}">{{ r.winner.driver.full_name }}</a>{% else %}<span class="muted">–</span>{% endif %}</td>
-        <td>{{ r.winner.constructor.name if r.winner and r.winner.constructor else '' }}</td>
+        <td>{% if r.winner and r.winner.constructor %}<a href="/constructors/{{ r.winner.constructor_id }}?season={{ r.event.season }}">{{ r.winner.constructor.name }}</a>{% endif %}</td>
         <td>{{ r.pole.driver.full_name if r.pole else '' }}</td>
         <td>{% if r.fastest %}{{ r.fastest.driver.full_name }}{% if r.fastest.fastest_lap_time %} <span class="mono muted small">{{ r.fastest.fastest_lap_time }}</span>{% endif %}{% endif %}</td>
       </tr>{% endfor %}

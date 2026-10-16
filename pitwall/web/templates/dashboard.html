@@ -96,7 +96,7 @@
   {% for c in followed_cards %}
     <article class="fcard">
       <span class="stripe" style="--team: {{ c.row.team_color if c.row and c.row.team_color else 'var(--border)' }}">
-        <a href="/drivers/{{ c.driver_id }}"><strong>{{ c.name }}</strong></a>{% if c.row and c.row.team %} <span class="muted small">{{ c.row.team }}</span>{% endif %}
+        <a href="/drivers/{{ c.driver_id }}"><strong>{{ c.name }}</strong></a>{% if c.row and c.row.team %} {% if c.row.team_id %}<a class="muted small" href="/constructors/{{ c.row.team_id }}">{{ c.row.team }}</a>{% else %}<span class="muted small">{{ c.row.team }}</span>{% endif %}{% endif %}
       </span>
       {% if held_event %}<p class="muted small">Standings and results hidden by spoiler mode.</p>
       {% else %}

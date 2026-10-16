@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% from "_macros.html" import spoiler_notice %}
+{% block title %}{{ team.name }}{% endblock %}
+{% block content %}
+<div class="row" style="justify-content:space-between;">
+  <div>
+    <h1 class="stripe team-title" style="--team: {{ (data.color if data else none) or 'var(--border)' }}">{{ team.name }}</h1>
+    <p class="sub">{{ team.nationality or '' }}{% if data and data.standing_position %}{% if team.nationality %} · {% endif %}P{{ data.standing_position }} in the {{ season }} constructors' championship{% if data.standing_round %} <span class="muted">(after round {{ data.standing_round }})</span>{% endif %}{% endif %}</p>
+  </div>
+  {% if seasons|length > 1 %}
+  <form method="get"><select name="season" data-autosubmit aria-label="Season">
+    {% for y in seasons %}<option value="{{ y }}" {{ 'selected' if y == season else '' }}>{{ y }}</option>{% endfor %}
+  </select></form>
+  {% endif %}
+</div>
+{% if held_event %}
+<div class="card">{{ spoiler_notice(held_event, "/constructors/" ~ team.id ~ "?season=" ~ season ~ "&reveal=1") }}</div>
+{% elif not data or not data.rounds %}
+<div class="card"><p class="muted">No race results stored for {{ team.name }} in {{ season or 'any season' }}.</p></div>
+{% else %}
+<div class="grid">
+  <div class="card">
+    <h2>{{ season }} season</h2>
+    <dl class="facts">
+      <dt>Points</dt><dd>{{ (data.standing_points if data.standing_points is not none else data.points)|pts }}{% if data.standing_points is not none and data.standing_points != data.points %} <span class="muted small">(official; results add up to {{ data.points|pts }})</span>{% endif %}</dd>
+      <dt>Races</dt><dd>{{ data.rounds|length }}</dd>
+      <dt>Wins</dt><dd>{{ data.wins }}{% if data.one_twos %} <span class="muted small">({{ data.one_twos }} one-two{{ 's' if data.one_twos != 1 }})</span>{% endif %}</dd>
+      <dt>Podiums</dt><dd>{{ data.podiums }}</dd>
+      {% if data.best_finish %}<dt>Best finish</dt><dd>P{{ data.best_finish }}</dd>{% endif %}
+      <dt>Both cars in the points</dt><dd>{{ data.double_points }} of {{ data.rounds|length }}</dd>
+      {% if data.quali_sessions %}
+      <dt>Poles</dt><dd>{{ data.poles }}{% if data.front_rows %} <span class="muted small">(front row {{ data.front_rows }}×)</span>{% endif %}</dd>
+      <dt>Cars in Q3</dt><dd>{{ data.q3_cars }} of {{ data.quali_sessions * 2 }}</dd>
+      {% endif %}
+      <dt>Retirements</dt><dd>{{ data.dnfs }} <span class="muted small">of {{ data.starts }} starts</span></dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h2>Points trend</h2>
+    {{ chart|safe }}
+    <p class="chart-legend small">{% for name, color in legend %}<span><i style="background: {{ color }}"></i>{{ name }}{% if loop.first %} (team){% endif %}</span>{% endfor %}</p>
+  </div>
+</div>
+
+<div class="card table-scroll" style="margin-top:16px;" id="drivers">
+  <h2>Drivers</h2>
+  <table>
+    <tr><th>Driver</th><th class="num">Races</th><th class="num">Pts</th><th class="num">Wins</th><th class="num">Podiums</th><th class="num">Best</th><th class="num">Avg finish</th><th class="num">Avg quali</th></tr>
+    {% for d in data.drivers %}
+    <tr class="{{ 'followed' if d.driver.id in followed else '' }}">
+      <td class="stripe" style="--team: {{ data.color or 'var(--border)' }}"><a href="/drivers/{{ d.driver.id }}?season={{ season }}">{{ d.driver.full_name }}</a>{% if d.driver.code %} <span class="muted small mono">{{ d.driver.code }}</span>{% endif %}</td>
+      <td class="num">{{ d.races }}</td>
+      <td class="num">{{ d.points|pts }}</td>
+      <td class="num">{{ d.wins }}</td>
+      <td class="num">{{ d.podiums }}</td>
+      <td class="num">{{ 'P' ~ d.best if d.best else '—' }}</td>
+      <td class="num">{{ d.avg_finish if d.avg_finish is not none else '—' }}</td>
+      <td class="num">{{ d.avg_quali if d.avg_quali is not none else '—' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="muted small">Points and results while driving for {{ team.name }}. Averages leave out retirements.</p>
+</div>
+
+<div class="card table-scroll" style="margin-top:16px;" id="races">
+  <h2>Race by race</h2>
+  <table>
+    <tr><th class="num">Rd</th><th>Grand Prix</th><th>Results</th><th class="num">Pts</th><th class="num">Total</th></tr>
+    {% for r in data.rounds %}
+    <tr>
+      <td class="num">{{ r.event.round }}</td>
+      <td><a href="/events/{{ r.event.id }}">{{ r.event.short_name }}</a>{% if r.event.is_sprint_weekend %} <span class="muted small" title="Sprint weekend: includes sprint points">⚡</span>{% endif %}</td>
+      <td>{% for c in r.cars %}<span class="team-car"><span class="mono">{{ c.driver.code or c.driver.family_name }}</span> {{ c.finish }}{% if c.dnf %} <span class="muted small">{{ c.status }}</span>{% endif %}</span>{% endfor %}</td>
+      <td class="num">{{ r.points|pts }}</td>
+      <td class="num muted">{{ r.cumulative|pts }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if history|length > 1 or (history and not data) %}
+<div class="card table-scroll" style="margin-top:16px;" id="history">
+  <h2>Season by season</h2>
+  <table>
+    <tr><th>Season</th><th class="num">Position</th><th class="num">Races</th><th class="num">Wins</th><th class="num">Podiums</th><th class="num">Pts</th></tr>
+    {% for h in history %}
+    <tr class="{{ 'current' if h.season == season else '' }}"{% if h.season == season %} aria-current="true"{% endif %}>
+      <td><a href="/constructors/{{ team.id }}?season={{ h.season }}">{{ h.season }}</a></td>
+      <td class="num">{{ 'P' ~ h.position if h.position else '—' }}</td>
+      <td class="num">{{ h.races }}</td>
+      <td class="num">{{ h.wins }}</td>
+      <td class="num">{{ h.podiums }}</td>
+      <td class="num">{{ h.points|pts }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="muted small">Seasons Pitwall has downloaded (Settings → History). Points are what the results add up to; the championship position comes from the official standings where stored.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -19,7 +19,7 @@
 {% for r in (table.rows[:limit] if limit else table.rows) %}
 <tr class="{{ 'followed' if r.followed else '' }}">
   <td class="num">{{ r.position }}</td>
-  <td class="stripe" style="--team: {{ r.team_color or 'var(--border)' }}">{% if heading == "Driver" %}<a href="/drivers/{{ r.entity_id }}">{{ r.name }}</a>{% else %}{{ r.name }}{% endif %}{% if r.team %} <span class="muted small">{{ r.team }}</span>{% endif %}</td>
+  <td class="stripe" style="--team: {{ r.team_color or 'var(--border)' }}">{% if heading == "Driver" %}<a href="/drivers/{{ r.entity_id }}">{{ r.name }}</a>{% else %}<a href="/constructors/{{ r.entity_id }}?season={{ table.season }}">{{ r.name }}</a>{% endif %}{% if r.team %} {% if r.team_id %}<a class="muted small" href="/constructors/{{ r.team_id }}?season={{ table.season }}">{{ r.team }}</a>{% else %}<span class="muted small">{{ r.team }}</span>{% endif %}{% endif %}</td>
   <td class="num">{{ r.points|pts }}</td>
   <td class="num">{{ r.wins }}</td>
   <td class="num muted">{% if r.gap_leader is not none %}{{ "-" if r.gap_leader else "" }}{{ r.gap_leader|pts }}{% else %}—{% endif %}</td>

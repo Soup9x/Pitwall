@@ -30,6 +30,7 @@ from pitwall.models import (
     SESSION_LABELS,
     SESSION_TYPES,
     Circuit,
+    Constructor,
     Driver,
     Event,
     FollowedDriver,
@@ -50,6 +51,7 @@ from pitwall.notify.dispatch import notify as dispatch_notify
 from pitwall.services import (
     circuit_maps,
     circuits_explorer,
+    constructor_stats,
     driver_stats,
     exports,
     ics,
@@ -595,6 +597,54 @@ def export_drivers(
     body = exports.drivers_csv(db, season, [driver] if driver else None, user_id=user.id)
     name = driver or "followed-drivers"
     return _csv_response(body, f"pitwall-{name}-{season}.csv")
+
+
+@private.get("/constructors/{constructor_id}", response_class=HTMLResponse)
+def constructor_page(
+    request: Request,
+    constructor_id: str,
+    season: int | None = None,
+    reveal: bool = False,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
+) -> HTMLResponse:
+    team = db.get(Constructor, constructor_id)
+    if team is None:
+        raise HTTPException(404)
+    seasons = constructor_stats.seasons_for(db, constructor_id)
+    season = season or (seasons[0] if seasons else None)
+    if season and season not in seasons:
+        seasons = sorted({*seasons, season}, reverse=True)
+    held = _held_event(db, user, reveal)
+    # Same rule as driver pages: a season containing held results is hidden as a whole.
+    hide = held is not None and season is not None and season >= held.season
+    data = constructor_stats.season(db, constructor_id, season) if season and not hide else None
+    chart, legend = "", []
+    if data and data.rounds:
+        labels = [(r.event.circuit.locality or r.event.short_name)[:3].upper() for r in data.rounds]
+        series = [(team.name, [r.cumulative for r in data.rounds])] + [
+            (d.driver.full_name, d.cumulative) for d in data.drivers if d.races
+        ]
+        chart = driver_stats.trend_svg(series, labels)
+        colors = driver_stats.TREND_COLORS
+        legend = [(name, colors[i % len(colors)]) for i, (name, _) in enumerate(series)]
+    return page(
+        request,
+        "constructor.html",
+        db,
+        user,
+        team=team,
+        season=season,
+        seasons=seasons,
+        data=data,
+        chart=chart,
+        legend=legend,
+        history=constructor_stats.history(
+            db, constructor_id, upto_season=held.season - 1 if held is not None else None
+        ),
+        followed={f.driver_id for f in _followed(db, user)},
+        held_event=held if hide else None,
+    )
 
 
 @private.get("/drivers/{driver_id}", response_class=HTMLResponse)
