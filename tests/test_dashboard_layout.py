@@ -74,7 +74,7 @@ def test_rearranging_via_the_dashboard(client, db, season):  # noqa: F811
     assert "Rearrange cards" in page and "card-tools" not in page and "dashboard.js" not in page
     assert _cards(page)[:2] == ["hero", "drivers"]
     editing = client.get("/?edit=1").text
-    assert 'class="card-tools"' in editing and '<script src="/static/dashboard.js">' in editing
+    assert 'class="card-tools"' in editing and '<script src="/static/dashboard.js?v=' in editing
     assert 'draggable="true"' in editing
     visible = ",".join(_cards(editing))
     r = client.post(

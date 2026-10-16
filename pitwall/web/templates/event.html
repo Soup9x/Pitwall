@@ -196,7 +196,7 @@
 {% endif %}
 {% endblock %}
 {% block scripts %}{% if temp_chart or quali_chart %}
-<script src="/static/vendor/chart.umd.min.js"></script>
+<script src="{{ static_url('vendor/chart.umd.min.js') }}"></script>
 {% endif %}
-<script src="/static/charts.js"></script>
+<script src="{{ static_url('charts.js') }}"></script>
 {% endblock %}

@@ -188,3 +188,14 @@ def test_email_layout(db, mexico):
     assert 'width="600"' in msg.html and "max-width:600px" in msg.html
     assert "background:#F6F7F9" in msg.html and "<script" not in msg.html
     assert msg.text and "<" not in msg.text.splitlines()[0]
+
+
+def test_static_files_are_versioned_so_updates_reach_browsers(client):
+    _login(client)
+    page = client.get("/").text
+    css = re.search(r'href="(/static/style\.css\?v=[0-9a-f]{12})"', page)
+    assert css and re.search(r'src="/static/app\.js\?v=[0-9a-f]{12}"', page)
+    versioned = client.get(css[1])
+    assert versioned.status_code == 200 and "immutable" in versioned.headers["cache-control"]
+    assert client.get("/static/style.css").headers["cache-control"] == "no-cache"
+    assert 'class="sr-only">Account' not in page and 'aria-label="Account (admin)"' in page

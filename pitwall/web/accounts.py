@@ -187,6 +187,8 @@ def account(
         kiosk_url=f"{env.base_url.rstrip('/')}/kiosk?token={user.kiosk_token}"
         if user.kiosk_token
         else None,
+        # Relative, so "Open kiosk" works whatever address you're browsing Pitwall on.
+        kiosk_path=f"/kiosk?token={user.kiosk_token}" if user.kiosk_token else None,
         error=request.session.pop("account_error", None),
     )
 

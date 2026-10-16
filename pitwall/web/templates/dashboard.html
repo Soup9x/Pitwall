@@ -165,4 +165,4 @@
   {% for key in card_order %}{{ cards[key]() }}{% endfor %}
 </div>
 {% endblock %}
-{% block scripts %}{% if edit %}<script src="/static/dashboard.js"></script>{% endif %}{% endblock %}
+{% block scripts %}{% if edit %}<script src="{{ static_url('dashboard.js') }}"></script>{% endif %}{% endblock %}

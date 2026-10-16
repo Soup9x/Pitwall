@@ -573,7 +573,9 @@ screen turned to portrait.
   `localhost`, so over plain `http://` on your LAN, turn screen blanking off on the device
   (below).
 
-**Get the link:** Account → Kiosk display → **Create a kiosk link**. You can add options to the
+**Get the link:** Account → Kiosk display → **Create a kiosk link**. **Open kiosk ↗** then
+opens it in a new tab on the device you're using (press F11 for full screen). For a TV or
+Raspberry Pi, copy the link under **Show my kiosk link** to that device. You can add options to the
 end of the link:
 
 | Option | What it does |

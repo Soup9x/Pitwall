@@ -72,9 +72,8 @@ def test_page_is_read_only_and_self_contained(client, mexico):
     assert "<a " not in html and "<form" not in html  # no links into the app
     assert 'class="kiosk portrait"' in html
     for tag in re.findall(r"<script\b[^>]*>", html):
-        assert tag in (
-            '<script type="application/json" id="kiosk-data">',
-            '<script src="/static/kiosk.js">',
+        assert tag == '<script type="application/json" id="kiosk-data">' or re.fullmatch(
+            r'<script src="/static/kiosk\.js\?v=[0-9a-f]{12}">', tag
         )
     assert r.headers["cache-control"] == "no-store"
     assert r.headers["referrer-policy"] == "no-referrer"
@@ -138,6 +137,7 @@ def test_account_page_creates_regenerates_and_turns_off(client, db, mexico):
     assert first and len(first) >= 32
     page = client.get("/account").text
     assert f"/kiosk?token={first}" in page and "contains a secret" in page
+    assert f'href="/kiosk?token={first}" target="_blank"' in page  # "Open kiosk" button
     client.post("/account/kiosk", data={"csrf_token": csrf})
     db.expire_all()
     second = db.get(User, 1).kiosk_token
