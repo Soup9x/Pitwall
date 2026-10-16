@@ -34,7 +34,6 @@
         <h3>Penalty alerts</h3>
         {% for p in hero.grid %}<div class="alert-line"><span aria-hidden="true">⚠️</span><span><strong>{{ p.driver.code or p.driver.family_name }}</strong> {{ describe_grid(p) }}</span></div>{% endfor %}
         {% for p in hero.licence %}<div class="alert-line"><span aria-hidden="true">{{ '⛔' if p.state == 'ban' else '🟨' }}</span><span><strong>{{ p.driver.code or p.driver.family_name }}</strong> {{ p.total }}/12 licence points{% if p.state == 'ban' %}: race ban{% endif %}</span></div>{% endfor %}
-        <a class="small" href="/penalties">Penalty watch →</a>
       </div>
       {% endif %}
     </div>
@@ -58,7 +57,6 @@
   {% if event_grid %}
   <table>{% for p in event_grid %}<tr><td class="stripe">{{ p.driver.code or p.driver.family_name }}</td><td><strong>{{ describe_grid(p) }}</strong>{% if p.reason %}<div class="muted small">{{ p.reason }}</div>{% endif %}</td></tr>{% endfor %}</table>
   {% else %}<p class="empty">No grid penalties recorded for this event.</p>{% endif %}
-  <a class="small" href="/penalties">Penalty watch →</a>
 </section>
 {% endif %}{% endmacro %}
 

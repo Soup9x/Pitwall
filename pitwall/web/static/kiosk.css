@@ -33,7 +33,6 @@ h2 { margin: 0 0 .6vmin; font-size: 1.6vmin; letter-spacing: .12em; text-transfo
 
 .k-head { grid-area: head; display: flex; align-items: center; gap: 2vmin; padding-bottom: 1vmin; border-bottom: .3vmin solid var(--accent); }
 .k-brand { display: flex; align-items: center; gap: 1vmin; font-weight: 800; font-size: 2.6vmin; letter-spacing: .14em; text-transform: uppercase; }
-.k-brand svg { width: 3.6vmin; height: 3.6vmin; }
 .k-brand .w { color: var(--accent); }
 .k-event { flex: 1; font-size: 2.6vmin; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .k-event .k-sub { color: var(--muted); font-weight: 400; }

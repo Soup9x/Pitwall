@@ -257,6 +257,16 @@
 </div>
 {% endif %}
 
+{% if user.is_admin %}
+<div class="card" id="admin-tools" style="margin-bottom:16px;">
+  <h2>Admin tools</h2>
+  <ul class="small admin-links">
+    <li><a href="/admin/penalties">Penalties</a>: power unit usage, grid penalties, licence points and the FIA documents source. They feed the event pages, the dashboard and penalty alerts.</li>
+    <li><a href="/admin/users">Users and invites</a></li>
+  </ul>
+</div>
+{% endif %}
+
 <div class="grid">
   <div class="card" id="followed">
     <h2>Followed drivers</h2>
