@@ -31,7 +31,7 @@ from pitwall.timeutil import in_window
 log = logging.getLogger(__name__)
 
 MAX_ATTEMPTS = 5
-Sender = Callable[[str, Message], tuple[bool, str]]
+Sender = Callable[[str, Message], tuple[bool | None, str]]
 
 
 def already_sent(db: DB, payload_hash: str, channel: str | None = None) -> bool:
@@ -169,6 +169,8 @@ def flush(db: DB, *, now: datetime | None = None, sender: Sender | None = None) 
                 ok, detail = sender(channel, msg)
             except Exception as exc:  # never let one bad channel break the queue
                 ok, detail = False, f"{type(exc).__name__}: {exc}"
+            if ok is None:
+                continue  # nothing set up on this channel for this user: skip, don't retry
             _log(db, row, channel, "sent" if ok else "failed", detail, now)
             all_ok &= ok
         row.attempts += 1

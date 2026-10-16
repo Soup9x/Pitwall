@@ -1121,9 +1121,13 @@ async def _send_test_email(db: DB, user: User, url: str, to: str) -> tuple[bool,
     return ok, detail
 
 
-def _test_flash(to: str, ok: bool, detail: str) -> str:
+def _test_flash(to: str, ok: bool | None, detail: str) -> str:
     if ok:
-        return f"Test email sent to {to} ✅ — check that it arrived (and the spam folder)."
+        return (
+            f"Test email handed to the mail server for {to} ✅. Check that it arrived (and the "
+            "spam folder). If it never arrives, the receiving server refused it: the sending "
+            "account's inbox will have a bounce message saying why."
+        )
     return f"Test email to {to} failed ❌ — {detail}"
 
 
@@ -1193,8 +1197,16 @@ async def mail_server(
         return back("/settings#mail-error")
     db.commit()
     if action == "test":
-        to = load_settings(db, user.id).notify_email or server.from_addr
-        addresses = mailserver.parse_addresses(to)
+        to = (
+            str(form.get("test_to", "")).strip()
+            or load_settings(db, user.id).notify_email
+            or server.from_addr
+        )
+        try:
+            addresses = mailserver.parse_addresses(to)
+        except targets_svc.TargetError as exc:
+            flash(request, f"Saved, but no test was sent: {exc}")
+            return back("/settings#mail-server")
         ok, detail = await _send_test_email(db, user, server.url(addresses), addresses[0])
         flash(request, "Saved. " + _test_flash(", ".join(addresses), ok, detail))
     else:
