@@ -213,6 +213,7 @@ page's season stats are hidden, as before.
     track time, an odd-hours badge, tyres, forecast with last year's conditions, and
     penalty alerts;
   - a top-10 timing tower with 3-letter codes, team stripe and ▲/▼ changes;
+  - a top-10 constructors tower next to it (★ marks the teams your followed drivers race for);
   - cards for the drivers you follow, and the news strip.
 - **Race weekend mode** (Thursday to the end of the race, track time): the dashboard leads
   with the session timeline, penalties, weather and tyres, then the standings.

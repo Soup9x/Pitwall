@@ -119,12 +119,14 @@
 {%- endmacro %}
 
 {# Timing-screen standings: position, team stripe + 3-letter code, points, gap, ▲/▼ change. #}
-{% macro timing_tower(table, limit=10) -%}
-<ol class="tower" aria-label="Top {{ limit }} drivers">
-{% for r in table.rows[:limit] %}
-  <li class="{{ 'followed' if r.followed else '' }}">
+{# Constructors show the full team name; `followed_teams` marks teams a followed driver races for. #}
+{% macro timing_tower(table, limit=10, followed_teams=()) -%}
+{% set teams = table.kind == "constructor" %}
+<ol class="tower{{ ' teams' if teams else '' }}" aria-label="Top {{ limit }} {{ 'constructors' if teams else 'drivers' }}">
+{% for r in table.rows[:limit] %}{% set fol = r.followed or (teams and r.entity_id in followed_teams) %}
+  <li class="{{ 'followed' if fol else '' }}">
     <span class="t-pos mono">{{ r.position }}</span>
-    <span class="t-drv stripe" style="--team: {{ r.team_color or 'var(--border)' }}"><a href="/drivers/{{ r.entity_id }}" title="{{ r.name }}{% if r.team %}, {{ r.team }}{% endif %}">{{ r.code or r.name.split(' ')[-1][:3]|upper }}</a>{% if r.followed %}<span class="sr-only"> (followed)</span> <span aria-hidden="true">★</span>{% endif %}</span>
+    <span class="t-drv stripe" style="--team: {{ r.team_color or 'var(--border)' }}">{% if teams %}<a href="/constructors/{{ r.entity_id }}?season={{ table.season }}">{{ r.name }}</a>{% else %}<a href="/drivers/{{ r.entity_id }}" title="{{ r.name }}{% if r.team %}, {{ r.team }}{% endif %}">{{ r.code or r.name.split(' ')[-1][:3]|upper }}</a>{% endif %}{% if fol %}<span class="sr-only"> ({{ 'a followed driver races here' if teams else 'followed' }})</span> <span aria-hidden="true">★</span>{% endif %}</span>
     <span class="t-pts mono">{{ r.points|pts }}</span>
     <span class="t-gap mono muted">{% if r.gap_leader %}−{{ r.gap_leader|pts }}{% else %}Leader{% endif %}</span>
     <span class="t-chg mono {{ 'up' if r.change and r.change > 0 else ('down' if r.change and r.change < 0 else 'same') }}" title="{% if r.change %}{{ 'Up' if r.change > 0 else 'Down' }} {{ r.change|abs }} since the previous round{% else %}No change{% endif %}">{{ r.arrow }}</span>
