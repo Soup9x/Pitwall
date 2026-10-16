@@ -5,6 +5,17 @@
 <h1>{{ event.name }} {% if event.is_sprint_weekend %}<span class="badge sprint">SPRINT WEEKEND</span>{% endif %}{% if event.status == 'cancelled' %} <span class="badge cancelled">CANCELLED</span>{% endif %}</h1>
 <p class="sub">{{ event.season }} · Round {{ event.round }} · {{ event.circuit.name }}, {{ event.circuit.locality }}, {{ event.circuit.country }}</p>
 
+{% if tabs|length > 1 %}
+<nav class="page-tabs" aria-label="Event sections">
+  {% for key, label in tabs %}{% set q = ([] if key == 'overview' else ['tab=' ~ key]) + (['reveal=1'] if reveal else []) %}
+  <a href="/events/{{ event.id }}{% if q %}?{{ q|join('&') }}{% endif %}"{% if key == tab %} aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>
+{% endif %}
+
+{% if tab != 'overview' %}
+{% include "_qualifying.html" %}
+{% else %}
 <div class="grid">
   <section class="card wide" id="sessions">
     <div class="section-head"><h2>Weekend</h2>{{ fresh_badge(fresh.jolpica) }}</div>
@@ -182,8 +193,9 @@
   {% endif %}
 
 </div>
+{% endif %}
 {% endblock %}
-{% block scripts %}{% if temp_chart %}
+{% block scripts %}{% if temp_chart or quali_chart %}
 <script src="/static/vendor/chart.umd.min.js"></script>
 {% endif %}
 <script src="/static/charts.js"></script>

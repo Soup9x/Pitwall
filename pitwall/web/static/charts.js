@@ -201,3 +201,109 @@
     });
   });
 })();
+
+// Qualifying gap to pole (event page): horizontal bars in qualifying order, team colours,
+// followed drivers' codes in bold. The pole sitter has a zero-length bar.
+(function () {
+  if (typeof Chart === "undefined") return;
+  var canvas = document.querySelector("canvas[data-chart='quali-gap']");
+  if (!canvas) return;
+  var data;
+  try { data = JSON.parse(document.getElementById(canvas.dataset.src).textContent); } catch (e) { return; }
+  var css = getComputedStyle(document.documentElement);
+  var muted = css.getPropertyValue("--muted").trim();
+  var grid = css.getPropertyValue("--border").trim();
+  var text = css.getPropertyValue("--text").trim();
+  var accent = css.getPropertyValue("--accent").trim();
+  var mono = css.getPropertyValue("--font-mono").trim() || "monospace";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var box = canvas.closest("[data-skeleton]");
+  if (box) box.classList.remove("skeleton");
+  new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: data.labels,
+      datasets: [{
+        data: data.gaps,
+        backgroundColor: data.colors.map(function (c) { return c || accent; }),
+        borderWidth: 0, barThickness: 12,
+      }],
+    },
+    options: {
+      indexAxis: "y",
+      animation: reduce ? false : { duration: 400 },
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: function (items) { return data.names[items[0].dataIndex]; },
+            label: function (item) {
+              var i = item.dataIndex;
+              return i === 0 && data.gaps[i] === 0 ? "Pole" : "+" + data.gaps[i].toFixed(3) + " s (" + data.pct[i].toFixed(2) + "%)";
+            },
+          },
+        },
+      },
+      scales: {
+        x: { beginAtZero: true, title: { display: true, text: "seconds behind pole", color: muted },
+             ticks: { color: muted }, grid: { color: grid } },
+        y: { grid: { display: false },
+             ticks: {
+               autoSkip: false,
+               color: function (ctx) { return data.followed[ctx.index] ? text : muted; },
+               font: function (ctx) { return { family: mono, size: 11, weight: data.followed[ctx.index] ? "bold" : "normal" }; },
+             } },
+      },
+    },
+  });
+})();
+
+// Driver page: qualifying position at each round (P1 at the top). Point style shows the
+// segment reached, so it doesn't rely on colour.
+(function () {
+  if (typeof Chart === "undefined") return;
+  var canvas = document.querySelector("canvas[data-chart='quali-pos']");
+  if (!canvas) return;
+  var rounds;
+  try { rounds = JSON.parse(document.getElementById(canvas.dataset.src).textContent); } catch (e) { return; }
+  var css = getComputedStyle(document.documentElement);
+  var muted = css.getPropertyValue("--muted").trim();
+  var grid = css.getPropertyValue("--border").trim();
+  var accent = css.getPropertyValue("--accent").trim();
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var styles = { 3: "circle", 2: "rectRot", 1: "triangle" };
+  var stage = { 3: "reached Q3", 2: "out in Q2", 1: "out in Q1" };
+  var box = canvas.closest("[data-skeleton]");
+  if (box) box.classList.remove("skeleton");
+  new Chart(canvas, {
+    type: "line",
+    data: {
+      labels: rounds.map(function (r) { return r.label; }),
+      datasets: [{
+        data: rounds.map(function (r) { return r.position; }),
+        borderColor: accent, backgroundColor: accent, borderWidth: 2, spanGaps: false, tension: 0,
+        pointStyle: rounds.map(function (r) { return styles[r.reached]; }),
+        pointRadius: 4, pointHoverRadius: 6,
+      }],
+    },
+    options: {
+      animation: reduce ? false : { duration: 400 },
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: function (items) { var r = rounds[items[0].dataIndex]; return "Round " + r.round + " · " + r.name; },
+            label: function (item) { var r = rounds[item.dataIndex]; return "P" + r.position + ", " + stage[r.reached]; },
+          },
+        },
+      },
+      scales: {
+        x: { ticks: { color: muted, maxRotation: 0, autoSkipPadding: 8 }, grid: { color: grid } },
+        y: { reverse: true, min: 1, suggestedMax: 20, ticks: { color: muted, stepSize: 5, callback: function (v) { return "P" + v; } },
+             grid: { color: grid } },
+      },
+    },
+  });
+})();

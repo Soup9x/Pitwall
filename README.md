@@ -123,6 +123,39 @@ Spoiler mode covers all of this. While an event is held, its race control, the p
 decisions and headlines published after its first competitive session started are left out
 of pages and emails. Pages show "N headlines hidden" and a **Show anyway** link.
 
+## Charts and qualifying
+
+- **Season progression** (Standings page): each driver's or team's points after every
+  round, for any season you pick.
+  - Switch between drivers and constructors, show the top 5 only (the default on phones), or
+    plot the gap to the leader instead of points.
+  - Followed drivers (and their teams) are drawn in team colour with their code at the end
+    of the line; everyone else is grey. ⚡ marks sprint weekends, whose sprint points count in
+    that round.
+  - Points come only from the official standings after each round. Pitwall stores the
+    current season's standings as it goes. For rounds it doesn't have yet (older seasons, or
+    a round from before you installed it), a background job fetches them from Jolpica, a
+    few dozen requests an hour. Until then those rounds are a gap in the line, marked
+    "Downloading round N", and are never estimated.
+- **Qualifying tab** on each event page, once qualifying has started:
+  - Q1/Q2/Q3 times, with the fastest time in each segment in purple and marked ◆;
+  - drivers grouped into the top segment, "Out in Q2" and "Out in Q1", each with their gap
+    to the cut-off (the slowest time that went through). Eliminations are worked out from
+    the times (no Q2 time means out in Q1), so it works for any grid size, including 22 cars;
+  - gap to pole in seconds and %, the gap to the teammate (in the last segment both set a
+    time in), and the improvement from one segment to the next;
+  - a "Started" column with the race grid where it differs from the qualifying result
+    (after the race, e.g. because of a grid penalty);
+  - a gap-to-pole bar chart in team colours.
+  Sprint qualifying gets its own tab only when its times are available. Jolpica doesn't
+  publish them at the moment, so usually there's no tab.
+- **Driver pages** add the season's average qualifying position, Q3 appearances and a chart
+  of the qualifying position at each round.
+
+Spoiler mode covers these too. While an event is held, the progression chart stops at the
+round before it, the qualifying tab shows only the "Show anyway" notice, and the driver
+page's season stats are hidden, as before.
+
 ## Look and feel
 
 - **Timing-screen design**, dark by default. Switch between **System**, **Light** and
@@ -144,7 +177,8 @@ of pages and emails. Pages show "N headlines hidden" and a **Show anyway** link.
 - **Race weekend mode** (Thursday to the end of the race, track time): the dashboard leads
   with the session timeline, penalties, weather and tyres, then the standings.
 - **Event page**: session timeline first, then the track card, penalties, race control,
-  conditions, track updates and results.
+  conditions, track updates and results. A **Qualifying** tab has the full breakdown (see
+  above).
 - **Penalty watch**: power unit usage as pips (yellow at the limit, red over it) and licence
   points as bars out of 12 (yellow from 8, red from 10), with the numbers and words too.
 - **Freshness badges** on data sections ("Synced 12m ago"), with ▲ in yellow when stale and

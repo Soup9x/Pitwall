@@ -1,0 +1,50 @@
+{# Qualifying breakdown tab. `quali` is a services.qualifying.Breakdown (None if no times). #}
+{% from "_macros.html" import fresh_badge, spoiler_notice %}
+<section class="card" id="quali">
+{% if spoiler_hidden %}
+  {{ spoiler_notice(event, "/events/" ~ event.id ~ "?tab=" ~ tab ~ "&reveal=1") }}
+{% elif not quali %}
+  <p class="empty">No qualifying times yet.</p>
+{% else %}{% set b = quali %}{% set segs = b.names[:b.segments] %}
+  <div class="section-head"><h2>{{ b.label }}</h2>{{ fresh_badge(fresh.jolpica) }}</div>
+  {% if b.pole %}<p class="q-pole">Pole: <strong>{{ b.pole.driver.full_name }}</strong> <span class="muted">{{ b.pole.team or '' }}</span> <span class="mono">{{ b.pole.texts[b.pole.reached - 1] or '' }}</span></p>{% endif %}
+  <p class="muted small"><span class="q-fast">◆</span> fastest time in that segment. Gaps to pole use each driver's best lap from any segment; teammates are compared in the last segment they both set a time in.</p>
+  <div class="table-scroll"><table class="quali">
+    <thead><tr>
+      <th class="num">Pos</th><th>Driver</th>
+      {% for s in segs %}<th class="num">{{ s }}</th>{% endfor %}
+      <th class="num">Gap to pole</th><th class="num">To cut-off</th><th>Teammate</th><th>Improvement</th>
+      {% if b.has_grid %}<th class="num">Started</th>{% endif %}
+    </tr></thead>
+    {% for name, rows in b.groups %}
+    <tbody>
+      <tr class="q-group"><th colspan="{{ 6 + segs|length + (1 if b.has_grid else 0) }}" scope="rowgroup"><span class="q-gl">{{ name }}
+        {% if name.startswith('Out in') and b.cutoff_text(rows[0].reached - 1) %}<span class="muted small">· slowest time through: <span class="mono">{{ b.cutoff_text(rows[0].reached - 1) }}</span></span>{% endif %}</span></th></tr>
+      {% for r in rows %}
+      <tr class="{{ 'followed' if r.driver.id in followed else '' }}">
+        <td class="num">{{ r.position_text or r.position or '–' }}</td>
+        <td class="stripe" style="--team: {{ r.color or 'var(--border)' }}"><a href="/drivers/{{ r.driver.id }}?season={{ event.season }}" title="{{ r.driver.full_name }}{% if r.team %}, {{ r.team }}{% endif %}"><span class="mono">{{ r.code }}</span></a> <span class="q-name">{{ r.driver.full_name }}</span></td>
+        {% for s in segs %}{% set i = loop.index0 %}
+        <td class="num mono{{ ' q-best' if r.fastest[i] else '' }}">{% if r.texts[i] %}{{ r.texts[i] }}{% if r.fastest[i] %} <span class="q-fast" title="Fastest in {{ s }}">◆</span><span class="sr-only"> (fastest in {{ s }})</span>{% endif %}{% elif i < r.reached %}<span class="muted small">no time</span>{% endif %}</td>
+        {% endfor %}
+        <td class="num mono">{% if r.gap_pole is none %}–{% elif r is sameas b.pole %}<span class="muted">pole</span>{% else %}{{ '%+.3f'|format(r.gap_pole) }}<span class="muted small"> {{ '%.2f'|format(r.gap_pole_pct) }}%</span>{% endif %}</td>
+        <td class="num mono">{% if r.gap_cutoff is not none %}{{ '%+.3f'|format(r.gap_cutoff) }}{% endif %}</td>
+        <td class="small">{% if r.teammate_gap is not none %}<span class="mono {{ 'up' if r.teammate_gap < 0 else ('down' if r.teammate_gap > 0 else 'same') }}">{{ '%+.3f'|format(r.teammate_gap) }}</span> {{ r.teammate.code or r.teammate.family_name }} <span class="muted">{{ r.teammate_segment }}</span>{% endif %}</td>
+        <td class="small mono">{% for label, d in r.improvements %}<span class="q-imp">{{ label }} {{ '%+.3f'|format(d) }}</span>{% endfor %}</td>
+        {% if b.has_grid %}<td class="num">{% if r.grid_text %}{{ r.grid_text }}{% if r.grid %} <span class="muted small">({{ '%+d'|format(r.grid - r.position) }})</span>{% endif %}{% endif %}</td>{% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% endfor %}
+  </table></div>
+  {% if b.has_grid %}<p class="muted small">"Started" shows the {{ 'sprint' if b.session.type == 'SQ' else 'race' }} grid where it differs from the qualifying result, e.g. after a grid penalty (+ is further back).</p>{% endif %}
+{% endif %}
+</section>
+{% if quali_chart %}
+<section class="card" id="quali-gap" style="margin-top:16px;">
+  <h2>Gap to pole</h2>
+  <div class="chart-box skeleton" data-skeleton style="height: {{ 60 + 20 * quali.timed }}px;"><canvas data-chart="quali-gap" data-src="quali-chart-data" role="img" aria-label="Bar chart: each driver's gap to pole in seconds"></canvas></div>
+  <script type="application/json" id="quali-chart-data">{{ quali_chart|safe }}</script>
+  <p class="muted small">Seconds behind the pole lap. Followed drivers are labelled in bold.</p>
+</section>
+{% endif %}
