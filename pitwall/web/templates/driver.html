@@ -35,6 +35,18 @@
     {{ chart|safe }}
   </div>
 </div>
+{% if quali %}
+<div class="card" id="quali" style="margin-top:16px;">
+  <h2>{{ season }} qualifying</h2>
+  <dl class="facts">
+    <dt>Average position</dt><dd>{{ quali.avg_position if quali.avg_position is not none else '—' }}</dd>
+    <dt>Q3 appearances</dt><dd>{{ quali.q3 }} of {{ quali.sessions }}</dd>
+  </dl>
+  <div class="chart-box skeleton" data-skeleton><canvas data-chart="quali-pos" data-src="quali-pos-data" role="img" aria-label="Qualifying position at each round"></canvas></div>
+  <script type="application/json" id="quali-pos-data">{{ quali_chart|safe }}</script>
+  <p class="muted small">Qualifying position by round (P1 at the top). Markers show how far they got: ● Q3, ◆ out in Q2, ▲ out in Q1.</p>
+</div>
+{% endif %}
 <div class="card table-scroll" style="margin-top:16px;">
   <h2>Race by race</h2>
   <table>
@@ -62,3 +74,7 @@
 </div>
 {% endif %}
 {% endblock %}
+{% block scripts %}{% if quali and not held_event %}
+<script src="/static/vendor/chart.umd.min.js"></script>
+<script src="/static/charts.js"></script>
+{% endif %}{% endblock %}

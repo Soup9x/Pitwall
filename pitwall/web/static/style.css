@@ -126,7 +126,7 @@ nav.main a[aria-current="page"] { color: var(--text); border-bottom-color: var(-
 .section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 
 /* ---------------------------------------------------------------- tables */
-.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-scroll { overflow-x: auto; position: relative; -webkit-overflow-scrolling: touch; }
 table { width: 100%; border-collapse: collapse; font-size: 15px; }
 th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
 th { color: var(--muted); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
@@ -314,3 +314,35 @@ ol.tower li.followed { background: var(--hl); }
 .fcard dt { color: var(--muted); } .fcard dd { margin: 0; }
 .pu-cell { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .theme-switch svg { display: block; }
+
+/* ---------------------------------------------------------------- charts (step 4) */
+.chart-box.tall { height: 420px; }
+@media (max-width: 640px) { .chart-box.tall { height: 340px; } }
+.chart-controls { gap: 6px 14px; align-items: center; font-size: 14px; }
+.chart-controls label { display: inline-flex; align-items: center; margin: 0; color: var(--text); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.seg label { padding: 4px 10px; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.seg label:has(input:checked) { background: var(--surface-2); font-weight: 700; }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--link); outline-offset: -2px; }
+
+/* ---------------------------------------------------------------- event tabs + qualifying */
+.page-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: 4px 0 16px; overflow-x: auto; }
+.page-tabs a { color: var(--muted); padding: 8px 12px; font-weight: 600; border-bottom: 2px solid transparent; white-space: nowrap; }
+.page-tabs a:hover { color: var(--text); text-decoration: none; }
+.page-tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
+.q-pole { margin: 0 0 4px; }
+table.quali td, table.quali th { white-space: nowrap; }
+table.quali tr.q-group th { text-align: left; padding-top: 14px; font-size: .8rem; letter-spacing: .06em; text-transform: uppercase; color: var(--text); border-bottom: 1px solid var(--border); }
+table.quali .q-best { color: var(--timing-purple); font-weight: 700; }
+.q-fast { color: var(--timing-purple); font-size: .75em; }
+.q-imp { display: block; line-height: 1.35; }
+@media (max-width: 640px) {
+  table.quali .q-name { display: none; }
+  /* Keep position and driver in view while the times scroll sideways. */
+  table.quali tr:not(.q-group) > :nth-child(-n+2) { position: sticky; z-index: 1; background: var(--surface); }
+  table.quali tr:not(.q-group) > :first-child { left: 0; min-width: 2.6em; }
+  table.quali tr:not(.q-group) > :nth-child(2) { left: 2.6em; }
+  table.quali tr.q-group .q-gl { position: sticky; left: 8px; }
+  table.quali tr.followed > td:nth-child(-n+2) { background: linear-gradient(var(--hl), var(--hl)), var(--surface); }
+}

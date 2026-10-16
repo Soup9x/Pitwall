@@ -10,6 +10,26 @@
   </select></form>
   {% endif %}
 </div>
+{% if progression_chart %}
+<section class="card" id="progression" style="margin-bottom:16px;">
+  <div class="section-head">
+    <h2>Season progression</h2>
+    <div class="row chart-controls" role="group" aria-label="Chart options">
+      <div class="seg" role="radiogroup" aria-label="Championship">
+        <label><input type="radio" name="prog-kind" value="driver" checked data-prog="kind"> Drivers</label>
+        <label><input type="radio" name="prog-kind" value="constructor" data-prog="kind"> Constructors</label>
+      </div>
+      <label><input type="checkbox" data-prog="top5"> Top 5 only</label>
+      <label><input type="checkbox" data-prog="gap"> Gap to leader</label>
+    </div>
+  </div>
+  <div class="chart-box tall skeleton" data-skeleton><canvas data-chart="progression" data-src="progression-data" role="img" aria-label="Cumulative championship points after each round of {{ season }}"></canvas></div>
+  <p class="muted small">Points after each round from the official standings. ⚡ marks a sprint weekend (sprint points count in that round). Followed drivers are drawn in their team colour and labelled; everyone else is grey. Hover or tap a line for details.</p>
+  {% if chart_held %}<p class="spoiler-notice small">🙈 The chart stops before {{ chart_held.name }} until you mark it as watched. <a href="/standings?season={{ season }}&amp;reveal=1#progression" rel="nofollow">Show anyway</a></p>{% endif %}
+  {% if progression_missing %}<p class="small"><span class="fresh stale"><span aria-hidden="true">▲</span> Downloading round{{ 's' if progression_missing|length != 1 }} {{ progression_missing|join(', ') }}</span> <span class="muted">— they're left out until then, never estimated.</span></p>{% endif %}
+  <script type="application/json" id="progression-data">{{ progression_chart|safe }}</script>
+</section>
+{% endif %}
 {% if held_event %}
 <div class="card">{{ spoiler_notice(held_event, "/standings?season=" ~ season ~ "&reveal=1") }}</div>
 {% elif not drivers %}
@@ -36,3 +56,7 @@
   <a href="/export/drivers.csv?season={{ season }}">followed drivers' races</a></p>
 {% endif %}
 {% endblock %}
+{% block scripts %}{% if progression_chart %}
+<script src="/static/vendor/chart.umd.min.js"></script>
+<script src="/static/charts.js"></script>
+{% endif %}{% endblock %}

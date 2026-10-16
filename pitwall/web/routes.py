@@ -52,6 +52,8 @@ from pitwall.services import (
     head_to_head,
     ics,
     news,
+    progression,
+    qualifying,
     reminders,
     spoilers,
     standings,
@@ -274,6 +276,7 @@ def event_page(
     request: Request,
     event_id: int,
     reveal: bool = False,
+    tab: str = "overview",
     db: DB = Depends(get_db),
     user: User = Depends(require_user),
 ) -> HTMLResponse:
@@ -282,6 +285,10 @@ def event_page(
         raise HTTPException(404)
     settings = load_settings(db, user.id)
     hidden = not reveal and _spoiler_hidden(db, event, user)
+    followed = {f.driver_id for f in _followed(db, user)}
+    tabs, quali, quali_chart = _quali_tabs(db, event, hidden, tab, followed)
+    if tab not in {t[0] for t in tabs}:
+        tab = "overview"
     # Trivia uses the latest results (milestones, streaks), so it waits for any held event.
     held = _held_event(db, user, reveal)
     results: list[dict[str, Any]] = []
@@ -297,7 +304,6 @@ def event_page(
         )
         if rows:
             results.append({"session": sess, "label": SESSION_LABELS[sess.type], "rows": rows})
-    followed = {f.driver_id for f in _followed(db, user)}
     return page(
         request,
         "event.html",
@@ -317,8 +323,33 @@ def event_page(
         watched=outbox.is_watched(db, event.id, user.id),
         spoiler_hidden=hidden and spoilers.results_arrived_at(db, event.id) is not None,
         held_event=held,
+        tab=tab,
+        tabs=tabs,
+        quali=quali,
+        quali_chart=quali_chart,
+        reveal=reveal,
         **racedata.event_context(db, event, user, settings, reveal),
     )
+
+
+def _quali_tabs(
+    db: DB, event: Event, hidden: bool, tab: str, followed: set[str]
+) -> tuple[list[tuple[str, str]], qualifying.Breakdown | None, str]:
+    """The event page's tabs. Qualifying appears once the session has started (while results
+    are held it only shows the spoiler notice); sprint qualifying only when its times exist."""
+    now = utcnow()
+    tabs = [("overview", "Overview")]
+    started = {s.type for s in event.sessions if s.start_utc and s.start_utc <= now}
+    with_data = [] if hidden else qualifying.sessions_with_data(db, event)
+    if "SQ" in {s.type for s in with_data}:
+        tabs.append(("sprint-qualifying", "Sprint qualifying"))
+    if "Q" in started or any(s.type == "Q" for s in with_data):
+        tabs.append(("qualifying", "Qualifying"))
+    want = {"qualifying": "Q", "sprint-qualifying": "SQ"}.get(tab)
+    sess = next((s for s in with_data if s.type == want), None)
+    b = qualifying.breakdown(db, sess) if sess is not None else None
+    chart = racedata.script_json(qualifying.chart_data(b, followed)) if b and b.pole else ""
+    return tabs, b, chart
 
 
 @private.post("/events/{event_id}/watched")
@@ -384,10 +415,17 @@ def standings_page(
     db: DB = Depends(get_db),
     user: User = Depends(require_user),
 ) -> HTMLResponse:
-    seasons = list(
-        db.scalars(
-            select(StandingsSnapshot.season).distinct().order_by(StandingsSnapshot.season.desc())
-        )
+    seasons = sorted(
+        set(db.scalars(select(StandingsSnapshot.season).distinct()))
+        | set(
+            db.scalars(
+                select(Event.season)
+                .join(Session, Session.event_id == Event.id)
+                .where(Session.type == "RACE", Session.results_fetched_at.is_not(None))
+                .distinct()
+            )
+        ),
+        reverse=True,
     )
     season = season or (seasons[0] if seasons else None)
     held = _held_event(db, user, reveal)
@@ -396,6 +434,23 @@ def standings_page(
     if season and not hide:
         drivers = standings.table(db, season, "driver", user_id=user.id)
         constructors = standings.table(db, season, "constructor", user_id=user.id)
+    chart = None
+    missing: list[int] = []
+    if season:
+        # Spoiler mode: the chart stops at the round before the held event.
+        upto = held.round - 1 if held is not None and held.season == season else None
+        if held is not None and held.season < season:
+            upto = 0
+        data = {
+            kind: progression.build(db, season, kind, user_id=user.id, upto_round=upto)
+            for kind in progression.KINDS
+        }
+        missing = sorted(set(data["driver"]["missing"]) | set(data["constructor"]["missing"]))
+        if missing:
+            progression.request(db, season)
+            db.commit()
+        if data["driver"]["series"] or data["constructor"]["series"]:
+            chart = racedata.script_json(data)
     return page(
         request,
         "standings.html",
@@ -411,6 +466,9 @@ def standings_page(
             if season and not hide and (tm := title_math.for_season(db, season, k))
         ],
         held_event=held if hide else None,
+        progression_chart=chart,
+        progression_missing=missing,
+        chart_held=held if held is not None and held.season <= (season or 0) else None,
     )
 
 
@@ -522,6 +580,7 @@ def driver_page(
             [(driver.full_name, [r.cumulative for r in data.rows])],
             [r.event.circuit.locality or r.event.short_name for r in data.rows],
         )
+    quali = qualifying.driver_season(db, driver_id, season) if season and not hide else None
     return page(
         request,
         "driver.html",
@@ -532,6 +591,8 @@ def driver_page(
         seasons=seasons,
         data=data,
         chart=chart,
+        quali=quali,
+        quali_chart=racedata.script_json(quali.rounds) if quali else "",
         followed=db.get(FollowedDriver, (user.id, driver_id)) is not None,
         held_event=held if hide else None,
     )

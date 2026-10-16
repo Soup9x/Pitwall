@@ -55,7 +55,7 @@ def _chart_json(cond: Any, label: str, unit: str) -> str | None:
     if len(points) < 2:
         return None
     to_f = unit == "F"
-    return _script_json(
+    return script_json(
         {
             "label": f"Track temperature, {label}",
             "unit": "°F" if to_f else "°C",
@@ -64,7 +64,7 @@ def _chart_json(cond: Any, label: str, unit: str) -> str | None:
     )
 
 
-def _script_json(data: Any) -> str:
+def script_json(data: Any) -> str:
     """JSON safe to place inside <script type="application/json">."""
     return json.dumps(data).replace("<", "\\u003c")
 

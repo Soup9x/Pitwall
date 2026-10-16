@@ -125,6 +125,15 @@ def install_recurring_jobs(sched: Any) -> None:
         name="News headlines from RSS feeds (every 30 min)",
     )
     sched.add_job(
+        "pitwall.jobs:progression_job",
+        "interval",
+        hours=1,
+        id="progression",
+        replace_existing=True,
+        next_run_time=now + timedelta(minutes=6),
+        name="Per-round standings for the season chart (hourly)",
+    )
+    sched.add_job(
         "pitwall.jobs:weather_sync_job",
         "interval",
         hours=3,
