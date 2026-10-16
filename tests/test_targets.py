@@ -228,7 +228,10 @@ def test_bad_target_shows_error_and_saves_nothing(client, db):
             "discord_url": "https://example.com/nope",
         },
     )
-    assert "Couldn&#39;t add webhook" in r.text
+    # The error sits next to the webhook form (the page scrolls there), not only at the top.
+    assert 'id="channel-error-webhook"' in r.text
+    assert "Couldn't add the webhook: That doesn&#39;t look like a Discord" in r.text
+    assert '<option value="discord" selected>' in r.text
     assert db.scalars(select(NotificationTarget)).first() is None
 
 
@@ -250,3 +253,80 @@ def test_secret_parts_are_redacted_from_logs(capsys):
     line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert PW not in line["msg"] and "p%40ss" not in line["msg"]
     logging.getLogger().handlers.clear()
+
+
+def test_smtp_relay_without_login_and_security_modes():
+    relay = build(
+        "email",
+        "smtp",
+        {"smtp_host": "192.168.1.10", "smtp_port": "25", "from_addr": "pitwall@home.lan"},
+    )
+    p = parsed(relay.url)
+    assert (p.smtp_host, p.port, p.user, p.secure) == ("192.168.1.10", 25, None, False)
+    starttls = parsed(
+        build(
+            "email",
+            "smtp",
+            {
+                "smtp_host": "smtp://Mail.Example.org:587/",
+                "username": "u",
+                "password": PW,
+                "from_addr": "a@example.org",
+            },
+        ).url
+    )
+    assert (starttls.smtp_host, starttls.port, starttls.secure_mode) == (
+        "Mail.Example.org",
+        587,
+        "starttls",
+    )
+    assert starttls.password == PW
+    ssl = parsed(
+        build(
+            "email",
+            "smtp",
+            {
+                "smtp_host": "mail.example.org",
+                "smtp_security": "ssl",
+                "username": "u",
+                "password": "p",
+                "from_addr": "a@example.org",
+            },
+        ).url
+    )
+    assert (ssl.port, ssl.secure_mode) == (465, "ssl")
+    with pytest.raises(TargetError, match="both a username and a password"):
+        build("email", "smtp", {"smtp_host": "h.example", "username": "u", "from_addr": "a@b.co"})
+    with pytest.raises(TargetError, match="host name"):
+        build("email", "smtp", {"smtp_host": "smtp example", "from_addr": "a@b.co"})
+
+
+def test_smtp_form_keeps_what_was_typed_except_the_password(client, db):
+    r = client.post(
+        "/settings/targets",
+        data={
+            "csrf_token": client.csrf,
+            "channel": "email",
+            "kind": "smtp",
+            "smtp_host": "mail.example.org",
+            "username": "me",
+            "password": "secret-do-not-echo",
+            "from_addr": "not-an-address",
+        },
+    )
+    assert 'id="channel-error-email"' in r.text and "From address doesn&#39;t look like" in r.text
+    assert 'value="mail.example.org"' in r.text and "secret-do-not-echo" not in r.text
+    assert '<option value="smtp" selected>' in r.text
+    r = client.post(
+        "/settings/targets",
+        data={
+            "csrf_token": client.csrf,
+            "channel": "email",
+            "kind": "smtp",
+            "smtp_host": "mail.example.org",
+            "from_addr": "pitwall@example.org",
+        },
+        follow_redirects=True,
+    )
+    assert "Added SMTP via mail.example.org" in r.text
+    assert db.scalars(select(NotificationTarget)).one().kind == "smtp"

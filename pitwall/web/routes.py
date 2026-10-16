@@ -53,7 +53,6 @@ from pitwall.services import (
     ics,
     news,
     reminders,
-    session_data,
     spoilers,
     standings,
     title_math,
@@ -62,9 +61,7 @@ from pitwall.services import (
     weather,
 )
 from pitwall.services.presenters import (
-    current_or_next_event,
     event_sessions,
-    next_session,
     session_view,
 )
 from pitwall.settings_store import (
@@ -79,6 +76,7 @@ from pitwall.settings_store import (
     save_settings,
 )
 from pitwall.units import TEMP_UNITS
+from pitwall.web import dashboard as dashboard_view
 from pitwall.web import racedata
 from pitwall.web.auth import checked_form, require_admin, require_user, safe_next, session_user
 from pitwall.web.common import back, flash, page
@@ -233,36 +231,16 @@ def dashboard(
 ) -> HTMLResponse:
     settings = load_settings(db, user.id)
     now = utcnow()
-    nxt = next_session(db, now)
-    event = current_or_next_event(db, now)
-    held = _held_event(db, user, reveal)
-    season = standings.latest_season_with_standings(db)
-    drivers = constructors = None
-    form: list[builders.FormLine] = []
-    if held is None:
-        if season:
-            drivers = standings.table(db, season, "driver", user_id=user.id)
-            constructors = standings.table(db, season, "constructor", user_id=user.id)
-        if _followed(db, user):
-            form = builders._form(db, settings, now, user.id)
     return page(
         request,
         "dashboard.html",
         db,
         user,
-        next_session=session_view(nxt, settings, now) if nxt else None,
-        next_event=nxt.event if nxt else None,
-        event=event,
-        sessions=event_sessions(event, settings, now) if event else [],
-        weather=weather.for_event(db, event, settings.temp_unit) if event else {},
-        last_year=session_data.last_year_conditions(db, event) if event else None,
-        drivers=drivers,
-        constructors=constructors,
-        followed_rows=[r for r in (drivers.rows if drivers else []) if r.followed],
-        form=form,
-        held_event=held,
-        has_standings=season is not None,
-        **racedata.news_context(db, user, settings, news.visible(db, user.id, settings, limit=6)),
+        now=now,
+        **dashboard_view.build(db, user, settings, now, reveal),
+        **racedata.news_context(
+            db, user, settings, news.visible(db, user.id, settings, limit=6, reveal=reveal)
+        ),
     )
 
 
@@ -665,6 +643,8 @@ def settings_page(
         season_drivers=season_drivers,
         followed=followed,
         error=request.session.pop("settings_error", None),
+        channel_form=request.session.pop("channel_form", None) or {},
+        smtp_security=targets_svc.SMTP_SECURITY,
         news_feeds=list(db.scalars(select(NewsFeed).order_by(NewsFeed.name)))
         if user.is_admin
         else [],
@@ -788,8 +768,28 @@ async def add_target(
     try:
         built = targets_svc.build(channel, kind, fields)
     except targets_svc.TargetError as exc:
-        request.session["settings_error"] = f"Couldn't add {channel}: {exc}"
-        return back("/settings#channels")
+        # Shown next to the form (not just at the top of the page, which is scrolled away),
+        # with what was typed kept - except passwords and other secrets.
+        keep = (
+            "smtp_host",
+            "smtp_port",
+            "smtp_security",
+            "username",
+            "from_addr",
+            "to_addr",
+            "address",
+            "ntfy_server",
+            "ntfy_topic",
+            "json_url",
+            "label",
+        )
+        request.session["channel_form"] = {
+            "channel": channel,
+            "kind": kind,
+            "error": str(exc),
+            **{k: fields[k][:200] for k in keep if k in fields},
+        }
+        return back(f"/settings#channel-error-{channel}")
     register_secrets(targets_svc.url_secrets(built.url))
     label = str(form.get("label", "")).strip()[:200] or built.label
     db.add(

@@ -1,65 +1,143 @@
 {% extends "base.html" %}
-{% from "_macros.html" import headline_list, news_hidden, session_table, spoiler_notice, standings_table %}
+{% from "_macros.html" import fresh_badge, headline_list, news_hidden, session_timeline, spoiler_notice, standings_table, timing_tower, tyre_chips %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-<div class="grid">
-  <div class="card">
-    <h2>Next session</h2>
-    {% if next_session %}
-      <div class="muted">{{ next_session.emoji }} {{ next_session.label }} — <a href="/events/{{ next_event.id }}">{{ next_event.name }}</a></div>
-      <div class="countdown" data-countdown="{{ next_session.start_utc.isoformat() }}">…</div>
-      <div>{{ next_session.owner_time }} <span class="muted small">{{ next_session.owner_tz }}</span></div>
-      {% if next_session.local_time %}<div class="muted small">Track time: {{ next_session.local_time }} {{ next_session.local_tz }}</div>{% endif %}
-      {% if next_session.odd %}<div class="odd">🌙 {{ next_session.label }} starts at {{ next_session.owner_clock }} your time</div>{% endif %}
-    {% else %}
-      <p class="muted">No upcoming sessions yet. The schedule syncs every 6 hours (first sync runs a few seconds after start).</p>
-    {% endif %}
-  </div>
 
-  {% if event %}
-  <div class="card">
-    <h2><a href="/events/{{ event.id }}">{{ event.name }}</a> {% if event.is_sprint_weekend %}<span class="badge sprint">SPRINT</span>{% endif %}</h2>
-    <p class="sub">{{ event.circuit.name }} · {{ event.circuit.locality }}, {{ event.circuit.country }} · Round {{ event.round }}</p>
-    {{ session_table(sessions, weather) }}
-    {% if last_year %}{% set ly = last_year.conditions %}
-    <p class="small">Last year here <span class="muted">({{ last_year.event.season }} race)</span>: track {{ ly.track_min|temp_range(ly.track_max, settings.temp_unit) }}{% if ly.rain is not none %}, {{ 'rain' if ly.rain else 'dry' }}{% endif %}</p>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  {% if followed_rows or form %}
-  <div class="card">
-    <h2>Followed drivers</h2>
-    <table>
-    {% for r in followed_rows %}
-      <tr class="followed"><td>P{{ r.position }}</td><td><a href="/drivers/{{ r.entity_id }}">{{ r.name }}</a></td><td class="num">{{ r.points|pts }} pts</td><td class="num muted">{% if r.gap_leader %}-{{ r.gap_leader|pts }}{% endif %}</td></tr>
-    {% endfor %}
-    </table>
-    {% if form %}<h3>Last 3 races</h3>
-      {% for f in form %}<div><strong>{{ f.driver }}</strong>: {% for ev, pos in f.results %}{{ pos }} <span class="muted small">{{ ev }}</span>{% if not loop.last %} · {% endif %}{% else %}<span class="muted">no results yet</span>{% endfor %}</div>{% endfor %}
-    {% endif %}
-  </div>
-  {% endif %}
-
-  <div class="card wide" id="news">
-    <h2>News <a class="small" href="/news" style="font-weight:normal;">all headlines →</a></h2>
-    {{ news_hidden(news, "/news?reveal=1") }}
-    {% if news.items %}{{ headline_list(news.items, news_labels, followed_tags, news_tags, settings.tz) }}
-    {% else %}<p class="muted small">No headlines yet. Feeds are checked every 30 minutes.</p>{% endif %}
-  </div>
-
-  <div class="card wide">
-    <h2>Standings{% if drivers %} <span class="muted small">after round {{ drivers.round }}</span>{% endif %}</h2>
-    {% if held_event %}
-      {{ spoiler_notice(held_event, "/?reveal=1") }}
-    {% elif not drivers %}
-      <p class="muted">No standings yet — they appear after the first sync/backfill.</p>
-    {% else %}
-      <div class="grid">
-        <div>{{ standings_table(drivers, 10) }}<p class="small"><a href="/standings">Full standings →</a></p></div>
-        {% if constructors %}<div>{{ standings_table(constructors, 10, "Team") }}</div>{% endif %}
+{# ---------------------------------------------------------------- sections #}
+{% macro hero_card() %}
+<section class="card wide" aria-labelledby="hero-title">
+  {% if hero %}{% set s = hero.session %}
+  <div class="hero">
+    <div>
+      <div class="eyebrow" id="hero-title">{{ s.emoji }} Next: {{ s.label }}{% if weekend %} · race weekend{% endif %}</div>
+      <div class="ev-name"><a href="/events/{{ hero.event.id }}">{{ hero.event.name }}</a>{% if hero.event.is_sprint_weekend %} <span class="badge sprint">⚡ Sprint</span>{% endif %}</div>
+      <div class="countdown" data-countdown="{{ s.start_utc.isoformat() }}" data-title="{{ s.label }}" aria-live="off">…</div>
+      <div class="times">
+        <div><span class="time">{{ s.owner_time }}</span> <span class="muted small">{{ s.owner_tz }} · your time</span></div>
+        {% if s.local_time %}<div class="muted"><span class="time">{{ s.local_time }}</span> <span class="small">{{ s.local_tz }} · track time</span></div>{% endif %}
       </div>
-    {% endif %}
+      {% if s.odd %}<p><span class="badge odd">🌙 Odd hours: starts {{ s.owner_clock }} your time</span></p>{% endif %}
+    </div>
+    <div class="side">
+      <div>
+        <h3>Tyres</h3>
+        {% if hero.tyres.nomination %}<div class="tchips">{{ tyre_chips(hero.tyres.nomination) }}</div>{% else %}<span class="muted small">Not announced yet</span>{% endif %}
+      </div>
+      <div>
+        <h3>Weather</h3>
+        {% if hero.forecast %}<div>{{ hero.forecast.icon }} {{ hero.forecast.summary }} · {{ hero.forecast.temp }}{% if hero.forecast.rain %} · <span class="{{ 'odd' if hero.forecast.risk else 'muted' }}">{% if hero.forecast.risk %}☔ {% endif %}{{ hero.forecast.rain }}</span>{% endif %}</div>
+        {% else %}<span class="muted small">Forecast appears about 16 days out.</span>{% endif %}
+        {% if hero.last_year %}{% set ly = hero.last_year.conditions %}<div class="muted small">Last year here: track {{ ly.track_min|temp_range(ly.track_max, settings.temp_unit) }}{% if ly.rain is not none %}, {{ 'rain' if ly.rain else 'dry' }}{% endif %}</div>{% endif %}
+      </div>
+      {% if hero.grid or hero.licence %}
+      <div>
+        <h3>Penalty alerts</h3>
+        {% for p in hero.grid %}<div class="alert-line"><span aria-hidden="true">⚠️</span><span><strong>{{ p.driver.code or p.driver.family_name }}</strong> {{ describe_grid(p) }}</span></div>{% endfor %}
+        {% for p in hero.licence %}<div class="alert-line"><span aria-hidden="true">{{ '⛔' if p.state == 'ban' else '🟨' }}</span><span><strong>{{ p.driver.code or p.driver.family_name }}</strong> {{ p.total }}/12 licence points{% if p.state == 'ban' %}: race ban{% endif %}</span></div>{% endfor %}
+        <a class="small" href="/penalties">Penalty watch →</a>
+      </div>
+      {% endif %}
+    </div>
   </div>
+  {% else %}
+  <div class="empty"><strong>No upcoming sessions yet.</strong> The schedule syncs every 6 hours (the first sync runs a few seconds after start). {{ fresh_badge(fresh.jolpica) }}</div>
+  {% endif %}
+</section>
+{% endmacro %}
+
+{% macro timeline_card() %}{% if event %}
+<section class="card wide">
+  <div class="section-head"><h2><a href="/events/{{ event.id }}">{{ event.name }}</a> <span class="muted small">Round {{ event.round }} · {{ event.circuit.locality }}</span></h2>{{ fresh_badge(fresh.jolpica) }}</div>
+  {{ session_timeline(timeline, weather) }}
+</section>
+{% endif %}{% endmacro %}
+
+{% macro penalties_card() %}{% if event %}
+<section class="card">
+  <h2>Penalties <span class="muted small">{{ event.short_name }}</span></h2>
+  {% if event_grid %}
+  <table>{% for p in event_grid %}<tr><td class="stripe">{{ p.driver.code or p.driver.family_name }}</td><td><strong>{{ describe_grid(p) }}</strong>{% if p.reason %}<div class="muted small">{{ p.reason }}</div>{% endif %}</td></tr>{% endfor %}</table>
+  {% else %}<p class="empty">No grid penalties recorded for this event.</p>{% endif %}
+  <a class="small" href="/penalties">Penalty watch →</a>
+</section>
+{% endif %}{% endmacro %}
+
+{% macro weather_card() %}{% if event %}
+<section class="card">
+  <div class="section-head"><h2>Weather</h2>{{ fresh_badge(fresh.openmeteo) }}</div>
+  {% if weather %}
+  <table>{% for it in timeline if weather.get(it.view.id) %}{% set wx = weather[it.view.id] %}<tr><td>{{ it.short }}</td><td>{{ wx.icon }} {{ wx.temp }}</td><td class="{{ 'odd' if wx.risk else 'muted' }}">{% if wx.risk %}☔ {% endif %}{{ wx.rain }}</td></tr>{% endfor %}</table>
+  {% else %}<p class="empty">No forecast yet: it appears about 16 days before each session.</p>{% endif %}
+  {% if last_year %}{% set ly = last_year.conditions %}<p class="small">Last year here ({{ last_year.event.season }} race): track {{ ly.track_min|temp_range(ly.track_max, settings.temp_unit) }}{% if ly.rain is not none %}, {{ 'rain' if ly.rain else 'dry' }}{% endif %}</p>{% endif %}
+</section>
+{% endif %}{% endmacro %}
+
+{% macro tyres_card() %}{% if event_tyres %}
+<section class="card">
+  <h2>Tyres</h2>
+  {% if event_tyres.nomination %}<div class="tchips">{{ tyre_chips(event_tyres.nomination) }}</div>{% else %}<p class="empty">Not announced yet.</p>{% endif %}
+  {% if event_tyres.last_year %}<p class="small">{{ event_tyres.last_year[0].season }} here: {{ tyre_chips(event_tyres.last_year[1]) }}</p>{% endif %}
+</section>
+{% endif %}{% endmacro %}
+
+{% macro standings_card() %}
+<section class="card">
+  <div class="section-head"><h2>Drivers{% if drivers %} <span class="muted small">after round {{ drivers.round }}</span>{% endif %}</h2>{{ fresh_badge(fresh.jolpica) }}</div>
+  {% if held_event %}{{ spoiler_notice(held_event, "/?reveal=1") }}
+  {% elif not drivers %}<p class="empty">No standings yet: they appear after the first sync or backfill.</p>
+  {% else %}{{ timing_tower(drivers, 10) }}<p class="small"><a href="/standings">Full standings →</a></p>{% endif %}
+</section>
+{% endmacro %}
+
+{% macro followed_card() %}{% if followed_cards %}
+<section class="card">
+  <h2>Followed drivers</h2>
+  <div class="followed-cards">
+  {% for c in followed_cards %}
+    <article class="fcard">
+      <span class="stripe" style="--team: {{ c.row.team_color if c.row and c.row.team_color else 'var(--border)' }}">
+        <a href="/drivers/{{ c.driver_id }}"><strong>{{ c.name }}</strong></a>{% if c.row and c.row.team %} <span class="muted small">{{ c.row.team }}</span>{% endif %}
+      </span>
+      {% if held_event %}<p class="muted small">Standings and results hidden by spoiler mode.</p>
+      {% else %}
+      {% if c.row %}<div class="big">P{{ c.row.position }} <span class="small muted">{{ c.row.points|pts }} pts</span></div>{% endif %}
+      <dl>
+        {% if c.row and c.row.gap_leader %}<dt>To leader</dt><dd class="mono">−{{ c.row.gap_leader|pts }}</dd>{% endif %}
+        {% if c.form and c.form.results %}<dt>Last races</dt><dd>{% for ev, pos in c.form.results %}<span class="mono">{{ pos }}</span> <span class="muted small">{{ ev }}</span>{% if not loop.last %} · {% endif %}{% endfor %}</dd>{% endif %}
+        {% if c.licence %}<dt>Licence pts</dt><dd class="mono">{{ c.licence }}/12</dd>{% endif %}
+      </dl>
+      {% endif %}
+    </article>
+  {% endfor %}
+  </div>
+</section>
+{% endif %}{% endmacro %}
+
+{% macro news_card() %}
+<section class="card wide" id="news">
+  <div class="section-head"><h2>News <a class="small" href="/news" style="font-weight:normal;">all headlines →</a></h2>{{ fresh_badge(fresh.news) }}</div>
+  {{ news_hidden(news, "/news?reveal=1") }}
+  {% if news.items %}{{ headline_list(news.items, news_labels, followed_tags, news_tags, settings.tz) }}
+  {% else %}<p class="empty">No headlines yet. Feeds are checked every 30 minutes.</p>{% endif %}
+</section>
+{% endmacro %}
+
+{# ---------------------------------------------------------------- layout #}
+<div class="grid">
+  {{ hero_card() }}
+  {% if weekend %}
+    {{ timeline_card() }}
+    {{ penalties_card() }}
+    {{ weather_card() }}
+    {{ tyres_card() }}
+    {{ standings_card() }}
+    {{ followed_card() }}
+    {{ news_card() }}
+  {% else %}
+    {{ standings_card() }}
+    {{ followed_card() }}
+    {{ news_card() }}
+    {{ timeline_card() }}
+  {% endif %}
 </div>
 {% endblock %}

@@ -76,20 +76,7 @@ def _build_email(kind: str, form: Mapping[str, str]) -> Built:
     if kind == "apprise":
         return Built(_field(form, "apprise_url", "Apprise URL"), "Email (Apprise URL)")
     if kind == "smtp":
-        host = _field(form, "smtp_host", "SMTP server")
-        port = _field(form, "smtp_port", "SMTP port", required=False) or "587"
-        if not port.isdigit():
-            raise TargetError("SMTP port must be a number.")
-        user = _field(form, "username", "Username")
-        password = _field(form, "password", "Password")
-        sender = _email_address(form, "from_addr", "From address")
-        to = _email_address(form, "to_addr", "Send to", required=False) or sender
-        mode = "ssl" if port == "465" else "starttls"
-        url = (
-            f"mailtos://{_q(user)}:{_q(password)}@{sender.split('@')[1]}:{port}"
-            f"?smtp={host}&mode={mode}&from={_q(sender)}&to={_q(to)}"
-        )
-        return Built(url, f"SMTP via {host} → {to}")
+        return _build_smtp(form)
 
     addr = _email_address(form, "address", "Email address")
     password = _field(form, "password", "App password" if kind == "gmail" else "Password")
@@ -109,6 +96,45 @@ def _build_email(kind: str, form: Mapping[str, str]) -> Built:
     smtp = "smtp-mail.outlook.com" if domain.lower() in _OUTLOOK_DOMAINS else "smtp.office365.com"
     url = f"mailtos://{_q(addr)}:{_q(password)}@{domain}?smtp={smtp}&mode=starttls&to={_q(to)}"
     return Built(url, f"Microsoft ({addr}) → {to}")
+
+
+SMTP_SECURITY = {"starttls": "STARTTLS", "ssl": "SSL/TLS", "none": "None (local relay)"}
+
+
+def _build_smtp(form: Mapping[str, str]) -> Built:
+    raw = _field(form, "smtp_host", "SMTP server")
+    # Accept "smtp.example.com", "smtp.example.com:587" or "smtp://smtp.example.com".
+    host = re.sub(r"^[a-z]+://", "", raw.strip(), flags=re.I).strip("/")
+    port = _field(form, "smtp_port", "SMTP port", required=False)
+    if ":" in host and not host.startswith("["):
+        host, _, host_port = host.rpartition(":")
+        port = port or host_port
+    if not re.fullmatch(r"[A-Za-z0-9.-]+", host):
+        raise TargetError("The SMTP server should be a host name like smtp.example.com.")
+    security = (form.get("smtp_security") or "").strip() or (
+        "ssl" if port == "465" else "none" if port == "25" else "starttls"
+    )
+    if security not in SMTP_SECURITY:
+        raise TargetError("Pick STARTTLS, SSL/TLS or None for security.")
+    port = port or {"ssl": "465", "none": "25"}.get(security, "587")
+    if not port.isdigit() or not 0 < int(port) < 65536:
+        raise TargetError("SMTP port must be a number.")
+    user = _field(form, "username", "Username", required=False)
+    password = _field(form, "password", "Password", required=False)
+    if bool(user) != bool(password):
+        raise TargetError(
+            "Enter both a username and a password, or leave both empty for a relay without login."
+        )
+    sender = _email_address(form, "from_addr", "From address")
+    to = _email_address(form, "to_addr", "Send to", required=False) or sender
+    login = f"{_q(user)}:{_q(password)}@" if user else ""
+    scheme = "mailto" if security == "none" else "mailtos"
+    mode = "" if security == "none" else f"&mode={security}"
+    url = (
+        f"{scheme}://{login}{sender.split('@')[1]}:{port}"
+        f"?smtp={host}{mode}&from={_q(sender)}&to={_q(to)}"
+    )
+    return Built(url, f"SMTP via {host} → {to}")
 
 
 def _build_webhook(kind: str, form: Mapping[str, str]) -> Built:

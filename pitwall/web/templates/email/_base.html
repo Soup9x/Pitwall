@@ -1,23 +1,32 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
 <title>{{ title }}</title></head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:16px 0;">
-<tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border-radius:8px;overflow:hidden;">
-<tr><td style="background:#15151e;color:#ffffff;padding:16px 20px;border-bottom:4px solid #e10600;">
-  <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#9ca3af;">Pitwall</div>
-  <div style="font-size:20px;font-weight:700;margin-top:4px;">{{ title }}</div>
+<body style="margin:0;padding:0;background:#F6F7F9;font-family:'Titillium Web',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#14161A;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F6F7F9;">
+<tr><td align="center" style="padding:16px 8px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#FFFFFF;border:1px solid #D9DDE5;border-top:4px solid #E8322F;border-radius:8px;">
+<tr><td style="padding:16px 20px 12px;border-bottom:1px solid #D9DDE5;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td style="padding-right:8px;vertical-align:middle;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background:#171A21;border-radius:5px;"><tr>
+        <td style="padding:5px 0 5px 5px;"><div style="width:4px;height:18px;background:#E8322F;border-radius:1px;"></div></td>
+        <td style="padding:5px 5px 5px 4px;"><div style="width:14px;height:4px;background:#E8EAED;margin:0 0 3px;"></div><div style="width:10px;height:4px;background:#9AA3AF;margin:0 0 3px;"></div><div style="width:7px;height:4px;background:#5D6573;"></div></td>
+      </tr></table>
+    </td>
+    <td style="vertical-align:middle;font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:700;color:#535B68;">Pitwall</td>
+  </tr></table>
+  <div style="font-size:20px;line-height:1.3;font-weight:700;margin-top:8px;color:#14161A;">{{ title }}</div>
 </td></tr>
-<tr><td style="padding:20px;font-size:15px;line-height:1.5;">
+<tr><td style="padding:16px 20px 20px;font-size:15px;line-height:1.5;color:#14161A;">
 {% block body %}{% endblock %}
 </td></tr>
 {% if link %}
 <tr><td style="padding:0 20px 20px;">
-  <a href="{{ link }}" style="display:inline-block;background:#e10600;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:6px;font-weight:600;">Open in Pitwall</a>
+  <a href="{{ link }}" style="display:inline-block;background:#C42320;color:#FFFFFF;text-decoration:none;padding:10px 16px;border-radius:6px;font-weight:700;">Open in Pitwall</a>
 </td></tr>
 {% endif %}
 </table>
-<div style="font-size:12px;color:#6b7280;padding:12px;">Sent by your self-hosted Pitwall.</div>
+<div style="font-size:12px;color:#535B68;padding:12px;">Sent by your self-hosted Pitwall.</div>
 </td></tr></table>
 </body></html>
