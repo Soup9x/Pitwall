@@ -1,6 +1,6 @@
 // Pitwall service worker. Caches only the app shell (CSS, JS, fonts, icons) and an offline
 // page. Pages are never cached: they hold personal data and spoiler-protected results.
-const VERSION = "pitwall-v1";
+const VERSION = "pitwall-v2"; // bump to drop old cached files
 const SHELL = [
   "/static/style.css",
   "/static/fonts/fonts.css",

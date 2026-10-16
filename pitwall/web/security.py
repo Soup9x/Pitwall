@@ -39,7 +39,17 @@ class SecurityHeadersMiddleware:
                 existing = {k.lower() for k, _ in message.get("headers", [])}
                 extra = [(k, v) for k, v in self.headers if k not in existing]
                 path = scope.get("path", "")
-                if not path.startswith(("/static/", "/circuit-maps/", "/calendar.ics")):
+                if path.startswith("/static/"):
+                    # Pages link CSS/JS as /static/x?v=<content hash>, so those URLs never change
+                    # content; anything else is checked with the server on every load.
+                    versioned = b"v=" in scope.get("query_string", b"")
+                    extra.append(
+                        (
+                            b"cache-control",
+                            b"public, max-age=31536000, immutable" if versioned else b"no-cache",
+                        )
+                    )
+                elif not path.startswith(("/circuit-maps/", "/calendar.ics")):
                     extra.append((b"cache-control", b"no-store"))  # pages hold personal data
                 headers = list(message.get("headers", []))
                 if scope.get("scheme") == "https":

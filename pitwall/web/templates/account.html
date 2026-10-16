@@ -55,6 +55,8 @@
     <h2>Kiosk display</h2>
     <p class="small">A read-only, full-screen page for a TV or wall screen: countdown, standings and trivia, and the session timeline, weather, tyres and penalties on race weekends. It needs no login and always follows your spoiler settings.</p>
     {% if kiosk_url %}
+    <p><a class="btn" href="{{ kiosk_path }}" target="_blank" rel="noopener noreferrer">Open kiosk ↗</a></p>
+    <p class="muted small">Opens in a new tab; press F11 there for full screen. For a TV or Raspberry Pi, open the link below in that device's browser (see the README for a Pi setup that starts it automatically).</p>
     <details>
       <summary class="small" style="cursor:pointer;">Show my kiosk link</summary>
       <p><code id="kiosk-url">{{ kiosk_url }}</code></p>

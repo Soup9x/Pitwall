@@ -8,8 +8,8 @@
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0E1014">
 <title>Pitwall</title>
-<link rel="stylesheet" href="/static/fonts/fonts.css">
-<link rel="stylesheet" href="/static/kiosk.css">
+<link rel="stylesheet" href="{{ static_url('fonts/fonts.css') }}">
+<link rel="stylesheet" href="{{ static_url('kiosk.css') }}">
 <link rel="icon" href="/static/icons/logo.svg" type="image/svg+xml">
 </head>
 <body>
@@ -56,6 +56,6 @@
   </section>
 </div>
 <script type="application/json" id="kiosk-data">{{ data|safe }}</script>
-<script src="/static/kiosk.js"></script>
+<script src="{{ static_url('kiosk.js') }}"></script>
 </body>
 </html>

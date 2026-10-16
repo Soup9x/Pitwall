@@ -38,6 +38,81 @@ SHORT = {
 }
 
 
+# Dashboard cards users can rearrange (Dashboard → Rearrange). The race-weekend layout has its
+# own order, since it leads with the session timeline, penalties, weather and tyres.
+CARDS = {
+    "hero": "Next session",
+    "timeline": "Weekend sessions",
+    "penalties": "Grid penalties",
+    "weather": "Weather",
+    "tyres": "Tyres",
+    "drivers": "Drivers",
+    "followed": "Followed drivers",
+    "constructors": "Constructors",
+    "news": "News",
+}
+DEFAULT_LAYOUT = {
+    "normal": ["hero", "drivers", "followed", "constructors", "news", "timeline"],
+    "weekend": [
+        "hero",
+        "timeline",
+        "penalties",
+        "weather",
+        "tyres",
+        "drivers",
+        "followed",
+        "constructors",
+        "news",
+    ],
+}
+
+
+def layout(saved: dict[str, list[str]] | None, mode: str) -> list[str]:
+    """The card order for a layout: the user's saved order, then any cards it doesn't mention
+    (e.g. ones added in a later version) in their default order."""
+    default = DEFAULT_LAYOUT[mode]
+    order = [k for k in dict.fromkeys((saved or {}).get(mode) or []) if k in default]
+    return order + [k for k in default if k not in order]
+
+
+def reorder(order: list[str], visible: list[str]) -> list[str]:
+    """Put the cards on screen in the order `visible` gives, keeping cards that aren't on
+    screen right now (e.g. no followed drivers) in their place."""
+    queue = iter([k for k in visible if k in order])
+    shown = set(visible) & set(order)
+    return [next(queue) if k in shown else k for k in order]
+
+
+def move(order: list[str], on_screen: list[str], key: str, direction: str) -> list[str]:
+    """Swap a card with its neighbour among the cards on screen."""
+    vis = [k for k in order if k in on_screen]
+    if key not in vis:
+        return order
+    i = vis.index(key)
+    j = i - 1 if direction == "up" else i + 1
+    if not 0 <= j < len(vis):
+        return order
+    vis[i], vis[j] = vis[j], vis[i]
+    return reorder(order, vis)
+
+
+def on_screen(ctx: dict[str, Any]) -> list[str]:
+    """Which cards actually render for this view model (the others are skipped)."""
+    event = ctx.get("event")
+    shown = {
+        "hero": True,
+        "timeline": event is not None,
+        "penalties": event is not None,
+        "weather": event is not None,
+        "tyres": bool(ctx.get("event_tyres")),
+        "drivers": True,
+        "followed": bool(ctx.get("followed_cards")),
+        "constructors": bool(ctx.get("constructors")) and ctx.get("held_event") is None,
+        "news": True,
+    }
+    return [k for k, v in shown.items() if v]
+
+
 @dataclass
 class TimelineItem:
     view: SessionView

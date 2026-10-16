@@ -7,7 +7,7 @@
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#0E1014">
 <title>{% block title %}Pitwall{% endblock %} · Pitwall</title>
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="{{ static_url('style.css') }}">
 <link rel="icon" href="/static/icons/logo.svg" type="image/svg+xml">
 <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
@@ -25,7 +25,7 @@
   </nav>
   <div class="spacer"></div>
   <div class="user-tools">
-    <a class="small muted" href="/account" title="Account"><span aria-hidden="true">👤</span> <span class="who">{{ user.username }}</span><span class="sr-only">Account</span></a>
+    <a class="small muted" href="/account" title="Account" aria-label="Account ({{ user.username }})"><span aria-hidden="true">👤</span> <span class="who">{{ user.username }}</span></a>
     <form class="inline" method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Log out</button></form>
   </div>
 </div></header>
@@ -40,7 +40,7 @@
 {% block content %}{% endblock %}
 </main>
 <footer>Pitwall {{ version }} · times shown in {{ settings.timezone }}</footer>
-<script src="/static/app.js"></script>
+<script src="{{ static_url('app.js') }}"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

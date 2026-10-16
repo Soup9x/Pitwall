@@ -173,6 +173,6 @@ def test_standings_page_embeds_chart_data_and_queues_missing_rounds(db, client, 
     data = json.loads(blob[1])
     assert data["driver"]["missing"] == [1] and data["constructor"]["missing"] == [1, 2]
     assert "Downloading round" in html
-    assert '<script src="/static/vendor/chart.umd.min.js"></script>' in html
+    assert '<script src="/static/vendor/chart.umd.min.js?v=' in html
     db.expire_all()
     assert get_kv(db, progression.QUEUE_KEY) == [2025]

@@ -3,9 +3,26 @@
 {% block title %}Dashboard{% endblock %}
 {% block content %}
 
+{# ---------------------------------------------------------------- rearranging #}
+{# Each card carries data-card; in edit mode (/?edit=1) it gets a bar with a drag handle and
+   up/down buttons. The buttons are plain forms, so they work without JavaScript. #}
+{% macro card_attrs(key) %}data-card="{{ key }}" id="{{ 'news' if key == 'news' else 'card-' ~ key }}"{% if edit %} draggable="true"{% endif %}{% endmacro %}
+{% macro card_tools(key) %}{% if edit %}
+<div class="card-tools">
+  <span class="drag-handle" aria-hidden="true" title="Drag to move">⠿</span>
+  <span class="card-tools-name">{{ card_names[key] }}</span>
+  <form method="post" action="/prefs/dashboard" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="mode" value="{{ layout_mode }}">
+    <input type="hidden" name="card" value="{{ key }}"><input type="hidden" name="visible" value="{{ card_visible|join(',') }}">
+    <button class="secondary small" name="direction" value="up" aria-label="Move {{ card_names[key] }} earlier" {{ 'disabled' if card_visible[0] == key }}>↑</button>
+    <button class="secondary small" name="direction" value="down" aria-label="Move {{ card_names[key] }} later" {{ 'disabled' if card_visible[-1] == key }}>↓</button>
+  </form>
+</div>
+{% endif %}{% endmacro %}
+
 {# ---------------------------------------------------------------- sections #}
 {% macro hero_card() %}
-<section class="card wide" aria-labelledby="hero-title">
+<section class="card wide" aria-labelledby="hero-title" {{ card_attrs("hero") }}>{{ card_tools("hero") }}
   {% if hero %}{% set s = hero.session %}
   <div class="hero">
     <div>
@@ -45,14 +62,14 @@
 {% endmacro %}
 
 {% macro timeline_card() %}{% if event %}
-<section class="card wide">
+<section class="card wide" {{ card_attrs("timeline") }}>{{ card_tools("timeline") }}
   <div class="section-head"><h2><a href="/events/{{ event.id }}">{{ event.name }}</a> <span class="muted small">Round {{ event.round }} · {{ event.circuit.locality }}</span></h2>{{ fresh_badge(fresh.jolpica) }}</div>
   {{ session_timeline(timeline, weather) }}
 </section>
 {% endif %}{% endmacro %}
 
 {% macro penalties_card() %}{% if event %}
-<section class="card">
+<section class="card" {{ card_attrs("penalties") }}>{{ card_tools("penalties") }}
   <h2>Penalties <span class="muted small">{{ event.short_name }}</span></h2>
   {% if event_grid %}
   <table>{% for p in event_grid %}<tr><td class="stripe">{{ p.driver.code or p.driver.family_name }}</td><td><strong>{{ describe_grid(p) }}</strong>{% if p.reason %}<div class="muted small">{{ p.reason }}</div>{% endif %}</td></tr>{% endfor %}</table>
@@ -61,7 +78,7 @@
 {% endif %}{% endmacro %}
 
 {% macro weather_card() %}{% if event %}
-<section class="card">
+<section class="card" {{ card_attrs("weather") }}>{{ card_tools("weather") }}
   <div class="section-head"><h2>Weather</h2>{{ fresh_badge(fresh.openmeteo) }}</div>
   {% if weather %}
   <table>{% for it in timeline if weather.get(it.view.id) %}{% set wx = weather[it.view.id] %}<tr><td>{{ it.short }}</td><td>{{ wx.icon }} {{ wx.temp }}</td><td class="{{ 'odd' if wx.risk else 'muted' }}">{% if wx.risk %}☔ {% endif %}{{ wx.rain }}</td></tr>{% endfor %}</table>
@@ -71,7 +88,7 @@
 {% endif %}{% endmacro %}
 
 {% macro tyres_card() %}{% if event_tyres %}
-<section class="card">
+<section class="card" {{ card_attrs("tyres") }}>{{ card_tools("tyres") }}
   <h2>Tyres</h2>
   {% if event_tyres.nomination %}<div class="tchips">{{ tyre_chips(event_tyres.nomination) }}</div>{% else %}<p class="empty">Not announced yet.</p>{% endif %}
   {% if event_tyres.last_year %}<p class="small">{{ event_tyres.last_year[0].season }} here: {{ tyre_chips(event_tyres.last_year[1]) }}</p>{% endif %}
@@ -79,7 +96,7 @@
 {% endif %}{% endmacro %}
 
 {% macro standings_card() %}
-<section class="card">
+<section class="card" {{ card_attrs("drivers") }}>{{ card_tools("drivers") }}
   <div class="section-head"><h2>Drivers{% if drivers %} <span class="muted small">after round {{ drivers.round }}</span>{% endif %}</h2>{{ fresh_badge(fresh.jolpica) }}</div>
   {% if held_event %}{{ spoiler_notice(held_event, "/?reveal=1") }}
   {% elif not drivers %}<p class="empty">No standings yet: they appear after the first sync or backfill.</p>
@@ -88,7 +105,7 @@
 {% endmacro %}
 
 {% macro constructors_card() %}{% if constructors and not held_event %}
-<section class="card">
+<section class="card" {{ card_attrs("constructors") }}>{{ card_tools("constructors") }}
   <div class="section-head"><h2>Constructors <span class="muted small">after round {{ constructors.round }}</span></h2>{{ fresh_badge(fresh.jolpica) }}</div>
   {{ timing_tower(constructors, 10, followed_teams) }}
   <p class="small"><a href="/standings#progression">Season progression →</a></p>
@@ -96,7 +113,7 @@
 {% endif %}{% endmacro %}
 
 {% macro followed_card() %}{% if followed_cards %}
-<section class="card">
+<section class="card" {{ card_attrs("followed") }}>{{ card_tools("followed") }}
   <h2>Followed drivers</h2>
   <div class="followed-cards">
   {% for c in followed_cards %}
@@ -120,7 +137,7 @@
 {% endif %}{% endmacro %}
 
 {% macro news_card() %}
-<section class="card wide" id="news">
+<section class="card wide" {{ card_attrs("news") }}>{{ card_tools("news") }}
   <div class="section-head"><h2>News <a class="small" href="/news" style="font-weight:normal;">all headlines →</a></h2>{{ fresh_badge(fresh.news) }}</div>
   {{ news_hidden(news, "/news?reveal=1") }}
   {% if news.items %}{{ headline_list(news.items, news_labels, followed_tags, news_tags, settings.tz) }}
@@ -129,23 +146,23 @@
 {% endmacro %}
 
 {# ---------------------------------------------------------------- layout #}
-<div class="grid">
-  {{ hero_card() }}
-  {% if weekend %}
-    {{ timeline_card() }}
-    {{ penalties_card() }}
-    {{ weather_card() }}
-    {{ tyres_card() }}
-    {{ standings_card() }}
-    {{ followed_card() }}
-    {{ constructors_card() }}
-    {{ news_card() }}
-  {% else %}
-    {{ standings_card() }}
-    {{ followed_card() }}
-    {{ constructors_card() }}
-    {{ news_card() }}
-    {{ timeline_card() }}
-  {% endif %}
+{% set cards = {"hero": hero_card, "timeline": timeline_card, "penalties": penalties_card, "weather": weather_card, "tyres": tyres_card, "drivers": standings_card, "followed": followed_card, "constructors": constructors_card, "news": news_card} %}
+{% if edit %}
+<div class="card layout-bar" role="region" aria-label="Rearrange the dashboard">
+  <p><strong>Rearrange your dashboard.</strong> Drag a card by its ⠿ handle, or use ↑ and ↓. Changes save as you go. {% if layout_mode == 'weekend' %}This is the race-weekend layout (Thursday to the end of the race); the normal layout is arranged separately.{% else %}This is the normal layout; the race-weekend layout (Thursday to the end of the race) is arranged separately.{% endif %}</p>
+  <div class="row">
+    <a class="btn" href="/">Done</a>
+    <form method="post" action="/prefs/dashboard" class="inline" data-confirm="Put this layout back to the default order?" id="layout-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="mode" value="{{ layout_mode }}">
+      <button class="secondary" name="reset" value="1">Reset to default</button>
+    </form>
+  </div>
+</div>
+{% else %}
+<p class="dash-actions"><a class="small muted" href="/?edit=1">⇅ Rearrange cards</a></p>
+{% endif %}
+<div class="grid{{ ' editing' if edit }}" id="dashboard-grid">
+  {% for key in card_order %}{{ cards[key]() }}{% endfor %}
 </div>
 {% endblock %}
+{% block scripts %}{% if edit %}<script src="{{ static_url('dashboard.js') }}"></script>{% endif %}{% endblock %}

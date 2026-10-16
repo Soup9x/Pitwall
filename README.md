@@ -217,6 +217,12 @@ page's season stats are hidden, as before.
   - cards for the drivers you follow, and the news strip.
 - **Race weekend mode** (Thursday to the end of the race, track time): the dashboard leads
   with the session timeline, penalties, weather and tyres, then the standings.
+- **Rearrange the dashboard:** click **⇅ Rearrange cards** above the cards.
+  - Drag a card by its ⠿ handle, or use the ↑ and ↓ buttons (they work on phones and with a
+    keyboard). Changes save straight away.
+  - Each user has their own order. The normal and race-weekend layouts are arranged
+    separately.
+  - **Reset to default** puts a layout back.
 - **Event page**: session timeline first, then the track card, penalties, race control,
   conditions, track updates and results. A **Qualifying** tab has the full breakdown (see
   above).
@@ -567,7 +573,9 @@ screen turned to portrait.
   `localhost`, so over plain `http://` on your LAN, turn screen blanking off on the device
   (below).
 
-**Get the link:** Account → Kiosk display → **Create a kiosk link**. You can add options to the
+**Get the link:** Account → Kiosk display → **Create a kiosk link**. **Open kiosk ↗** then
+opens it in a new tab on the device you're using (press F11 for full screen). For a TV or
+Raspberry Pi, copy the link under **Show my kiosk link** to that device. You can add options to the
 end of the link:
 
 | Option | What it does |

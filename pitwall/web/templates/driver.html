@@ -75,6 +75,6 @@
 {% endif %}
 {% endblock %}
 {% block scripts %}{% if quali and not held_event %}
-<script src="/static/vendor/chart.umd.min.js"></script>
-<script src="/static/charts.js"></script>
+<script src="{{ static_url('vendor/chart.umd.min.js') }}"></script>
+<script src="{{ static_url('charts.js') }}"></script>
 {% endif %}{% endblock %}
