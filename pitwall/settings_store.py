@@ -92,6 +92,8 @@ class AppSettings:
     digest_types: list[str] = field(default_factory=lambda: list(DIGESTIBLE))
     temp_unit: str = "both"  # C / F / both
     theme: str = "dark"  # dark / light / system
+    # Where this user's email alerts go, sent through the server's mail account (admin).
+    notify_email: str = ""
 
     @property
     def tz(self) -> ZoneInfo:

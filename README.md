@@ -314,22 +314,52 @@ Then go to **Settings**, pick the drivers you follow, and press **Send test** fo
 
 ## 2. Notifications (email and webhooks)
 
-Each user adds their own destinations in the web UI under **Settings → Notification channels**. Choose a type and fill
-in the form, then press **Add** and **Test**. You can add as many as you like, and disable or
-remove them at any time. Pitwall builds the [Apprise](https://github.com/caronc/apprise/wiki) URL
-for you, and passwords are never shown again after you save them.
+**Email** is set up once, by an admin, for everyone. Each user then only types the address
+they want their alerts sent to. **Webhooks** (phone push via ntfy, Discord, JSON) are personal:
+each user adds their own under **Settings → Notification channels**, presses **Add** and then
+**Test**. Pitwall builds the [Apprise](https://github.com/caronc/apprise/wiki) URLs for you, and
+passwords are never shown again after you save them.
 
 ### Email
 
-| Type | What you need |
-|---|---|
-| **Gmail** | Your address and an **app password**. Turn on 2-Step Verification, then create one at <https://myaccount.google.com/apppasswords>. Your normal password won't work. Google Workspace addresses work too. |
-| **Microsoft 365 / Outlook.com** | Your address and password. For Microsoft 365, an admin must enable **Authenticated SMTP** for the mailbox. |
-| **Other SMTP server** | Server, a From address, and optionally port and security (STARTTLS on 587, SSL/TLS on 465, or none on 25 for a local relay; "Automatic" picks by port). Username and password are optional, for relays that don't need a login. You can type the server as `smtp.example.com:587`. |
-| **Apprise URL** | Anything else Apprise supports. |
+**1. An admin sets up outgoing email** (Settings → **Outgoing email**, admins only). Every
+user's email is sent through this one account.
 
-By default, alerts go to the sending address; fill in **Send alerts to** to use another one.
-Emails are HTML with a plain-text alternative part.
+| Send with | What you need |
+|---|---|
+| **Gmail / Google Workspace** | The Google account's address and an **app password**. Turn on 2-Step Verification, then create one at <https://myaccount.google.com/apppasswords>; your normal password won't work. Pitwall connects to `smtp.gmail.com`, port 587, with STARTTLS. |
+| **Microsoft 365 / Outlook.com** | The mailbox address and password. For Microsoft 365, an admin must enable **Authenticated SMTP** for the mailbox. |
+| **Other SMTP server** | Server, port and security (STARTTLS on 587, SSL/TLS on 465, or none on 25 for a local relay; "Automatic" picks by port). Username and password are optional, for relays without a login. |
+
+Then fill in the **From address** (e.g. `pitwall@yourdomain.com`) and **From name**, and press
+**Save and send a test**. The test goes to your own alert address, or to the From address if
+you haven't set one yet.
+
+**Sending from your own domain through Gmail:**
+- **Google Workspace** (your domain's mail is hosted by Google): sign in with that address, or
+  with any Workspace account that has it as an alias. Nothing else to do.
+- **Regular Gmail account:** first add the address in Gmail → Settings → **Accounts and
+  Import** → **Send mail as**, and confirm it with the code Google emails you. Without that,
+  Gmail replaces the From address with your Gmail address.
+- For best delivery, your domain's SPF record should include `include:_spf.google.com`.
+- Gmail allows about 500 emails a day (2,000 on Workspace), far more than Pitwall needs.
+
+Already added your own Gmail or SMTP channel in an earlier version? On Settings it now shows a
+**Use for everyone** button. It turns that channel into the server's outgoing email in one
+click, and your alerts keep going to the same address.
+
+**2. Each user enters their address:** Settings → **Send my email alerts to** → **Save and send
+me a test**. Up to 3 addresses, separated by commas; leave it empty to stop email.
+- Admins can also type a new user's address when creating the account (Users → Create an
+  account). Invited people can enter theirs on the sign-up page.
+- The Users page shows where each person's alerts go.
+- Someone who uses email only (no webhooks) gets every alert type by email when they first
+  add an address: reminders, results and standings too, not just previews and the digest.
+  They can change that under **Routing**.
+
+Normal users can't change the server's mail settings or add email accounts of their own.
+Admins can still add a separate email channel with its own login under "Add a separate email
+channel (advanced)". Emails are HTML with a plain-text alternative part.
 
 ### Webhooks
 

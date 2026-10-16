@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -11,7 +12,9 @@ from sqlalchemy.orm import Session as DB
 
 from pitwall.config import get_env
 from pitwall.db import get_db, utcnow
-from pitwall.models import OWNER_ID, Invite, Outbox, User
+from pitwall.models import OWNER_ID, Invite, Outbox, User, UserSetting
+from pitwall.notify import mailserver
+from pitwall.notify.targets import TargetError
 from pitwall.users import (
     AccountError,
     accept_invite,
@@ -107,6 +110,7 @@ def invite_form(request: Request, token: str, db: DB = Depends(get_db)) -> HTMLR
             "reset_user": reset_user,
             "token": token,
             "error": None,
+            "email_ready": mailserver.load(db) is not None,
         },
     )
 
@@ -122,6 +126,8 @@ async def invite_accept(request: Request, token: str, db: DB = Depends(get_db)) 
         "valid": inv is not None,
         "reset_user": reset_user,
         "token": token,
+        "email_ready": mailserver.load(db) is not None,
+        "email": str(form.get("email", ""))[:200],
     }
     if limiter.blocked(key):
         return templates.TemplateResponse(
@@ -136,6 +142,12 @@ async def invite_accept(request: Request, token: str, db: DB = Depends(get_db)) 
             request, "invite.html", {**ctx, "error": "The passwords don't match."}, status_code=400
         )
     try:
+        addresses = mailserver.parse_addresses(str(form.get("email", "")))
+    except TargetError as exc:
+        return templates.TemplateResponse(
+            request, "invite.html", {**ctx, "error": str(exc)}, status_code=400
+        )
+    try:
         user = accept_invite(db, token, str(form.get("username", "")), password)
     except AccountError as exc:
         limiter.fail(key)
@@ -143,11 +155,13 @@ async def invite_accept(request: Request, token: str, db: DB = Depends(get_db)) 
         return templates.TemplateResponse(
             request, "invite.html", {**ctx, "error": str(exc)}, status_code=400
         )
+    if addresses and not reset_user:
+        mailserver.set_user_addresses(db, user.id, addresses)
     db.commit()
     login_session(request, user)
     flash(
         request,
-        f"Welcome, {user.username}! Set your timezone and add where your alerts should go below."
+        f"Welcome, {user.username}! Set your timezone and choose your alerts below."
         if not reset_user
         else "Password updated.",
     )
@@ -284,6 +298,11 @@ def _users_page(
         now=now,
         new_link=request.session.pop("new_link", None),
         login_url=get_env().base_url.rstrip("/"),
+        mail_ready=mailserver.load(db) is not None,
+        alert_emails={
+            row.user_id: json.loads(row.value)
+            for row in db.scalars(select(UserSetting).where(UserSetting.key == "notify_email"))
+        },
         **extra,
     )
     resp.status_code = status
@@ -306,6 +325,10 @@ async def create_account(
     username = str(form.get("username", ""))[:64]
     password = str(form.get("password", "")) or generate_password(username.strip().lower())
     try:
+        addresses = mailserver.parse_addresses(str(form.get("email", "")))
+    except TargetError as exc:
+        return _users_page(request, db, user, 400, create_error=str(exc), create_name=username)
+    try:
         new = create_user(
             db,
             username,
@@ -316,6 +339,8 @@ async def create_account(
     except AccountError as exc:
         db.rollback()
         return _users_page(request, db, user, 400, create_error=str(exc), create_name=username)
+    if addresses:
+        mailserver.set_user_addresses(db, new.id, addresses)
     db.commit()
     log.info("account created", extra={"user": new.username, "by": user.username})
     creds = {"kind": "new", "username": new.username, "password": password}

@@ -90,7 +90,22 @@
   {% for c in channels %}
     <div>
       <h3>{{ "Email" if c == "email" else "Webhooks" }}</h3>
+      {% if c == "email" %}
+      {% if email_error %}<div class="error" role="alert" id="email-error">Couldn't save your address: {{ email_error }}</div>{% endif %}
+      {% if mail_server %}
+      <form method="post" action="/settings/email" id="my-email">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <label for="notify-email">Send my email alerts to</label>
+        <input id="notify-email" type="text" name="notify_email" value="{{ settings.notify_email }}" placeholder="you@example.com" autocomplete="email" inputmode="email" style="width:100%;">
+        <p class="muted small">Up to 3 addresses, separated by commas. Leave it empty to stop email alerts. Choose which alerts are emailed under <em>Routing</em>.</p>
+        <div class="row"><button name="action" value="save">Save</button><button class="secondary" name="action" value="test">Save and send me a test</button></div>
+      </form>
+      {% else %}
+      <p class="small">{% if user.is_admin %}Set up <a href="#mail-server">outgoing email</a> below first. After that, everyone just enters the address they want alerts sent to.{% else %}Email alerts aren't set up on this server yet. Ask an admin to set up outgoing email; then you'll only need to enter your address here.{% endif %}</p>
+      {% endif %}
+      {% endif %}
       {% if targets[c] or env_targets[c] %}
+      {% if c == "email" %}<h4 class="small" style="margin:14px 0 4px;">Other email channels</h4>{% endif %}
       <table>
         {% for t in targets[c] %}
         <tr class="{{ '' if t.enabled else 'past' }}">
@@ -99,6 +114,9 @@
             {% for action, text in [("test", "Test"), ("toggle", "Disable" if t.enabled else "Enable"), ("delete", "Remove")] %}
             <form class="inline" method="post" action="/settings/targets/{{ t.id }}/{{ action }}"{% if action == "delete" %} data-confirm="Remove {{ t.label }}?"{% endif %}><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">{{ text }}</button></form>
             {% endfor %}
+            {% if t.id in convertible %}
+            <form class="inline" method="post" action="/admin/mail/from-target/{{ t.id }}" data-confirm="Use this account to send everyone's email alerts? This channel becomes the server's outgoing email and your alerts keep going to the same address."><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="small">Use for everyone</button></form>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -109,13 +127,15 @@
       {% if (targets[c]|length) + (env_targets[c]|length) > 1 %}
       <form class="inline" method="post" action="/settings/test/{{ c }}"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small" style="margin-top:6px;">Test all {{ c }}</button></form>
       {% endif %}
-      {% else %}
+      {% if c == "email" and convertible and not mail_server %}<p class="small">Already set up email for yourself? <strong>Use for everyone</strong> turns it into the server's outgoing email in one step.</p>{% endif %}
+      {% elif c == "webhook" %}
       <p class="muted small">None yet.</p>
       {% endif %}
 
+      {% if c == "webhook" or user.is_admin %}
       {% if channel_form.channel == c and channel_form.error %}<div class="error" role="alert" id="channel-error-{{ c }}">Couldn't add {{ 'the email address' if c == 'email' else 'the webhook' }}: {{ channel_form.error }}</div>{% endif %}
-      <details style="margin-top:12px;" {{ 'open' if not (targets[c] or env_targets[c]) or channel_form.channel == c else '' }}>
-        <summary class="small" style="cursor:pointer;font-weight:600;">+ Add {{ "an email address" if c == "email" else "a webhook" }}</summary>
+      <details style="margin-top:12px;" {{ 'open' if (c == 'webhook' and not (targets[c] or env_targets[c])) or channel_form.channel == c else '' }}>
+        <summary class="small" style="cursor:pointer;font-weight:600;">+ Add {{ "a separate email channel (advanced)" if c == "email" else "a webhook" }}</summary>
         <form method="post" action="/settings/targets" class="target-form">
           <input type="hidden" name="csrf_token" value="{{ csrf }}">
           <input type="hidden" name="channel" value="{{ c }}">
@@ -171,12 +191,71 @@
           </div>
           <label>Name <span class="muted">(optional)</span></label><input type="text" name="label" placeholder="e.g. My phone">
           <div style="margin-top:10px;"><button>Add</button></div>
+          {% if c == "email" %}<p class="muted small">Only for an extra destination with its own login. Normally you only need the address above.</p>{% endif %}
         </form>
       </details>
+      {% endif %}
     </div>
   {% endfor %}
   </div>
 </div>
+
+{% if user.is_admin %}{% set ms = mail_server or {} %}{% set mf = mail_form %}
+<div class="card" id="mail-server" style="margin-bottom:16px;">
+  <h2>Outgoing email <span class="badge muted">admin · everyone</span></h2>
+  <p class="small">Pitwall sends everyone's email alerts from this one account. Users only enter the address they want alerts sent to (Settings → Email); nobody else needs any mail server details.</p>
+  {% if mail_server %}<p class="small">✅ Set up: <code>{{ mail_server.host }}:{{ mail_server.port }}</code>, sending as <strong>{{ mail_server.from_name }} &lt;{{ mail_server.from_addr }}&gt;</strong>{% if mail_server.username %} (signs in as {{ mail_server.username }}){% endif %}.</p>
+  {% else %}<p class="small">Not set up yet: nobody gets email alerts until it is.</p>{% endif %}
+  {% if mf.error %}<div class="error" role="alert" id="mail-error">Couldn't save: {{ mf.error }}</div>{% endif %}
+  <form method="post" action="/admin/mail" class="target-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    {% set provider = mf.get('provider') or ms.get('provider') or 'gmail' %}
+    <label for="mail-provider">Send with</label>
+    <select id="mail-provider" name="provider" data-kind-select>
+      {% for k, name in mail_providers.items() %}<option value="{{ k }}" {{ 'selected' if provider == k else '' }}>{{ name }}</option>{% endfor %}
+    </select>
+    <div data-kind="gmail">
+      <ol class="small steps">
+        <li>Turn on <a href="https://myaccount.google.com/signinoptions/twosv" target="_blank" rel="noopener">2-Step Verification</a> for the Google account, then create an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">app password</a> (name it "Pitwall"). Your normal password won't work.</li>
+        <li>To send from an address on your own domain (e.g. <code>pitwall@yourdomain.com</code>):
+          <ul>
+            <li>If the domain is on <strong>Google Workspace</strong>, sign in with that address, or with any Workspace account that has it as an alias.</li>
+            <li>With a <strong>regular Gmail account</strong>, first add the address in Gmail → Settings → <em>Accounts and Import</em> → <em>Send mail as</em> and confirm it. Otherwise Gmail replaces it with your Gmail address.</li>
+          </ul></li>
+        <li>Pitwall connects to <code>smtp.gmail.com</code>, port 587, with STARTTLS. Gmail allows about 500 emails a day (2,000 on Workspace), plenty for Pitwall.</li>
+      </ol>
+    </div>
+    <div data-kind="m365">
+      <p class="muted small">Uses <code>smtp.office365.com</code>, port 587, STARTTLS. The mailbox needs "Authenticated SMTP" turned on (Microsoft 365 admin center → Users → Mail).</p>
+    </div>
+    <div data-kind="smtp">
+      <div class="row">
+        <div><label>SMTP server</label><input type="text" name="smtp_host" placeholder="smtp.example.com" value="{{ mf.get('smtp_host') or (ms.get('host') if ms.get('provider') == 'smtp' else '') }}"></div>
+        <div><label>Port <span class="muted">(blank = default)</span></label><input type="number" name="smtp_port" min="1" max="65535" placeholder="587" style="width:100px;" value="{{ mf.get('smtp_port') or (ms.get('port') if ms.get('provider') == 'smtp' else '') }}"></div>
+        <div><label>Security</label><select name="smtp_security">
+          <option value="">Automatic (by port)</option>
+          {% for k, name in smtp_security.items() %}<option value="{{ k }}" {{ 'selected' if (mf.get('smtp_security') or ms.get('security')) == k and provider == 'smtp' else '' }}>{{ name }}</option>{% endfor %}
+        </select></div>
+      </div>
+    </div>
+    <label for="mail-user">Account <span class="muted" data-kind="smtp">(blank if your relay needs no login)</span></label>
+    <input id="mail-user" type="text" name="username" autocomplete="off" placeholder="you@gmail.com" value="{{ mf.get('username') or ms.get('username', '') }}">
+    <label for="mail-pass"><span data-kind="gmail">App password</span><span data-kind="m365 smtp">Password</span></label>
+    <input id="mail-pass" type="password" name="password" autocomplete="new-password" placeholder="{{ 'saved: leave empty to keep it' if ms.get('has_password') else '' }}">
+    <label for="mail-from">From address</label>
+    <input id="mail-from" type="text" name="from_addr" placeholder="pitwall@yourdomain.com" value="{{ mf.get('from_addr') or ms.get('from_addr', '') }}">
+    <label for="mail-name">From name</label>
+    <input id="mail-name" type="text" name="from_name" maxlength="60" value="{{ mf.get('from_name') or ms.get('from_name', 'Pitwall') }}">
+    <div class="row" style="margin-top:10px;"><button name="action" value="save">Save</button><button class="secondary" name="action" value="test">Save and send a test</button></div>
+    <p class="muted small">The test goes to your own alert address (or the From address if you haven't set one). The password is stored in Pitwall's database and never shown again.</p>
+  </form>
+  {% if mail_server %}
+  <form method="post" action="/admin/mail" data-confirm="Remove the outgoing email account? Nobody will get email alerts until it's set up again." style="margin-top:8px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small" name="action" value="remove">Remove</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
 
 <div class="grid">
   <div class="card" id="followed">

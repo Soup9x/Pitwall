@@ -357,3 +357,8 @@ ol.leaders li > span:first-child { display: inline-block; min-width: 0; }
 ol.leaders li { display: list-item; }
 ol.leaders li .mono { float: right; }
 .active-mark { color: var(--good); font-size: .7em; vertical-align: middle; }
+
+/* Settings → Outgoing email: setup steps */
+ol.steps { margin: 6px 0 8px; padding-left: 20px; }
+ol.steps li { margin: 4px 0; }
+ol.steps ul { margin: 4px 0; padding-left: 18px; }

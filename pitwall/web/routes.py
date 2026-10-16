@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import asdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -42,7 +43,7 @@ from pitwall.models import (
     StandingsSnapshot,
     User,
 )
-from pitwall.notify import builders, outbox
+from pitwall.notify import builders, mailserver, outbox
 from pitwall.notify import targets as targets_svc
 from pitwall.notify.dispatch import mask_url
 from pitwall.notify.dispatch import notify as dispatch_notify
@@ -79,6 +80,7 @@ from pitwall.settings_store import (
     load_settings,
     parse_hhmm,
     save_settings,
+    set_kv,
 )
 from pitwall.units import TEMP_UNITS
 from pitwall.web import dashboard as dashboard_view
@@ -778,6 +780,17 @@ def settings_page(
         followed=followed,
         this_year=utcnow().year,
         backfill_next=_backfill_next(db, settings),
+        mail_server=mailserver.describe(mailserver.load(db)),
+        mail_providers=mailserver.PROVIDERS,
+        mail_form=(request.session.pop("mail_form", None) or {}) if user.is_admin else {},
+        email_error=request.session.pop("email_error", None),
+        convertible={
+            t.id
+            for t in targets_svc.db_targets(db, "email", user.id)
+            if mailserver.from_target_url(t.url) is not None
+        }
+        if user.is_admin
+        else set(),
         error=request.session.pop("settings_error", None),
         channel_form=request.session.pop("channel_form", None) or {},
         smtp_security=targets_svc.SMTP_SECURITY,
@@ -899,6 +912,9 @@ async def add_target(
     form = await checked_form(request)
     channel = str(form.get("channel", ""))
     kind = str(form.get("kind", ""))
+    if channel == "email" and not user.is_admin:
+        # Email goes through the server's mail account; users just enter their address.
+        raise HTTPException(403)
     fields: dict[str, str] = {}
     for k, v in form.multi_items():  # first non-empty value wins (fields repeat across types)
         if k != "csrf_token" and isinstance(v, str) and v.strip() and k not in fields:
@@ -1025,6 +1041,139 @@ async def test_channel(
     db.commit()
     flash(request, f"Test {channel}: {'sent ✅' if ok else 'failed ❌ — ' + detail}")
     return back("/settings#channels")
+
+
+def _log_test(db: DB, user: User, msg: Any, title: str, ok: bool, detail: str) -> None:
+    db.add(
+        NotificationLog(
+            user_id=user.id,
+            type="test",
+            channel="email",
+            payload_hash=msg.payload_hash(),
+            title=title,
+            status="sent" if ok else "failed",
+            detail=detail[:1000],
+        )
+    )
+
+
+async def _send_test_email(db: DB, user: User, url: str, to: str) -> tuple[bool, str]:
+    msg = builders.test_message("email")
+    msg.user_id = user.id
+    ok, detail = await run_in_threadpool(dispatch_notify, "email", msg, [url])
+    _log_test(db, user, msg, f"{msg.title} ({to})", ok, detail)
+    db.commit()
+    return ok, detail
+
+
+def _test_flash(to: str, ok: bool, detail: str) -> str:
+    if ok:
+        return f"Test email sent to {to} ✅ — check that it arrived (and the spam folder)."
+    return f"Test email to {to} failed ❌ — {detail}"
+
+
+@private.post("/settings/email")
+async def my_email(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
+    """A user's own alert address. The server's mail account (admin) does the sending."""
+    form = await checked_form(request)
+    try:
+        addresses = mailserver.parse_addresses(str(form.get("notify_email", "")))
+    except targets_svc.TargetError as exc:
+        request.session["email_error"] = str(exc)
+        return back("/settings#email-error")
+    routed = mailserver.set_user_addresses(db, user.id, addresses)
+    db.commit()
+    if not addresses:
+        flash(request, "Email alerts turned off: no address saved.")
+        return back("/settings#channels")
+    server = mailserver.load(db)
+    if form.get("action") == "test" and server is not None:
+        ok, detail = await _send_test_email(db, user, server.url(addresses), addresses[0])
+        flash(request, _test_flash(", ".join(addresses), ok, detail))
+        return back("/settings#channels")
+    note = (
+        " Reminders, results and standings will be emailed too, since you have no webhooks;"
+        " change that under Routing."
+        if routed
+        else ""
+    )
+    flash(request, f"Saved: email alerts go to {', '.join(addresses)}.{note}")
+    return back("/settings#channels")
+
+
+# Typed into the outgoing-email form and kept after an error (never the password).
+MAIL_FORM_KEEP = (
+    "provider",
+    "smtp_host",
+    "smtp_port",
+    "smtp_security",
+    "username",
+    "from_addr",
+    "from_name",
+)
+
+
+@admin.post("/admin/mail")
+async def mail_server(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_admin)
+) -> Response:
+    """The server's outgoing email account (admin only): save, test or remove."""
+    form = await checked_form(request)
+    action = str(form.get("action", "save"))
+    if action == "remove":
+        mailserver.clear(db)
+        db.commit()
+        flash(request, "Outgoing email removed. Nobody gets email alerts until it's set up again.")
+        return back("/settings#mail-server")
+    fields = {k: v for k, v in form.items() if isinstance(v, str)}
+    try:
+        server = mailserver.save(db, fields)
+    except targets_svc.TargetError as exc:
+        request.session["mail_form"] = {
+            "error": str(exc),
+            **{k: fields[k][:200] for k in MAIL_FORM_KEEP if k in fields},
+        }
+        return back("/settings#mail-error")
+    db.commit()
+    if action == "test":
+        to = load_settings(db, user.id).notify_email or server.from_addr
+        addresses = mailserver.parse_addresses(to)
+        ok, detail = await _send_test_email(db, user, server.url(addresses), addresses[0])
+        flash(request, "Saved. " + _test_flash(", ".join(addresses), ok, detail))
+    else:
+        flash(request, "Outgoing email saved. Use “Save and send a test” to check it works.")
+    return back("/settings#mail-server")
+
+
+@admin.post("/admin/mail/from-target/{target_id}")
+async def mail_from_target(
+    request: Request,
+    target_id: int,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_admin),
+) -> Response:
+    """Turn the admin's own email channel into the server's mail account, in one click."""
+    await checked_form(request)
+    target = _target(db, target_id, user)
+    parsed = mailserver.from_target_url(target.url) if target.channel == "email" else None
+    if parsed is None:
+        flash(request, "That channel can't be converted; set up outgoing email by hand below.")
+        return back("/settings#mail-server")
+    server, to = parsed
+    set_kv(db, mailserver.KEY, asdict(server))
+    mailserver.register(server)
+    if not load_settings(db, user.id).notify_email:
+        save_settings(db, {"notify_email": ", ".join(to[: mailserver.MAX_RECIPIENTS])}, user.id)
+    db.delete(target)
+    db.commit()
+    flash(
+        request,
+        f"Outgoing email now uses {server.host} (from {server.from_addr}) for everyone, and your "
+        "alerts go to your address below. Send a test to check.",
+    )
+    return back("/settings#mail-server")
 
 
 @admin.post("/admin/run/{job}")

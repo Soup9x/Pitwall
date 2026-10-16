@@ -213,18 +213,39 @@ def db_targets(
     return list(db.scalars(q))
 
 
+def server_email_url(db: DB, user_id: int) -> str | None:
+    """The user's alert address(es) sent through the server's mail account, if both are set."""
+    from pitwall.notify import mailserver
+    from pitwall.settings_store import get_user_kv
+
+    server = mailserver.load(db)
+    if server is None:
+        return None
+    try:
+        to = mailserver.parse_addresses(get_user_kv(db, user_id, "notify_email", "") or "")
+    except TargetError:
+        return None
+    return server.url(to) if to else None
+
+
 def channel_urls(channel: str, db: DB | None = None, user_id: int | None = None) -> list[str]:
-    """Every enabled destination of a user on a channel. URLs from .env belong to the owner."""
+    """Every enabled destination of a user on a channel: their address via the server's mail
+    account, channels they added themselves, and (for the owner) URLs from .env."""
     uid = user_id or OWNER_ID
     if db is None:
         with session_scope() as s:
             return channel_urls(channel, s, uid)
     urls = [t.url for t in db_targets(db, channel, uid) if t.enabled]
+    if channel == "email" and (server_url := server_email_url(db, uid)):
+        urls.insert(0, server_url)
     if uid == OWNER_ID:
         urls += [u for u in env_urls(channel) if u not in urls]
     return urls
 
 
 def register_all_secrets(db: DB) -> None:
+    from pitwall.notify import mailserver
+
     for t in db_targets(db, user_id=None):
         register_secrets(url_secrets(t.url))
+    mailserver.register(mailserver.load(db))

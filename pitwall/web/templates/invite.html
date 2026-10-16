@@ -23,6 +23,11 @@
       <label for="password2">Password again</label>
       <input id="password2" type="password" name="password2" autocomplete="new-password" style="width:100%;" required minlength="10">
       <p class="muted small">At least 10 characters.</p>
+      {% if email_ready and not reset_user %}
+      <label for="email">Email for alerts <span class="muted">(optional)</span></label>
+      <input id="email" type="email" name="email" autocomplete="email" style="width:100%;" value="{{ email or '' }}">
+      <p class="muted small">Race reminders, results and previews are emailed here. You can change it later in Settings.</p>
+      {% endif %}
       <div style="margin-top:14px;"><button type="submit">{{ 'Set password' if reset_user else 'Create account' }}</button></div>
     </form>
   {% endif %}
