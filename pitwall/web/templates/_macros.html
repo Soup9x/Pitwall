@@ -19,12 +19,12 @@
 {% for r in (table.rows[:limit] if limit else table.rows) %}
 <tr class="{{ 'followed' if r.followed else '' }}">
   <td class="num">{{ r.position }}</td>
-  <td>{% if heading == "Driver" %}<a href="/drivers/{{ r.entity_id }}">{{ r.name }}</a>{% else %}{{ r.name }}{% endif %}{% if r.team %} <span class="muted small">{{ r.team }}</span>{% endif %}</td>
+  <td class="stripe" style="--team: {{ r.team_color or 'var(--border)' }}">{% if heading == "Driver" %}<a href="/drivers/{{ r.entity_id }}">{{ r.name }}</a>{% else %}{{ r.name }}{% endif %}{% if r.team %} <span class="muted small">{{ r.team }}</span>{% endif %}</td>
   <td class="num">{{ r.points|pts }}</td>
   <td class="num">{{ r.wins }}</td>
   <td class="num muted">{% if r.gap_leader is not none %}-{{ r.gap_leader|pts }}{% else %}—{% endif %}</td>
   <td class="num muted">{% if r.gap_ahead is not none %}-{{ r.gap_ahead|pts }}{% else %}—{% endif %}</td>
-  <td class="{{ 'up' if r.change and r.change > 0 else ('down' if r.change and r.change < 0 else 'same') }}">{{ r.arrow }}</td>
+  <td class="mono {{ 'up' if r.change and r.change > 0 else ('down' if r.change and r.change < 0 else 'same') }}" title="{% if r.change %}{{ 'Up' if r.change > 0 else 'Down' }} {{ r.change|abs }} since the previous round{% else %}No change{% endif %}">{{ r.arrow }}</td>
 </tr>
 {% endfor %}
 </table></div>
@@ -96,4 +96,39 @@
 
 {% macro news_hidden(view, reveal_url) -%}
 {% if view.hidden %}<p class="spoiler-notice small">🙈 {{ view.hidden }} headline{{ 's' if view.hidden != 1 }} hidden by spoiler mode{% if view.held_event %} until you mark {{ view.held_event.name }} as watched{% endif %}. <a href="{{ reveal_url }}" rel="nofollow">Show anyway</a></p>{% endif %}
+{%- endmacro %}
+
+{# "Synced 12 min ago" (●), stale (▲) or failed (✕): symbol + words, never colour alone. #}
+{% macro fresh_badge(f) -%}
+{% if f %}<span class="fresh {{ f.css }}" title="{{ f.last_error or '' }}"><span aria-hidden="true">{{ f.symbol }}</span> {{ f.text }}</span>{% endif %}
+{%- endmacro %}
+
+{# Horizontal FP1 → Race timeline with a state word on each session. #}
+{% macro session_timeline(items, weather={}) -%}
+<ol class="timeline" aria-label="Weekend sessions">
+{% for it in items %}{% set v = it.view %}
+  <li class="tl tl-{{ it.state }}">
+    <div class="tl-head"><span class="tl-name">{{ it.short }}</span>{% if it.state_label %}<span class="tl-state">{{ it.marker }} {{ it.state_label }}</span>{% endif %}</div>
+    <div class="tl-time time">{{ v.owner_time }}</div>
+    {% if v.local_time %}<div class="tl-track muted small">Track {{ v.local_time.split(', ')[-1] }} {{ v.local_tz }}</div>{% endif %}
+    {% if v.odd and it.state not in ('done', 'cancelled') %}<span class="badge odd">🌙 odd hours</span>{% endif %}
+    {% set wx = weather.get(v.id) %}{% if wx and it.state != 'done' %}<div class="small">{{ wx.icon }} {{ wx.temp }}{% if wx.risk %} <span class="odd">☔ {{ wx.rain }}</span>{% endif %}</div>{% endif %}
+  </li>
+{% endfor %}
+</ol>
+{%- endmacro %}
+
+{# Timing-screen standings: position, team stripe + 3-letter code, points, gap, ▲/▼ change. #}
+{% macro timing_tower(table, limit=10) -%}
+<ol class="tower" aria-label="Top {{ limit }} drivers">
+{% for r in table.rows[:limit] %}
+  <li class="{{ 'followed' if r.followed else '' }}">
+    <span class="t-pos mono">{{ r.position }}</span>
+    <span class="t-drv stripe" style="--team: {{ r.team_color or 'var(--border)' }}"><a href="/drivers/{{ r.entity_id }}" title="{{ r.name }}{% if r.team %}, {{ r.team }}{% endif %}">{{ r.code or r.name.split(' ')[-1][:3]|upper }}</a>{% if r.followed %}<span class="sr-only"> (followed)</span> <span aria-hidden="true">★</span>{% endif %}</span>
+    <span class="t-pts mono">{{ r.points|pts }}</span>
+    <span class="t-gap mono muted">{% if r.gap_leader %}−{{ r.gap_leader|pts }}{% else %}Leader{% endif %}</span>
+    <span class="t-chg mono {{ 'up' if r.change and r.change > 0 else ('down' if r.change and r.change < 0 else 'same') }}" title="{% if r.change %}{{ 'Up' if r.change > 0 else 'Down' }} {{ r.change|abs }} since the previous round{% else %}No change{% endif %}">{{ r.arrow }}</span>
+  </li>
+{% endfor %}
+</ol>
 {%- endmacro %}

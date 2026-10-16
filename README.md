@@ -123,6 +123,42 @@ Spoiler mode covers all of this. While an event is held, its race control, the p
 decisions and headlines published after its first competitive session started are left out
 of pages and emails. Pages show "N headlines hidden" and a **Show anyway** link.
 
+## Look and feel
+
+- **Timing-screen design**, dark by default. Switch between **System**, **Light** and
+  **Dark** with the three icons in the header. The choice is saved per user, and System
+  follows your device. Colour never carries meaning on its own: arrows, icons or words
+  always go with it, and the colours pass WCAG AA contrast (checked by the tests).
+- **Fonts**: Titillium Web for text, JetBrains Mono with tabular figures for times, gaps and
+  points. Both are self-hosted under `pitwall/web/static/fonts` (SIL Open Font License).
+  The logo is Pitwall's own; there are no F1/FIA logos, fonts, team logos or driver photos.
+- **Team colours** come from `data/team_colors.yaml` (per season). They're only used for a
+  thin stripe next to a team's drivers. The values are approximate; edit them freely. A
+  team without an entry simply gets no stripe.
+- **Dashboard**:
+  - a next-session card with countdown (also shown in the browser tab), your time and
+    track time, an odd-hours badge, tyres, forecast with last year's conditions, and
+    penalty alerts;
+  - a top-10 timing tower with 3-letter codes, team stripe and ▲/▼ changes;
+  - cards for the drivers you follow, and the news strip.
+- **Race weekend mode** (Thursday to the end of the race, track time): the dashboard leads
+  with the session timeline, penalties, weather and tyres, then the standings.
+- **Event page**: session timeline first, then the track card, penalties, race control,
+  conditions, track updates and results.
+- **Penalty watch**: power unit usage as pips (yellow at the limit, red over it) and licence
+  points as bars out of 12 (yellow from 8, red from 10), with the numbers and words too.
+- **Freshness badges** on data sections ("Synced 12m ago"), with ▲ in yellow when stale and
+  ✕ in red when the last sync failed.
+- Works from 375 px wide phones up. Animations are switched off if your device asks for
+  reduced motion.
+- **Install as an app** (PWA): use your browser's "Install" or "Add to Home Screen". The app
+  caches only its own files (never pages with your data or results), with an offline page.
+  Browsers only allow installing over HTTPS or on `localhost`. Over plain `http://` on your
+  LAN, Pitwall works normally in the browser, but phones may only offer a home-screen
+  shortcut.
+- **Emails** use a light, 600 px wide table layout with inline styles, plus a plain-text
+  version. Spoiler rules apply to them as well.
+
 Data comes from the [Jolpica F1 API](https://github.com/jolpica/jolpica-f1) (the
 Ergast successor), [OpenF1](https://openf1.org), FIA event documents, Pirelli press releases
 and the news feeds you choose, plus curated circuit facts in `data/circuits.yaml`.
@@ -225,7 +261,7 @@ for you, and passwords are never shown again after you save them.
 |---|---|
 | **Gmail** | Your address and an **app password**. Turn on 2-Step Verification, then create one at <https://myaccount.google.com/apppasswords>. Your normal password won't work. Google Workspace addresses work too. |
 | **Microsoft 365 / Outlook.com** | Your address and password. For Microsoft 365, an admin must enable **Authenticated SMTP** for the mailbox. |
-| **Other SMTP server** | Server, port (587 STARTTLS or 465 SSL), username, password and a From address. |
+| **Other SMTP server** | Server, a From address, and optionally port and security (STARTTLS on 587, SSL/TLS on 465, or none on 25 for a local relay; "Automatic" picks by port). Username and password are optional, for relays that don't need a login. You can type the server as `smtp.example.com:587`. |
 | **Apprise URL** | Anything else Apprise supports. |
 
 By default, alerts go to the sending address; fill in **Send alerts to** to use another one.
@@ -457,6 +493,7 @@ PITWALL_DATA_DIR=./data PITWALL_ADMIN_PASSWORD=dev python -m pitwall serve
 ```
 
 Other commands: `python -m pitwall migrate | sync | backfill`.
+`scripts/make_icons.py` redraws the PNG app icons from the logo.
 `scripts/record_fixtures.py` records real Jolpica responses for tests (see
 `tests/fixtures/jolpica/README.md`).
 `scripts/record_step2_fixtures.py` does the same for OpenF1 race control/weather, the news

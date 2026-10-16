@@ -33,6 +33,7 @@ from pitwall.services import news, penalties, penalty_watch, session_data, spoil
 from pitwall.services.presenters import current_or_next_event
 from pitwall.settings_store import AppSettings, get_kv, load_settings, set_kv
 from pitwall.units import c_to_f
+from pitwall.web import dashboard
 from pitwall.web.auth import checked_form, require_admin, require_user
 from pitwall.web.common import back, flash, page
 
@@ -101,6 +102,7 @@ def event_context(
         "describe_grid": penalties.describe_grid,
         "track_news": news.track_updates(db, event, user.id, settings, reveal=reveal),
         "news_tags": news.tags_of,
+        "timeline": dashboard.timeline(event, settings, utcnow()),
     }
 
 

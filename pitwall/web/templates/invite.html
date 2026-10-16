@@ -1,11 +1,10 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex">
-<title>{{ 'Reset password' if reset_user else 'Join' }} · Pitwall</title><link rel="stylesheet" href="/static/style.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏁</text></svg>"></head>
+<html lang="en" data-theme="dark"><head>
+{% include "_head.html" %}
+<title>{{ 'Reset password' if reset_user else 'Join' }} · Pitwall</title></head>
 <body>
 <div class="login card">
-  <div class="brand" style="font-size:1.4rem;">Pit<span>wall</span></div>
+  <div class="brand" style="font-size:1.3rem;margin-bottom:8px;">{% include "_logo.svg" %}<span>Pit<span class="w">wall</span></span></div>
   {% if not valid %}
     <div class="error">This link has expired or was already used. Ask for a new one.</div>
     <p><a href="/login">Go to the login page</a></p>

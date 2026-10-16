@@ -3,42 +3,42 @@
 {% set c = ev.circuit %}
 {% block body %}
 <p style="margin:0 0 4px;font-size:16px;"><strong>{{ c.name }}</strong></p>
-<p style="margin:0 0 12px;color:#4b5563;">{{ c.locality }}{% if c.country %}, {{ c.country }}{% endif %} · Round {{ ev.round }}
+<p style="margin:0 0 12px;color:#535B68;">{{ c.locality }}{% if c.country %}, {{ c.country }}{% endif %} · Round {{ ev.round }}
 {% if ev.is_sprint_weekend %} · <span style="background:#fde68a;color:#92400e;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:700;">SPRINT WEEKEND</span>{% endif %}</p>
 
 <h3 style="margin:16px 0 8px;">Sessions</h3>
 <table role="presentation" width="100%" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
-<tr style="background:#f3f4f6;text-align:left;"><th>Session</th><th>Your time</th><th>Track time</th>{% if ctx.weather %}<th>Weather</th>{% endif %}</tr>
+<tr style="background:#EEF0F4;text-align:left;"><th>Session</th><th>Your time</th><th>Track time</th>{% if ctx.weather %}<th>Weather</th>{% endif %}</tr>
 {% for s in ctx.sessions %}
-<tr style="border-bottom:1px solid #e5e7eb;">
+<tr style="border-bottom:1px solid #D9DDE5;">
   <td>{{ s.emoji }} {{ s.label }}{% if s.status == "cancelled" %} <em>(cancelled)</em>{% endif %}</td>
   <td>{{ s.owner_time }} {{ s.owner_tz }}{% if s.odd %} <span title="odd hours">🌙</span>{% endif %}</td>
-  <td style="color:#4b5563;">{{ s.local_time }} {{ s.local_tz }}</td>
-  {% if ctx.weather %}{% set wx = ctx.weather.get(s.id) %}<td style="color:#4b5563;">{% if wx %}{{ wx.short }}{% if wx.risk %} ☔{% endif %}{% else %}—{% endif %}</td>{% endif %}
+  <td style="color:#535B68;">{{ s.local_time }} {{ s.local_tz }}</td>
+  {% if ctx.weather %}{% set wx = ctx.weather.get(s.id) %}<td style="color:#535B68;">{% if wx %}{{ wx.short }}{% if wx.risk %} ☔{% endif %}{% else %}—{% endif %}</td>{% endif %}
 </tr>
 {% endfor %}
 </table>
-{% for n in ctx.odd_notes %}<p style="margin:6px 0 0;color:#b45309;">🌙 {{ n }}</p>{% endfor %}
+{% for n in ctx.odd_notes %}<p style="margin:6px 0 0;color:#854D0E;">🌙 {{ n }}</p>{% endfor %}
 
 {% set st = ctx.stats %}
 <h3 style="margin:16px 0 8px;">Track</h3>
 {% if ctx.map_url %}<img src="{{ ctx.map_url }}" alt="{{ c.name }} layout" width="400" style="display:block;max-width:100%;height:auto;margin:0 0 8px;">{% endif %}
 <table role="presentation" cellpadding="3" cellspacing="0" style="font-size:14px;">
-{% if c.length_km %}<tr><td style="color:#6b7280;">Length</td><td>{{ "%.3f"|format(c.length_km) }} km{% if c.laps %} × {{ c.laps }} laps{% endif %}</td></tr>{% endif %}
-{% if c.turns %}<tr><td style="color:#6b7280;">Turns</td><td>{{ c.turns }}</td></tr>{% endif %}
-{% if c.drs_zones %}<tr><td style="color:#6b7280;">DRS zones (2025)</td><td>{{ c.drs_zones }}</td></tr>{% endif %}
-{% if c.first_gp_year %}<tr><td style="color:#6b7280;">First GP</td><td>{{ c.first_gp_year }}</td></tr>{% endif %}
-{% if c.lap_record_time %}<tr><td style="color:#6b7280;">Lap record</td><td>{{ c.lap_record_time }} — {{ c.lap_record_driver }} ({{ c.lap_record_year }})</td></tr>{% endif %}
-{% if st.last_winner %}<tr><td style="color:#6b7280;">{{ st.last_winner.season }} winner</td><td>{{ st.last_winner.driver }}{% if st.last_winner.constructor %} ({{ st.last_winner.constructor }}){% endif %}</td></tr>{% endif %}
-{% if st.last_pole %}<tr><td style="color:#6b7280;">{{ st.last_pole.season }} pole</td><td>{{ st.last_pole.driver }}{% if st.last_pole.constructor %} ({{ st.last_pole.constructor }}){% endif %}</td></tr>{% endif %}
-{% if st.winningest_driver %}<tr><td style="color:#6b7280;">Most wins (active)</td><td>{{ st.winningest_driver.name }} ({{ st.winningest_driver.wins }})</td></tr>{% endif %}
-{% if st.winningest_constructor %}<tr><td style="color:#6b7280;">Most wins (team)</td><td>{{ st.winningest_constructor.name }} ({{ st.winningest_constructor.wins }})</td></tr>{% endif %}
-{% if st.pole_to_win_pct is not none %}<tr><td style="color:#6b7280;">Pole → win</td><td>{{ st.pole_to_win_pct }}% ({{ st.pole_to_win[0] }}/{{ st.pole_to_win[1] }} since {{ st.seasons[0] }})</td></tr>{% endif %}
-{% if st.winner_avg_gain %}<tr><td style="color:#6b7280;">Winner gain</td><td>+{{ st.winner_avg_gain[0] }} places from grid on average</td></tr>{% endif %}
+{% if c.length_km %}<tr><td style="color:#535B68;">Length</td><td>{{ "%.3f"|format(c.length_km) }} km{% if c.laps %} × {{ c.laps }} laps{% endif %}</td></tr>{% endif %}
+{% if c.turns %}<tr><td style="color:#535B68;">Turns</td><td>{{ c.turns }}</td></tr>{% endif %}
+{% if c.drs_zones %}<tr><td style="color:#535B68;">DRS zones (2025)</td><td>{{ c.drs_zones }}</td></tr>{% endif %}
+{% if c.first_gp_year %}<tr><td style="color:#535B68;">First GP</td><td>{{ c.first_gp_year }}</td></tr>{% endif %}
+{% if c.lap_record_time %}<tr><td style="color:#535B68;">Lap record</td><td>{{ c.lap_record_time }} — {{ c.lap_record_driver }} ({{ c.lap_record_year }})</td></tr>{% endif %}
+{% if st.last_winner %}<tr><td style="color:#535B68;">{{ st.last_winner.season }} winner</td><td>{{ st.last_winner.driver }}{% if st.last_winner.constructor %} ({{ st.last_winner.constructor }}){% endif %}</td></tr>{% endif %}
+{% if st.last_pole %}<tr><td style="color:#535B68;">{{ st.last_pole.season }} pole</td><td>{{ st.last_pole.driver }}{% if st.last_pole.constructor %} ({{ st.last_pole.constructor }}){% endif %}</td></tr>{% endif %}
+{% if st.winningest_driver %}<tr><td style="color:#535B68;">Most wins (active)</td><td>{{ st.winningest_driver.name }} ({{ st.winningest_driver.wins }})</td></tr>{% endif %}
+{% if st.winningest_constructor %}<tr><td style="color:#535B68;">Most wins (team)</td><td>{{ st.winningest_constructor.name }} ({{ st.winningest_constructor.wins }})</td></tr>{% endif %}
+{% if st.pole_to_win_pct is not none %}<tr><td style="color:#535B68;">Pole → win</td><td>{{ st.pole_to_win_pct }}% ({{ st.pole_to_win[0] }}/{{ st.pole_to_win[1] }} since {{ st.seasons[0] }})</td></tr>{% endif %}
+{% if st.winner_avg_gain %}<tr><td style="color:#535B68;">Winner gain</td><td>+{{ st.winner_avg_gain[0] }} places from grid on average</td></tr>{% endif %}
 </table>
 
 {% if ctx.held_event %}
-<p style="margin:16px 0 8px;color:#6b7280;font-size:13px;">Standings, recent form and trivia are left out until you mark {{ ctx.held_event.name }} as watched (spoiler mode).</p>
+<p style="margin:16px 0 8px;color:#535B68;font-size:13px;">Standings, recent form and trivia are left out until you mark {{ ctx.held_event.name }} as watched (spoiler mode).</p>
 {% endif %}
 {% if ctx.drivers %}
 <h3 style="margin:16px 0 8px;">Standings after round {{ ctx.drivers.round }}</h3>
@@ -57,7 +57,7 @@
 {% if ctx.form %}
 <h3 style="margin:16px 0 8px;">Followed drivers — last 3 races</h3>
 {% for f in ctx.form %}
-<p style="margin:2px 0;"><strong>{{ f.driver }}</strong>: {% if f.results %}{% for ev, pos in f.results %}{{ pos }} <span style="color:#6b7280;">({{ ev }})</span>{% if not loop.last %} · {% endif %}{% endfor %}{% else %}no results yet{% endif %}</p>
+<p style="margin:2px 0;"><strong>{{ f.driver }}</strong>: {% if f.results %}{% for ev, pos in f.results %}{{ pos }} <span style="color:#535B68;">({{ ev }})</span>{% if not loop.last %} · {% endif %}{% endfor %}{% else %}no results yet{% endif %}</p>
 {% endfor %}
 {% endif %}
 
@@ -66,19 +66,19 @@
 {% if ctx.tyres.nomination %}{% set t = ctx.tyres.nomination %}
 <p style="margin:2px 0;">Hard <strong>{{ t.hard }}</strong> · Medium <strong>{{ t.medium }}</strong> · Soft <strong>{{ t.soft }}</strong></p>
 {% else %}<p style="margin:2px 0;">Not announced yet.</p>{% endif %}
-{% if ctx.tyres.last_year %}{% set ly = ctx.tyres.last_year[1] %}<p style="margin:2px 0;color:#6b7280;font-size:13px;">{{ ctx.tyres.last_year[0].season }} here: hard {{ ly.hard }}, medium {{ ly.medium }}, soft {{ ly.soft }}</p>{% endif %}
+{% if ctx.tyres.last_year %}{% set ly = ctx.tyres.last_year[1] %}<p style="margin:2px 0;color:#535B68;font-size:13px;">{{ ctx.tyres.last_year[0].season }} here: hard {{ ly.hard }}, medium {{ ly.medium }}, soft {{ ly.soft }}</p>{% endif %}
 {% endif %}
 
 {% if ctx.weather or ctx.last_year %}
 <h3 style="margin:16px 0 8px;">Weather</h3>
-{% if ctx.weather %}{% for w in ctx.rain %}<p style="margin:2px 0;color:#b45309;font-weight:600;">☔ {{ w }}</p>{% else %}<p style="margin:2px 0;">No significant rain risk for qualifying or the race (forecast from Open-Meteo).</p>{% endfor %}{% endif %}
-{% if ctx.last_year %}{% set c = ctx.last_year.conditions %}<p style="margin:2px 0;color:#6b7280;font-size:13px;">Last year here ({{ ctx.last_year.event.season }} race): track {{ c.track_min|temp_range(c.track_max, ctx.temp_unit) }}{% if c.rain is not none %}, {{ 'rain' if c.rain else 'dry' }}{% endif %}</p>{% endif %}
+{% if ctx.weather %}{% for w in ctx.rain %}<p style="margin:2px 0;color:#854D0E;font-weight:600;">☔ {{ w }}</p>{% else %}<p style="margin:2px 0;">No significant rain risk for qualifying or the race (forecast from Open-Meteo).</p>{% endfor %}{% endif %}
+{% if ctx.last_year %}{% set c = ctx.last_year.conditions %}<p style="margin:2px 0;color:#535B68;font-size:13px;">Last year here ({{ ctx.last_year.event.season }} race): track {{ c.track_min|temp_range(c.track_max, ctx.temp_unit) }}{% if c.rain is not none %}, {{ 'rain' if c.rain else 'dry' }}{% endif %}</p>{% endif %}
 {% endif %}
 
 {% if ctx.track_news %}
 <h3 style="margin:16px 0 8px;">Track updates</h3>
 <ul style="margin:0;padding-left:18px;">
-{% for n in ctx.track_news %}<li style="margin:3px 0;"><a href="{{ n.link }}" style="color:#1d4ed8;">{{ n.title }}</a> <span style="color:#6b7280;font-size:13px;">({{ n.source }})</span></li>{% endfor %}
+{% for n in ctx.track_news %}<li style="margin:3px 0;"><a href="{{ n.link }}" style="color:#1D4ED8;">{{ n.title }}</a> <span style="color:#535B68;font-size:13px;">({{ n.source }})</span></li>{% endfor %}
 </ul>
 {% endif %}
 

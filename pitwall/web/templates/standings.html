@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% from "_macros.html" import spoiler_notice, standings_table %}
+{% from "_macros.html" import fresh_badge, spoiler_notice, standings_table %}
 {% block title %}Standings{% endblock %}
 {% block content %}
 <div class="row" style="justify-content:space-between;">
-  <h1>{{ season or '' }} standings{% if drivers %} <span class="muted small">after round {{ drivers.round }}</span>{% endif %}</h1>
+  <h1>{{ season or '' }} standings{% if drivers %} <span class="muted small">after round {{ drivers.round }}</span>{% endif %} {{ fresh_badge(fresh.jolpica) }}</h1>
   {% if seasons|length > 1 %}
   <form method="get" action="/standings"><select name="season" data-autosubmit>
     {% for y in seasons %}<option value="{{ y }}" {{ 'selected' if y == season else '' }}>{{ y }}</option>{% endfor %}

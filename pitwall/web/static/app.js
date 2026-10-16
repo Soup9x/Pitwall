@@ -7,10 +7,15 @@
     const pad = (n) => String(n).padStart(2, "0");
     return (d ? d + "d " : "") + pad(h) + ":" + pad(m) + ":" + pad(sec);
   }
+  const baseTitle = document.title;
+  const titled = document.querySelector("[data-countdown][data-title]");
   function tick() {
     document.querySelectorAll("[data-countdown]").forEach(function (el) {
       el.textContent = fmt(new Date(el.dataset.countdown) - new Date());
     });
+    // Mirror the hero countdown in the tab title, e.g. "02:13:44 · Qualifying · Pitwall".
+    if (titled) document.title = titled.textContent + " · " + titled.dataset.title + " · Pitwall";
+    else if (document.title !== baseTitle) document.title = baseTitle;
   }
   tick();
   setInterval(tick, 1000);
@@ -65,4 +70,12 @@
       try { if (document.execCommand("copy")) done(); } finally { box.remove(); }
     });
   });
+})();
+
+// Installable app: register the service worker (it caches only static files). Browsers allow
+// this on HTTPS or localhost.
+(function () {
+  if ("serviceWorker" in navigator && window.isSecureContext) {
+    navigator.serviceWorker.register("/sw.js").catch(function () {});
+  }
 })();

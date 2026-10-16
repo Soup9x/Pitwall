@@ -2,18 +2,26 @@
 // <script type="application/json" id="..."> blocks referenced by data-chart on a <canvas>;
 // no inline scripts (Content-Security-Policy).
 (function () {
-  if (typeof Chart === "undefined") return;
+  function ready(canvas) {
+    var box = canvas.closest("[data-skeleton]");
+    if (box) box.classList.remove("skeleton");
+  }
+  if (typeof Chart === "undefined") {
+    document.querySelectorAll("canvas[data-chart]").forEach(ready);
+    return;
+  }
   var css = getComputedStyle(document.documentElement);
-  var muted = css.getPropertyValue("--muted").trim() || "#9aa1b2";
-  var grid = css.getPropertyValue("--border").trim() || "#2a2f3e";
-  var accent = css.getPropertyValue("--accent").trim() || "#e8322f";
+  var muted = css.getPropertyValue("--muted").trim();
+  var grid = css.getPropertyValue("--border").trim();
+  var accent = css.getPropertyValue("--accent").trim();
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   document.querySelectorAll("canvas[data-chart='temp']").forEach(function (canvas) {
     var src = document.getElementById(canvas.dataset.src);
     if (!src) return;
     var data;
-    try { data = JSON.parse(src.textContent); } catch (e) { return; }
+    try { data = JSON.parse(src.textContent); } catch (e) { ready(canvas); return; }
+    ready(canvas);
     new Chart(canvas, {
       type: "line",
       data: {

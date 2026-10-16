@@ -3,7 +3,7 @@
 {% for heading, items in ctx.sections %}
 <h3 style="margin:0 0 8px;">{{ heading }}</h3>
 {% for item in items %}
-<div style="margin:0 0 12px;padding:8px 10px;background:#f9fafb;border-left:3px solid #e10600;">
+<div style="margin:0 0 12px;padding:8px 10px;background:#f9fafb;border-left:3px solid #C42320;">
   <div style="font-weight:600;">{{ item.title }}</div>
   {% for line in item.text.splitlines() %}<div style="font-size:14px;color:#374151;">{{ line }}</div>{% endfor %}
 </div>
@@ -14,15 +14,15 @@
 <h3 style="margin:16px 0 8px;">Coming up this week</h3>
 <table role="presentation" width="100%" cellpadding="4" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
 {% for ev, s, wx in ctx.upcoming %}
-<tr style="border-bottom:1px solid #e5e7eb;">
-  <td>{{ s.emoji }} {{ s.label }} <span style="color:#6b7280;">{{ ev.short_name }}</span></td>
+<tr style="border-bottom:1px solid #D9DDE5;">
+  <td>{{ s.emoji }} {{ s.label }} <span style="color:#535B68;">{{ ev.short_name }}</span></td>
   <td>{{ s.owner_time }} {{ s.owner_tz }}{% if s.odd %} 🌙{% endif %}</td>
-  <td style="color:#4b5563;">{% if wx %}{{ wx.short }}{% if wx.risk %} <strong style="color:#b45309;">☔ rain risk</strong>{% endif %}{% endif %}</td>
+  <td style="color:#535B68;">{% if wx %}{{ wx.short }}{% if wx.risk %} <strong style="color:#854D0E;">☔ rain risk</strong>{% endif %}{% endif %}</td>
 </tr>
 {% endfor %}
 </table>
 {% else %}
-<p style="color:#6b7280;">No sessions in the next 7 days.</p>
+<p style="color:#535B68;">No sessions in the next 7 days.</p>
 {% endif %}
 
 {% if ctx.drivers %}

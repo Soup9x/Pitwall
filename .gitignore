@@ -7,7 +7,8 @@ __pycache__/
 *.egg-info/
 build/
 dist/
-# Runtime data lives in ./data (mounted into the container). Only circuits.yaml is tracked.
+# Runtime data lives in ./data (mounted into the container). Only the curated YAML files are tracked.
 data/*
 !data/circuits.yaml
+!data/team_colors.yaml
 !data/.gitkeep

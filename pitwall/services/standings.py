@@ -17,6 +17,7 @@ from pitwall.models import (
     Session,
     StandingsSnapshot,
 )
+from pitwall.services import team_colors
 
 
 @dataclass
@@ -32,6 +33,8 @@ class StandingRow:
     team: str | None = None
     code: str | None = None
     followed: bool = False
+    team_id: str | None = None
+    team_color: str | None = None  # for a thin stripe only (data/team_colors.yaml)
 
     @property
     def arrow(self) -> str:
@@ -56,16 +59,17 @@ def fmt_points(p: float) -> str:
     return str(int(p)) if float(p).is_integer() else f"{p:g}"
 
 
-def _driver_teams(db: DB, season: int) -> dict[str, str]:
+def _driver_teams(db: DB, season: int) -> dict[str, tuple[str, str]]:
+    """driver id -> (constructor id, name) of their latest race team this season."""
     rows = db.execute(
-        select(Result.driver_id, Constructor.name, Event.round)
+        select(Result.driver_id, Constructor.id, Constructor.name, Event.round)
         .join(Session, Result.session_id == Session.id)
         .join(Event, Session.event_id == Event.id)
         .join(Constructor, Result.constructor_id == Constructor.id)
         .where(Event.season == season)
         .order_by(Event.round)
     ).all()
-    return {r[0]: r[1] for r in rows}  # latest round wins
+    return {r[0]: (r[1], r[2]) for r in rows}  # latest round wins
 
 
 def table(
@@ -124,6 +128,9 @@ def table(
             con = db.get(Constructor, s.entity_id)
             name = con.name if con else s.entity_id
             code = None
+        team_id, team = (
+            teams.get(s.entity_id, (None, None)) if kind == "driver" else (s.entity_id, None)
+        )
         old = prev.get(s.entity_id)
         change = (old - s.position) if (old is not None and s.position is not None) else None
         rows.append(
@@ -136,9 +143,11 @@ def table(
                 change=change,
                 gap_leader=None if s is snaps[0] else leader - s.points,
                 gap_ahead=None if ahead is None else ahead - s.points,
-                team=teams.get(s.entity_id),
+                team=team,
                 code=code,
                 followed=s.entity_id in followed,
+                team_id=team_id,
+                team_color=team_colors.color(team_id, season),
             )
         )
         ahead = s.points

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% from "_macros.html" import headline_list, news_hidden %}
+{% from "_macros.html" import fresh_badge, headline_list, news_hidden %}
 {% block title %}News{% endblock %}
 {% block content %}
-<h1>News</h1>
+<h1>News {{ fresh_badge(fresh.news) }}</h1>
 <p class="sub">Headlines from RSS feeds{% if feeds %} ({{ feeds|selectattr('enabled')|map(attribute='name')|join(', ') }}){% endif %}. Pitwall stores only the headline, link, source and date; articles open on the publisher's site.</p>
 <div class="row tabs" role="tablist">
   {% for key, label in (('all', 'All'), ('followed', '★ Followed drivers'), ('track', '🛠 Track changes')) %}

@@ -1,20 +1,21 @@
 {% extends "base.html" %}
-{% from "_macros.html" import headline_list, news_hidden, session_table, spoiler_notice, track_facts, tyre_summary %}
+{% from "_macros.html" import fresh_badge, headline_list, news_hidden, session_timeline, spoiler_notice, track_facts, tyre_summary %}
 {% block title %}{{ event.name }}{% endblock %}
 {% block content %}
 <h1>{{ event.name }} {% if event.is_sprint_weekend %}<span class="badge sprint">SPRINT WEEKEND</span>{% endif %}{% if event.status == 'cancelled' %} <span class="badge cancelled">CANCELLED</span>{% endif %}</h1>
 <p class="sub">{{ event.season }} · Round {{ event.round }} · {{ event.circuit.name }}, {{ event.circuit.locality }}, {{ event.circuit.country }}</p>
 
 <div class="grid">
-  <div class="card">
-    <h2>Sessions</h2>
-    {{ session_table(sessions, weather) }}
-    {% for w in rain %}<div class="odd" style="margin-top:6px;">☔ {{ w }}</div>{% endfor %}
-    {% if weather %}<p class="muted small">Forecast: Open-Meteo, updated every 3 hours.</p>{% endif %}
-    {% if last_year %}{% set ly = last_year.conditions %}
-    <p class="small">Last year here <span class="muted">({{ last_year.event.season }} race)</span>: track {{ ly.track_min|temp_range(ly.track_max, settings.temp_unit) }}{% if ly.air_min is not none %}, air {{ ly.air_min|temp_range(ly.air_max, settings.temp_unit) }}{% endif %}{% if ly.rain is not none %}, {{ 'rain' if ly.rain else 'dry' }}{% endif %}</p>
-    {% endif %}
-  </div>
+  <section class="card wide" id="sessions">
+    <div class="section-head"><h2>Weekend</h2>{{ fresh_badge(fresh.jolpica) }}</div>
+    {{ session_timeline(timeline, weather) }}
+    {% for w in rain %}<div class="odd" style="margin-top:8px;">☔ {{ w }}</div>{% endfor %}
+    <div class="row small" style="justify-content:space-between;margin-top:8px;align-items:baseline;">
+      <span>{% if last_year %}{% set ly = last_year.conditions %}Last year here <span class="muted">({{ last_year.event.season }} race)</span>: track {{ ly.track_min|temp_range(ly.track_max, settings.temp_unit) }}{% if ly.air_min is not none %}, air {{ ly.air_min|temp_range(ly.air_max, settings.temp_unit) }}{% endif %}{% if ly.rain is not none %}, {{ 'rain' if ly.rain else 'dry' }}{% endif %}{% endif %}</span>
+      {% if weather %}{{ fresh_badge(fresh.openmeteo) }}{% endif %}
+    </div>
+  </section>
+
   <div class="card">
     <h2>Track</h2>
     {{ track_facts(event.circuit, stats, map_url) }}
@@ -27,7 +28,7 @@
     <h2>Tyres</h2>
     {{ tyre_summary(tyres) }}
     {% if user.is_admin %}
-    <details class="admin-edit"{% if not tyres.nomination %} open{% endif %}>
+    <details class="admin-edit">
       <summary class="small">Admin: {{ 'change' if tyres.nomination else 'enter' }} the nomination</summary>
       <form method="post" action="/admin/events/{{ event.id }}/tyres">
         <input type="hidden" name="csrf_token" value="{{ csrf }}">
@@ -56,9 +57,9 @@
     {% endif %}
   </div>
 
-  {% if grid_penalties %}
   <div class="card" id="penalties">
     <h2>Grid penalties</h2>
+    {% if not grid_penalties %}<p class="empty">None recorded for this event.</p>{% endif %}
     <table>
     {% for p in grid_penalties %}
       <tr><td>{{ p.driver.full_name }}</td><td><strong>{{ describe_grid(p) }}</strong>{% if p.reason %}<div class="muted small">{{ p.reason }}</div>{% endif %}</td>
@@ -67,41 +68,11 @@
     </table>
     <p class="small"><a href="/penalties#grid">Penalty watch →</a></p>
   </div>
-  {% endif %}
-
-  {% if track_news.items or track_news.hidden %}
-  <div class="card" id="track-updates">
-    <h2>Track updates</h2>
-    {{ news_hidden(track_news, "/events/" ~ event.id ~ "?reveal=1#track-updates") }}
-    {{ headline_list(track_news.items, {}, [], news_tags, settings.tz, False) }}
-  </div>
-  {% endif %}
-
-  {% if conditions %}
-  <div class="card wide" id="conditions">
-    <h2>Conditions</h2>
-    <div class="table-scroll"><table>
-      <tr><th>Session</th><th>Track</th><th>Air</th><th class="num">Humidity</th><th>Rain</th><th class="num">Max wind</th></tr>
-      {% for s in sessions if conditions.get(s.id) %}{% set c = conditions[s.id] %}
-      <tr><td>{{ s.label }}</td>
-        <td class="num">{{ c.track_min|temp_range(c.track_max, settings.temp_unit) }}{% if c.track_avg is not none %} <span class="muted small">avg {{ c.track_avg|temp(settings.temp_unit) }}</span>{% endif %}</td>
-        <td class="num">{{ c.air_min|temp_range(c.air_max, settings.temp_unit) }}</td>
-        <td class="num">{% if c.humidity_avg is not none %}{{ c.humidity_avg|round|int }}%{% endif %}</td>
-        <td>{% if c.rain is none %}<span class="muted">–</span>{% elif c.rain %}☔ yes{% else %}no{% endif %}</td>
-        <td class="num">{{ c.wind_max_ms|wind }}</td></tr>
-      {% endfor %}
-    </table></div>
-    {% if temp_chart %}
-    <div class="chart-box"><canvas data-chart="temp" data-src="temp-chart-data" aria-label="Track temperature over the session" role="img"></canvas></div>
-    <script type="application/json" id="temp-chart-data">{{ temp_chart|safe }}</script>
-    {% endif %}
-    <p class="muted small">Measured at the track (OpenF1), after each session.</p>
-  </div>
-  {% endif %}
+  
 
   {% if race_control or race_control_hidden %}
   <div class="card wide" id="race-control">
-    <h2>Race control</h2>
+    <div class="section-head"><h2>Race control</h2>{{ fresh_badge(fresh.openf1) }}</div>
     {% if race_control_hidden %}<p class="spoiler-notice small">🙈 Race control from {{ race_control_hidden }} session{{ 's' if race_control_hidden != 1 }} hidden by spoiler mode. <a href="/events/{{ event.id }}?reveal=1#race-control" rel="nofollow">Show anyway</a></p>{% endif %}
     {% if race_control %}
     <div class="row rc-filters small" role="group" aria-label="Show messages about">
@@ -125,12 +96,33 @@
   </div>
   {% endif %}
 
-  {% if facts %}
-  <div class="card wide">
-    <h2>Did you know?</h2>
-    <ul class="facts-list">
-    {% for f in facts %}<li>{{ f.text }} <span class="muted small" title="Source: {{ f.source }}">ⓘ</span></li>{% endfor %}
-    </ul>
+  {% if conditions %}
+  <div class="card wide" id="conditions">
+    <h2>Conditions</h2>
+    <div class="table-scroll"><table>
+      <tr><th>Session</th><th>Track</th><th>Air</th><th class="num">Humidity</th><th>Rain</th><th class="num">Max wind</th></tr>
+      {% for s in sessions if conditions.get(s.id) %}{% set c = conditions[s.id] %}
+      <tr><td>{{ s.label }}</td>
+        <td class="num">{{ c.track_min|temp_range(c.track_max, settings.temp_unit) }}{% if c.track_avg is not none %} <span class="muted small">avg {{ c.track_avg|temp(settings.temp_unit) }}</span>{% endif %}</td>
+        <td class="num">{{ c.air_min|temp_range(c.air_max, settings.temp_unit) }}</td>
+        <td class="num">{% if c.humidity_avg is not none %}{{ c.humidity_avg|round|int }}%{% endif %}</td>
+        <td>{% if c.rain is none %}<span class="muted">–</span>{% elif c.rain %}☔ yes{% else %}no{% endif %}</td>
+        <td class="num">{{ c.wind_max_ms|wind }}</td></tr>
+      {% endfor %}
+    </table></div>
+    {% if temp_chart %}
+    <div class="chart-box skeleton" data-skeleton><canvas data-chart="temp" data-src="temp-chart-data" aria-label="Track temperature over the session" role="img"></canvas></div>
+    <script type="application/json" id="temp-chart-data">{{ temp_chart|safe }}</script>
+    {% endif %}
+    <p class="muted small">Measured at the track (OpenF1), after each session.</p>
+  </div>
+  {% endif %}
+
+  {% if track_news.items or track_news.hidden %}
+  <div class="card" id="track-updates">
+    <h2>Track updates</h2>
+    {{ news_hidden(track_news, "/events/" ~ event.id ~ "?reveal=1#track-updates") }}
+    {{ headline_list(track_news.items, {}, [], news_tags, settings.tz, False) }}
   </div>
   {% endif %}
 
@@ -180,6 +172,15 @@
       </div>
     {% endif %}
   </div>
+  {% if facts %}
+  <div class="card wide">
+    <h2>Did you know?</h2>
+    <ul class="facts-list">
+    {% for f in facts %}<li>{{ f.text }} <span class="muted small" title="Source: {{ f.source }}">ⓘ</span></li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
 </div>
 {% endblock %}
 {% block scripts %}{% if temp_chart %}

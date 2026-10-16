@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session as DB
 
 from pitwall import __version__
 from pitwall.models import User
+from pitwall.services import freshness
 from pitwall.settings_store import get_kv, load_settings
 from pitwall.templating import get_jinja_env
 from pitwall.web.auth import csrf_token
@@ -27,6 +28,7 @@ def page(request: Request, name: str, db: DB, user: User, **ctx: Any) -> HTMLRes
         "version": __version__,
         "flash": request.session.pop("flash", None),
         "backfill": get_kv(db, "backfill_progress"),
+        "fresh": freshness.all_of(db),
     }
     base.update(ctx)
     return templates.TemplateResponse(request, name, base)

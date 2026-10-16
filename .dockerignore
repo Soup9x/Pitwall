@@ -8,6 +8,7 @@ tests
 scripts
 data/*
 !data/circuits.yaml
+!data/team_colors.yaml
 *.egg-info
 build
 dist

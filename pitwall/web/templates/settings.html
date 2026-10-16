@@ -111,14 +111,15 @@
       <p class="muted small">None yet.</p>
       {% endif %}
 
-      <details style="margin-top:12px;" {{ 'open' if not (targets[c] or env_targets[c]) else '' }}>
+      {% if channel_form.channel == c and channel_form.error %}<div class="error" role="alert" id="channel-error-{{ c }}">Couldn't add {{ 'the email address' if c == 'email' else 'the webhook' }}: {{ channel_form.error }}</div>{% endif %}
+      <details style="margin-top:12px;" {{ 'open' if not (targets[c] or env_targets[c]) or channel_form.channel == c else '' }}>
         <summary class="small" style="cursor:pointer;font-weight:600;">+ Add {{ "an email address" if c == "email" else "a webhook" }}</summary>
         <form method="post" action="/settings/targets" class="target-form">
           <input type="hidden" name="csrf_token" value="{{ csrf }}">
           <input type="hidden" name="channel" value="{{ c }}">
           <label>Type</label>
           <select name="kind" data-kind-select>
-            {% for k, name in target_kinds[c].items() %}<option value="{{ k }}">{{ name }}</option>{% endfor %}
+            {% for k, name in target_kinds[c].items() %}<option value="{{ k }}" {{ 'selected' if channel_form.channel == c and channel_form.kind == k else '' }}>{{ name }}</option>{% endfor %}
           </select>
           {% if c == "email" %}
           <div data-kind="gmail">
@@ -133,12 +134,16 @@
           </div>
           <div data-kind="smtp">
             <div class="row">
-              <div><label>SMTP server</label><input type="text" name="smtp_host" placeholder="smtp.example.com"></div>
-              <div><label>Port</label><input type="number" name="smtp_port" value="587" style="width:90px;"></div>
+              <div><label>SMTP server</label><input type="text" name="smtp_host" placeholder="smtp.example.com" value="{{ channel_form.get('smtp_host', '') if channel_form.channel == c else '' }}"></div>
+              <div><label>Port <span class="muted">(blank = default)</span></label><input type="number" name="smtp_port" min="1" max="65535" placeholder="587" style="width:100px;" value="{{ channel_form.get('smtp_port', '') if channel_form.channel == c else '' }}"></div>
+              <div><label>Security</label><select name="smtp_security">
+                <option value="">Automatic (by port)</option>
+                {% for k, name in smtp_security.items() %}<option value="{{ k }}" {{ 'selected' if channel_form.get('smtp_security') == k else '' }}>{{ name }}</option>{% endfor %}
+              </select></div>
             </div>
-            <label>Username</label><input type="text" name="username" autocomplete="off">
+            <label>Username <span class="muted">(blank if your relay needs no login)</span></label><input type="text" name="username" autocomplete="off" value="{{ channel_form.get('username', '') if channel_form.channel == c else '' }}">
             <label>Password</label><input type="password" name="password" autocomplete="new-password">
-            <label>From address</label><input type="text" name="from_addr" placeholder="pitwall@example.com">
+            <label>From address</label><input type="text" name="from_addr" placeholder="pitwall@example.com" value="{{ channel_form.get('from_addr', '') if channel_form.channel == c else '' }}">
           </div>
           <div data-kind="gmail m365 smtp">
             <label>Send alerts to <span class="muted">(blank = same address)</span></label><input type="text" name="to_addr">
