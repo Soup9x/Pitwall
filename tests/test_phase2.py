@@ -1,4 +1,4 @@
-"""Head-to-head, followed-driver tracker, OpenF1 detail, title math wiring and Phase 2 pages."""
+"""Followed-driver tracker, OpenF1 detail, title math wiring and Phase 2 pages."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from pitwall.models import DriverSessionDetail, Event, FollowedDriver
 from pitwall.notify import builders
-from pitwall.services import driver_stats, head_to_head, openf1_sync, title_math
+from pitwall.services import driver_stats, openf1_sync, title_math
 from pitwall.settings_store import load_settings
 from pitwall.sources.http import RateLimiter
 from pitwall.sources.openf1 import OpenF1Client, fmt_lap, match_session, summarize
@@ -107,18 +107,6 @@ def season(db):
     )
     db.flush()
     return w
-
-
-def test_head_to_head(db, season):
-    pairs = head_to_head.season(db, 2025)
-    assert len(pairs) == 1
-    p = pairs[0]
-    assert p.constructor == "Redline"
-    assert (p.a.id, p.b.id) == ("bob_bolt", "alice_ace")  # higher scorer first: 45 vs 43
-    assert (p.quali.a, p.quali.b) == (2, 1)
-    assert (p.race.a, p.race.b) == (1, 1)  # round 3: both retired, not counted
-    assert (p.points_a, p.points_b) == (45, 43)
-    assert p.points_share_a == 51 and p.races_together == 3
 
 
 def test_driver_season_tracker(db, season):
@@ -238,8 +226,7 @@ def client(engine):
 
 def test_phase2_pages(client, db, season):
     db.commit()
-    h2h = client.get("/head-to-head?season=2025")
-    assert h2h.status_code == 200 and "Redline" in h2h.text and "51%" in h2h.text
+    assert client.get("/head-to-head?season=2025").status_code == 404  # page removed
     d = client.get("/drivers/alice_ace?season=2025")
     assert d.status_code == 200 and "<polyline" in d.text and "Engine" in d.text
     assert client.get("/drivers/nobody").status_code == 404

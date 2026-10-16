@@ -50,8 +50,7 @@
   <div class="card"><h2>Drivers</h2>{{ standings_table(drivers) }}</div>
   {% if constructors %}<div class="card"><h2>Constructors</h2>{{ standings_table(constructors, None, "Team") }}</div>{% endif %}
 </div>
-<p class="small"><a href="/head-to-head?season={{ season }}">Teammate head-to-head →</a>
-  · Download CSV: <a href="/export/standings.csv?season={{ season }}&amp;kind=driver">drivers</a>,
+<p class="small">Download CSV: <a href="/export/standings.csv?season={{ season }}&amp;kind=driver">drivers</a>,
   <a href="/export/standings.csv?season={{ season }}&amp;kind=constructor">constructors</a>,
   <a href="/export/drivers.csv?season={{ season }}">followed drivers' races</a></p>
 {% endif %}

@@ -36,8 +36,6 @@ and trivia, and weather, maps, digest and CSV export.
   with P3 or better if Piastri doesn't win" (sprint weekends and the constructors' title use
   points margins instead). Conditions are always safe: the leader's own fastest-lap point is
   never assumed, and a tie only counts for the leader when the rival can't match their wins.
-- **Teammate head-to-head** (Head-to-head page): qualifying record, race record (races where
-  both retired don't count) and points split, including sprints.
 - **Driver pages** (click any driver name): race-by-race results, average grid and finish,
   positions gained, DNFs and a points-trend chart. For drivers you follow, best lap, tyre stints
   and pit stops come from [OpenF1](https://openf1.org) (2023 onwards), fetched in the
@@ -398,7 +396,7 @@ that event **Watched** on its page. If you set "Auto-release after N hours", the
 N hours after the event's latest results arrived. Each new session restarts that clock, so a
 race isn't revealed early by its qualifying. Alerts and pages follow the same rule. While an
 event is held:
-- its results, and the standings, recent form, head-to-head, driver season pages, title maths
+- its results, and the standings, recent form, driver season pages, title maths
   and trivia (which all include the latest results) are left out of the pages entirely, not
   just collapsed, so they aren't in the page source either;
 - race control, penalty decisions and news headlines published after the event's first

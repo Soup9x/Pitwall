@@ -52,7 +52,6 @@ from pitwall.services import (
     circuits_explorer,
     driver_stats,
     exports,
-    head_to_head,
     ics,
     news,
     progression,
@@ -596,38 +595,6 @@ def export_drivers(
     body = exports.drivers_csv(db, season, [driver] if driver else None, user_id=user.id)
     name = driver or "followed-drivers"
     return _csv_response(body, f"pitwall-{name}-{season}.csv")
-
-
-@private.get("/head-to-head", response_class=HTMLResponse)
-def head_to_head_page(
-    request: Request,
-    season: int | None = None,
-    reveal: bool = False,
-    db: DB = Depends(get_db),
-    user: User = Depends(require_user),
-) -> HTMLResponse:
-    seasons = list(
-        db.scalars(
-            select(Event.season)
-            .join(Session)
-            .join(Result, Result.session_id == Session.id)
-            .distinct()
-            .order_by(Event.season.desc())
-        )
-    )
-    season = season or (seasons[0] if seasons else None)
-    held = _held_event(db, user, reveal)
-    hide = held is not None and season is not None and season >= held.season
-    return page(
-        request,
-        "head_to_head.html",
-        db,
-        user,
-        season=season,
-        seasons=seasons,
-        pairs=head_to_head.season(db, season) if season and not hide else [],
-        held_event=held if hide else None,
-    )
 
 
 @private.get("/drivers/{driver_id}", response_class=HTMLResponse)

@@ -15,7 +15,7 @@
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-{% set nav_items = [("/", "Dashboard"), ("/events", "Calendar"), ("/circuits", "Circuits"), ("/standings", "Standings"), ("/head-to-head", "Head-to-head"), ("/penalties", "Penalties"), ("/news", "News"), ("/history", "Notifications"), ("/settings", "Settings")] + ([("/admin/users", "Users")] if user and user.is_admin else []) %}
+{% set nav_items = [("/", "Dashboard"), ("/events", "Calendar"), ("/circuits", "Circuits"), ("/standings", "Standings"), ("/penalties", "Penalties"), ("/news", "News"), ("/history", "Notifications"), ("/settings", "Settings")] + ([("/admin/users", "Users")] if user and user.is_admin else []) %}
 <header class="top"><div class="wrap bar">
   <a class="brand" href="/" aria-label="Pitwall home">{% include "_logo.svg" %}<span>Pit<span class="w">wall</span></span></a>
   <nav class="main" aria-label="Main">
