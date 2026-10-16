@@ -15,7 +15,7 @@
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-{% set nav_items = [("/", "Dashboard"), ("/events", "Calendar"), ("/standings", "Standings"), ("/head-to-head", "Head-to-head"), ("/penalties", "Penalties"), ("/news", "News"), ("/history", "Notifications"), ("/settings", "Settings")] + ([("/admin/users", "Users")] if user and user.is_admin else []) %}
+{% set nav_items = [("/", "Dashboard"), ("/events", "Calendar"), ("/circuits", "Circuits"), ("/standings", "Standings"), ("/head-to-head", "Head-to-head"), ("/penalties", "Penalties"), ("/news", "News"), ("/history", "Notifications"), ("/settings", "Settings")] + ([("/admin/users", "Users")] if user and user.is_admin else []) %}
 <header class="top"><div class="wrap bar">
   <a class="brand" href="/" aria-label="Pitwall home">{% include "_logo.svg" %}<span>Pit<span class="w">wall</span></span></a>
   <nav class="main" aria-label="Main">
@@ -42,9 +42,9 @@
 </div></header>
 <main class="wrap" id="main">
 {% if flash %}<div class="flash" role="status">{{ flash }}</div>{% endif %}
-{% if backfill and backfill.running %}
+{% if backfill and (backfill.running or (backfill.paused and user and user.is_admin)) %}
 <div class="card" style="margin-bottom:16px;">
-  <div class="small">Historical backfill in progress — {{ backfill.done }}/{{ backfill.total }} seasons{% if backfill.current %} (now: {{ backfill.current }}){% endif %}. Track stats fill in as it runs; everything else works normally.</div>
+  <div class="small">Historical backfill {{ 'in progress' if backfill.running else 'paused between batches' }} — {{ backfill.done }}/{{ backfill.total }} seasons{% if backfill.current %} (now: {{ backfill.current }}){% endif %}. Track stats fill in as it runs; everything else works normally.{% if not backfill.running %} <a href="/settings">Details</a>{% endif %}</div>
   <div class="progress" style="margin-top:6px;" role="progressbar" aria-valuemin="0" aria-valuemax="{{ backfill.total }}" aria-valuenow="{{ backfill.done }}"><div style="width: {{ (100 * backfill.done / (backfill.total or 1))|round|int }}%"></div></div>
 </div>
 {% endif %}

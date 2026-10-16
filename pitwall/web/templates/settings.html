@@ -73,8 +73,10 @@
   <div class="card">
     <h2>History <span class="badge muted">admin · everyone</span></h2>
     <label for="bsy">Backfill seasons from</label>
-    <input id="bsy" type="number" min="1950" name="backfill_start_year" value="{{ settings.backfill_start_year }}">
-    <p class="muted small">Past seasons are fetched once (politely rate-limited) and used for track stats.</p>
+    <input id="bsy" type="number" min="1950" max="{{ this_year }}" name="backfill_start_year" value="{{ settings.backfill_start_year }}">
+    <p class="muted small">Past seasons are fetched once and used for track stats and the circuit pages. The default is 2000; you can go back as far as 1950.</p>
+    <p class="muted small">Going further back means a longer first download. Pitwall fetches in batches of about 250 requests an hour (half of what the Jolpica API allows, so live results always get through), newest season first. 2000 onwards takes about an hour; going back to 1950 can take several hours. It starts within a minute of saving, picks up where it left off after a restart or an outage, and never fetches a finished season twice.</p>
+    {% if backfill_next %}<p class="small">Downloaded {{ backfill.done }} of {{ backfill.total }} seasons; the next batch starts around {{ backfill_next }}.</p>{% endif %}
   </div>
   {% endif %}
 </div>

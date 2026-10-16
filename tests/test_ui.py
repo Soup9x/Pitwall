@@ -92,7 +92,18 @@ def test_pwa_files_and_self_hosted_assets(client):
 
 
 @pytest.mark.parametrize(
-    "path", ["/", "/events", "/standings", "/news", "/penalties", "/settings", "/login"]
+    "path",
+    [
+        "/",
+        "/events",
+        "/circuits",
+        "/circuits/rodriguez",
+        "/standings",
+        "/news",
+        "/penalties",
+        "/settings",
+        "/login",
+    ],
 )
 def test_no_inline_scripts_or_external_resources(client, mexico, path):
     if path != "/login":

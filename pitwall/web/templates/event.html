@@ -3,7 +3,7 @@
 {% block title %}{{ event.name }}{% endblock %}
 {% block content %}
 <h1>{{ event.name }} {% if event.is_sprint_weekend %}<span class="badge sprint">SPRINT WEEKEND</span>{% endif %}{% if event.status == 'cancelled' %} <span class="badge cancelled">CANCELLED</span>{% endif %}</h1>
-<p class="sub">{{ event.season }} · Round {{ event.round }} · {{ event.circuit.name }}, {{ event.circuit.locality }}, {{ event.circuit.country }}</p>
+<p class="sub">{{ event.season }} · Round {{ event.round }} · <a href="/circuits/{{ event.circuit.id }}">{{ event.circuit.name }}</a>, {{ event.circuit.locality }}, {{ event.circuit.country }}</p>
 
 {% if tabs|length > 1 %}
 <nav class="page-tabs" aria-label="Event sections">

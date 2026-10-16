@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import available_timezones
@@ -47,6 +48,7 @@ from pitwall.notify.dispatch import mask_url
 from pitwall.notify.dispatch import notify as dispatch_notify
 from pitwall.services import (
     circuit_maps,
+    circuits_explorer,
     driver_stats,
     exports,
     head_to_head,
@@ -72,6 +74,7 @@ from pitwall.settings_store import (
     CHANNELS,
     DIGESTIBLE,
     WEEKDAYS,
+    AppSettings,
     get_kv,
     load_settings,
     parse_hhmm,
@@ -82,6 +85,8 @@ from pitwall.web import dashboard as dashboard_view
 from pitwall.web import racedata
 from pitwall.web.auth import checked_form, require_admin, require_user, safe_next, session_user
 from pitwall.web.common import back, flash, page
+
+BACKFILL_SOON = timedelta(seconds=30)
 
 log = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -268,6 +273,74 @@ def events_list(
         rows.append({"event": ev, "race": session_view(race, settings) if race else None})
     return page(
         request, "events.html", db, user, rows=rows, season=season, seasons=seasons, now=utcnow()
+    )
+
+
+def _hidden_events(db: DB, user: User, reveal: bool) -> tuple[set[int], Event | None]:
+    """Events spoiler mode holds back for this user: the latest results event while it's held,
+    and an event whose competitive sessions have started but that isn't released yet."""
+    if reveal:
+        return set(), None
+    settings = load_settings(db, user.id)
+    held = spoilers.held_event(db, user.id, settings)
+    cut = spoilers.cutoff(db, user.id, settings)
+    ids = {e.id for e in (held, cut[0] if cut else None) if e is not None}
+    return ids, held or (cut[0] if cut else None)
+
+
+def _backfill_next(db: DB, settings: AppSettings) -> str | None:
+    """When the next history batch starts (local time), while a long backfill is paused."""
+    progress = get_kv(db, "backfill_progress") or {}
+    if not progress.get("paused") or not progress.get("next_at"):
+        return None
+    try:
+        at = datetime.fromisoformat(progress["next_at"])
+    except ValueError:
+        return None
+    return at.astimezone(settings.tz).strftime("%H:%M")
+
+
+@private.get("/circuits", response_class=HTMLResponse)
+def circuits_list(
+    request: Request,
+    q: str = "",
+    show: str = "all",
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
+) -> HTMLResponse:
+    show = show if show in circuits_explorer.FILTERS else "all"
+    now = utcnow()
+    hidden, _ = _hidden_events(db, user, False)
+    rows = circuits_explorer.listing(
+        db, racedata._current_season(db), now, query=q[:80], which=show, hidden=hidden
+    )
+    return page(request, "circuits.html", db, user, rows=rows, q=q[:80], show=show)
+
+
+@private.get("/circuits/{circuit_id}", response_class=HTMLResponse)
+def circuit_page(
+    request: Request,
+    circuit_id: str,
+    reveal: bool = False,
+    db: DB = Depends(get_db),
+    user: User = Depends(require_user),
+) -> HTMLResponse:
+    hidden, held = _hidden_events(db, user, reveal)
+    data = circuits_explorer.detail(
+        db, circuit_id, racedata._current_season(db), utcnow(), hidden=hidden
+    )
+    if data is None:
+        raise HTTPException(404)
+    held_here = held if held is not None and held.circuit_id == circuit_id else None
+    return page(
+        request,
+        "circuit.html",
+        db,
+        user,
+        c=data,
+        map_url=circuit_maps.map_url(data.circuit),
+        held_here=held_here,
+        unit=load_settings(db, user.id).temp_unit,
     )
 
 
@@ -703,6 +776,8 @@ def settings_page(
         else None,
         season_drivers=season_drivers,
         followed=followed,
+        this_year=utcnow().year,
+        backfill_next=_backfill_next(db, settings),
         error=request.session.pop("settings_error", None),
         channel_form=request.session.pop("channel_form", None) or {},
         smtp_security=targets_svc.SMTP_SECURITY,
@@ -773,6 +848,8 @@ async def save_settings_route(
     if sched is not None:
         if user.id == OWNER_ID and new.timezone != old.timezone:
             scheduler.install_recurring_jobs(sched)  # nightly jobs follow the owner's timezone
+        if new.backfill_start_year < old.backfill_start_year:
+            jobs.schedule_backfill(BACKFILL_SOON)  # fetch the extra seasons soon
         reminders.reconcile(sched, db)
     flash(request, "Settings saved.")
     return back("/settings")

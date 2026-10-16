@@ -346,3 +346,14 @@ table.quali .q-best { color: var(--timing-purple); font-weight: 700; }
   table.quali tr.q-group .q-gl { position: sticky; left: 8px; }
   table.quali tr.followed > td:nth-child(-n+2) { background: linear-gradient(var(--hl), var(--hl)), var(--surface); }
 }
+
+/* ---------------------------------------------------------------- circuits */
+.circuit-search { gap: 8px; align-items: center; margin-bottom: 16px; }
+.circuit-search input[type=search] { flex: 1; min-width: 180px; }
+.leader-grid { display: grid; gap: 12px 20px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.leader-grid h3 { margin: 0 0 4px; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+ol.leaders { margin: 0; padding-left: 20px; }
+ol.leaders li > span:first-child { display: inline-block; min-width: 0; }
+ol.leaders li { display: list-item; }
+ol.leaders li .mono { float: right; }
+.active-mark { color: var(--good); font-size: .7em; vertical-align: middle; }
