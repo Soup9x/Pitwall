@@ -236,22 +236,60 @@ def _followed(db: DB, user: User) -> list[FollowedDriver]:
 def dashboard(
     request: Request,
     reveal: bool = False,
+    edit: bool = False,
     db: DB = Depends(get_db),
     user: User = Depends(require_user),
 ) -> HTMLResponse:
     settings = load_settings(db, user.id)
     now = utcnow()
+    ctx = dashboard_view.build(db, user, settings, now, reveal)
+    mode = "weekend" if ctx["weekend"] else "normal"
+    order = dashboard_view.layout(settings.dashboard_layout, mode)
+    shown = dashboard_view.on_screen(ctx)
     return page(
         request,
         "dashboard.html",
         db,
         user,
         now=now,
-        **dashboard_view.build(db, user, settings, now, reveal),
+        **ctx,
+        card_order=order,
+        card_visible=[k for k in order if k in shown],
+        card_names=dashboard_view.CARDS,
+        layout_mode=mode,
+        edit=edit,
         **racedata.news_context(
             db, user, settings, news.visible(db, user.id, settings, limit=6, reveal=reveal)
         ),
     )
+
+
+@private.post("/prefs/dashboard")
+async def dashboard_layout(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
+    """Save the dashboard card order: one card up/down (arrows), a whole new order (drag and
+    drop, sent by dashboard.js) or back to the default."""
+    form = await checked_form(request)
+    mode = str(form.get("mode", ""))
+    if mode not in dashboard_view.DEFAULT_LAYOUT:
+        raise HTTPException(400)
+    saved = dict(load_settings(db, user.id).dashboard_layout or {})
+    order = dashboard_view.layout(saved, mode)
+    visible = [k for k in str(form.get("visible", "")).split(",") if k in order]
+    key = str(form.get("card", ""))
+    if form.get("reset"):
+        saved.pop(mode, None)
+    elif form.get("order"):
+        new = [k for k in str(form.get("order")).split(",") if k in order]
+        saved[mode] = dashboard_view.reorder(order, new)
+    elif form.get("direction") in ("up", "down"):
+        saved[mode] = dashboard_view.move(order, visible, key, str(form.get("direction")))
+    save_settings(db, {"dashboard_layout": saved}, user.id)
+    db.commit()
+    if request.headers.get("x-requested-with") == "fetch":
+        return Response(status_code=204)
+    return back("/?edit=1" + (f"#card-{key}" if key in order else ""))
 
 
 # ---------------------------------------------------------------------------- events

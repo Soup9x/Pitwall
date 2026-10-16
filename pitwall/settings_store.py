@@ -94,6 +94,8 @@ class AppSettings:
     theme: str = "dark"  # dark / light / system
     # Where this user's email alerts go, sent through the server's mail account (admin).
     notify_email: str = ""
+    # Dashboard card order per layout: {"normal": [...], "weekend": [...]}; empty = default.
+    dashboard_layout: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def tz(self) -> ZoneInfo:

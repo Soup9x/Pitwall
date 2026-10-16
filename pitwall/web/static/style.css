@@ -363,3 +363,21 @@ h1.team-title { padding-left: 14px !important; }
 tr.current td { background: var(--surface-2); font-weight: 700; }
 .chart-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 0; }
 .chart-legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+/* Dashboard → Rearrange */
+.dash-actions { margin: -6px 0 8px; text-align: right; }
+.layout-bar { margin-bottom: 16px; border-color: var(--accent); }
+.layout-bar p { margin-top: 0; }
+.card-tools { display: flex; align-items: center; gap: 8px; margin: -4px 0 10px; padding: 4px 6px;
+  border: 1px dashed var(--border); border-radius: 6px; background: var(--surface-2); }
+.card-tools-name { flex: 1; font-size: 13px; font-weight: 700; color: var(--muted); }
+.card-tools button { min-width: 2.2em; }
+.drag-handle { cursor: grab; color: var(--muted); font-size: 18px; line-height: 1; user-select: none; }
+.grid.editing [data-card] { cursor: grab; }
+.grid.editing [data-card].dragging { opacity: .45; }
+.grid.editing [data-card].drop-before { box-shadow: inset 4px 0 0 var(--accent), inset 0 4px 0 var(--accent); }
+.grid.editing [data-card].drop-after { box-shadow: inset -4px 0 0 var(--accent), inset 0 -4px 0 var(--accent); }
+@media (max-width: 480px) {
+  /* Narrower number columns so team names fit in the constructors tower on phones. */
+  ol.tower.teams li { grid-template-columns: 2em minmax(5.5em, 1fr) 3.4em 4em 2.4em; gap: 4px; }
+}

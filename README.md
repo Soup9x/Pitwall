@@ -217,6 +217,12 @@ page's season stats are hidden, as before.
   - cards for the drivers you follow, and the news strip.
 - **Race weekend mode** (Thursday to the end of the race, track time): the dashboard leads
   with the session timeline, penalties, weather and tyres, then the standings.
+- **Rearrange the dashboard:** click **⇅ Rearrange cards** above the cards.
+  - Drag a card by its ⠿ handle, or use the ↑ and ↓ buttons (they work on phones and with a
+    keyboard). Changes save straight away.
+  - Each user has their own order. The normal and race-weekend layouts are arranged
+    separately.
+  - **Reset to default** puts a layout back.
 - **Event page**: session timeline first, then the track card, penalties, race control,
   conditions, track updates and results. A **Qualifying** tab has the full breakdown (see
   above).
