@@ -87,6 +87,14 @@
 </section>
 {% endmacro %}
 
+{% macro constructors_card() %}{% if constructors and not held_event %}
+<section class="card">
+  <div class="section-head"><h2>Constructors <span class="muted small">after round {{ constructors.round }}</span></h2>{{ fresh_badge(fresh.jolpica) }}</div>
+  {{ timing_tower(constructors, 10, followed_teams) }}
+  <p class="small"><a href="/standings#progression">Season progression →</a></p>
+</section>
+{% endif %}{% endmacro %}
+
 {% macro followed_card() %}{% if followed_cards %}
 <section class="card">
   <h2>Followed drivers</h2>
@@ -130,10 +138,12 @@
     {{ tyres_card() }}
     {{ standings_card() }}
     {{ followed_card() }}
+    {{ constructors_card() }}
     {{ news_card() }}
   {% else %}
     {{ standings_card() }}
     {{ followed_card() }}
+    {{ constructors_card() }}
     {{ news_card() }}
     {{ timeline_card() }}
   {% endif %}

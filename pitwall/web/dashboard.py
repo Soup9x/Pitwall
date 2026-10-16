@@ -180,6 +180,7 @@ def build(
         "drivers": drivers,
         "constructors": constructors,
         "followed_cards": cards,
+        "followed_teams": {c.row.team_id for c in cards if c.row and c.row.team_id},
         "held_event": held,
         "has_standings": season is not None,
         "describe_grid": penalties.describe_grid,

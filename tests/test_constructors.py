@@ -74,3 +74,17 @@ def test_held_season_is_hidden(client, db, season):  # noqa: F811
     assert "Hidden by spoiler mode" in page
     assert "Race by race" not in page and "Bob Bolt" not in page and ">88<" not in page
     assert "Race by race" in client.get("/constructors/redline?season=2025&reveal=1").text
+
+
+def test_dashboard_constructors_card(client, db, season):  # noqa: F811
+    from pitwall.models import FollowedDriver
+
+    db.add(FollowedDriver(driver_id="cy_crash"))
+    db.commit()
+    page = client.get("/").text
+    assert 'aria-label="Top 10 constructors"' in page
+    assert 'href="/constructors/redline?season=2025">Redline</a>' in page
+    assert "(a followed driver races here)" in page  # Azure: Cy Crash's team
+    save_settings(db, {"spoiler_enabled": True})
+    db.commit()
+    assert 'aria-label="Top 10 constructors"' not in client.get("/").text

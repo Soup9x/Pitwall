@@ -298,6 +298,7 @@ ol.tower li.followed { background: var(--hl); }
 .t-pos { text-align: right; color: var(--muted); }
 .t-drv { font-weight: 700; letter-spacing: .04em; }
 .t-drv a { color: var(--text); }
+ol.tower.teams .t-drv { letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .t-pts, .t-gap, .t-chg { text-align: right; }
 
 .followed-cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
