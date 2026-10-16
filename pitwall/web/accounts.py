@@ -170,6 +170,9 @@ def account(
         ics_url=f"{env.base_url.rstrip('/')}/calendar.ics?token={user.ics_token}"
         if user.ics_token
         else None,
+        kiosk_url=f"{env.base_url.rstrip('/')}/kiosk?token={user.kiosk_token}"
+        if user.kiosk_token
+        else None,
         error=request.session.pop("account_error", None),
     )
 
@@ -197,6 +200,29 @@ async def change_password(
     login_session(request, me)  # keep this session; all others are signed out
     flash(request, "Password changed. Other devices have been signed out.")
     return back("/account")
+
+
+@router.post("/account/kiosk")
+async def kiosk_link(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
+    form = await checked_form(request)
+    me = db.get(User, user.id)
+    assert me is not None
+    if form.get("action") == "off":
+        me.kiosk_token = None
+        msg = "Kiosk link turned off. Any display using it now shows nothing."
+    else:
+        had = me.kiosk_token is not None
+        me.kiosk_token = new_ics_token()
+        msg = (
+            "New kiosk link created. The old one has stopped working — update your display."
+            if had
+            else "Kiosk link created."
+        )
+    db.commit()
+    flash(request, msg)
+    return back("/account#kiosk")
 
 
 @router.post("/account/ics")

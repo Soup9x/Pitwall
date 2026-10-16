@@ -156,6 +156,36 @@ Spoiler mode covers these too. While an event is held, the progression chart sto
 round before it, the qualifying tab shows only the "Show anyway" notice, and the driver
 page's season stats are hidden, as before.
 
+## Circuits and kiosk
+
+- **Circuit explorer** (Circuits in the menu, or the circuit name on an event page):
+  - The list puts this year's calendar first (in round order), then every other circuit in
+    the seasons Pitwall has downloaded. You can search by circuit, city or country, and filter
+    to this year's calendar or historical circuits only.
+  - Each circuit page shows "Round N" if it's on this year's calendar, otherwise "Last held
+    YEAR". It has the facts from `data/circuits.yaml`, with an **unverified** badge until you
+    set `verified: true`.
+  - The **official race lap record** (from `circuits.yaml`) and the **fastest race lap in
+    Pitwall's data** are shown separately. Layouts change over the years, so the computed lap
+    is never called the record.
+  - Every race held there, newest first: year, Grand Prix, winner, team, pole and fastest
+    lap. Races are grouped by circuit, not Grand Prix name, so a race held at a circuit under
+    another name still appears.
+  - Most wins, poles and podiums (drivers) and team wins. A ● marks drivers and teams in the
+    latest season.
+  - How often pole led to a win, the winner's average grid position, the retirement rate,
+    and safety car and race-day weather history. Those last two come from OpenF1, so they
+    start in 2023.
+  - While spoiler mode holds an event, that event is left out of its circuit's page entirely.
+- **How far back history goes:** Settings → History (admins). The default is 2000; you can go
+  back to 1950. Pitwall downloads in batches of about 250 requests an hour (half of what the
+  Jolpica API allows, so live results always get through), newest season first.
+  - 2000 onwards takes about an hour. 1950 onwards can take several hours.
+  - The download starts within a minute of lowering the year. Finished seasons are never
+    fetched twice, and it picks up where it left off after a restart or an API outage.
+  - Admins see a "paused between batches" note while it waits for the next batch.
+- **Kiosk mode** for a TV or wall screen: see [Kiosk display](#9-kiosk-display-eg-a-raspberry-pi).
+
 ## Look and feel
 
 - **Timing-screen design**, dark by default. Switch between **System**, **Light** and
@@ -478,6 +508,60 @@ This also unlocks the account. To create an account from the command line:
 press Enter at the password prompt to generate one; it's printed, and the person chooses their
 own at first login.
 
+## 9. Kiosk display (e.g. a Raspberry Pi)
+
+`/kiosk` is a read-only, full-screen page for a TV or wall screen. It's dark only, uses large
+type and never scrolls. It's designed for 1920×1080, and also works at 1280×720 and on a
+screen turned to portrait.
+
+- **Normal view:** a big countdown to the next session, the top 10 drivers and top 5
+  constructors, and a "Did you know?" fact that changes every 30 seconds.
+- **Race weekend view** (Thursday to the end of the race, track time): the session timeline,
+  countdown, weather, tyres, grid penalties and standings.
+- It needs no login and has no links into the app. It always follows **your** spoiler
+  settings: while an event is held, the standings and trivia are hidden, and there's no "show
+  anyway".
+- It refreshes every 60 seconds and the countdown ticks every second. If the server can't be
+  reached, the last data stays up with an "Offline – last updated HH:MM" badge.
+- To avoid burn-in, the layout shifts a few pixels every 3 minutes. It also asks the browser
+  to keep the screen on (Screen Wake Lock). Browsers only allow that over HTTPS or on
+  `localhost`, so over plain `http://` on your LAN, turn screen blanking off on the device
+  (below).
+
+**Get the link:** Account → Kiosk display → **Create a kiosk link**. You can add options to the
+end of the link:
+
+| Option | What it does |
+| --- | --- |
+| `&layout=portrait` | Layout for a screen turned on its side. A tall screen gets it automatically. |
+| `&rotate=1` | On race weekends, alternate between the weekend view and the standings/trivia view. |
+| `&interval=30` | Seconds each view stays up when rotating (10–3600, default 30). |
+
+> **The kiosk link contains a secret.** Anyone who has it can see what your kiosk shows (but
+> nothing else: no settings, no other pages). Don't post it or put it in screenshots. If it
+> leaks, use **Create a new link** on the Account page (the old one stops working at once)
+> or **Turn off**. Pitwall never writes the token to its logs.
+
+**Raspberry Pi setup** (Raspberry Pi OS with desktop, Bookworm):
+
+1. Turn off screen blanking: `sudo raspi-config` → *Display Options* → *Screen Blanking* →
+   *No*.
+2. Install Chromium if it isn't already there: `sudo apt install -y chromium-browser`
+   (called `chromium` on some images).
+3. Start it in kiosk mode at login. Create `~/.config/autostart/pitwall-kiosk.desktop`:
+
+   ```ini
+   [Desktop Entry]
+   Type=Application
+   Name=Pitwall kiosk
+   Exec=chromium-browser --kiosk --noerrdialogs --disable-infobars --incognito --check-for-update-interval=31536000 "http://<server IP>:8080/kiosk?token=<your token>"
+   ```
+
+   This file now holds your secret link, so keep it private
+   (`chmod 600 ~/.config/autostart/pitwall-kiosk.desktop`).
+4. Reboot. To get out of kiosk mode, press `Alt+F4`, or connect over SSH and run
+   `pkill chromium`.
+
 ## Security notes
 
 - **Logins:**
@@ -492,8 +576,9 @@ own at first login.
 - **Accounts:** there's no open sign-up. Admins create accounts or send one-time invite links
   (only a hash of the link is stored). Passwords an admin chose or generated are shown once,
   never stored in plain text, and (by default) replaced by the person at their first login.
-- **Public URLs:** `/calendar.ics` uses a per-user token instead of a login, so Google can fetch
-  it. `/circuit-maps/*` is public, so email clients can show maps. `/health` tells internet
+- **Public URLs:** `/calendar.ics` and `/kiosk` use per-user tokens instead of a login (the
+  kiosk link is off until you create it), and a wrong token is a plain 404. Tokens are never
+  written to the logs. `/circuit-maps/*` is public, so email clients can show maps. `/health` tells internet
   visitors only `{"status": "ok"}`; details are for logged-in users and the local healthcheck.
 - **Browser hardening:**
   - Strict Content-Security-Policy with no inline scripts.

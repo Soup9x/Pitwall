@@ -37,6 +37,32 @@
     </form>
   </div>
 
+  <div class="card" id="kiosk">
+    <h2>Kiosk display</h2>
+    <p class="small">A read-only, full-screen page for a TV or wall screen: countdown, standings and trivia, and the session timeline, weather, tyres and penalties on race weekends. It needs no login and always follows your spoiler settings.</p>
+    {% if kiosk_url %}
+    <details>
+      <summary class="small" style="cursor:pointer;">Show my kiosk link</summary>
+      <p><code id="kiosk-url">{{ kiosk_url }}</code></p>
+      <button type="button" class="secondary small" data-copy="kiosk-url">Copy</button>
+      <p class="muted small">Options: <code>&amp;layout=portrait</code> for a screen on its side, <code>&amp;rotate=1</code> to alternate between the race weekend and standings views, and <code>&amp;interval=30</code> to set how many seconds each view stays up.</p>
+    </details>
+    <p class="small"><strong>The link contains a secret.</strong> Anyone who has it can see what your kiosk shows (no settings, nothing else). Don't share it; create a new one if it leaks.</p>
+    <div class="row">
+      <form method="post" action="/account/kiosk" data-confirm="Create a new link? The current one will stop working.">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Create a new link</button>
+      </form>
+      <form method="post" action="/account/kiosk" data-confirm="Turn the kiosk link off?">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small" name="action" value="off">Turn off</button>
+      </form>
+    </div>
+    {% else %}
+    <form method="post" action="/account/kiosk">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Create a kiosk link</button>
+    </form>
+    {% endif %}
+  </div>
+
   <div class="card">
     <h2>Sessions</h2>
     <p class="small">Lost a phone or used a shared computer? Sign out everywhere, including here.</p>
