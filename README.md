@@ -94,12 +94,13 @@ and trivia, and weather, maps, digest and CSV export.
 
 ## Penalties, tyres, race control, conditions and news
 
-- **Penalty watch** (menu → Penalties):
-  - power unit elements used per driver, against the season allocation;
-  - grid penalties per event (places or back of the grid, with the reason);
-  - super licence penalty points over a rolling 12 months, with expiry dates (12 = race ban).
+- **Penalties** (there's no separate page; they show where they matter):
+  - grid penalties on each event page (places or back of the grid, with the reason);
+  - penalty alerts on the dashboard during a race week (grid penalties, and drivers on 10+
+    super licence points out of 12);
+  - power unit usage against the season allocation, used for the alerts below.
 
-  Admins enter values under **Penalties → Edit / sources**, and manual values always win over
+  Admins enter values under **Settings → Admin tools → Penalties**, and manual values always win over
   parsed ones. Pitwall can also read the FIA's event documents (PDFs). Paste the season's FIA
   documents page there once. During race week it's checked every 2 hours from Wednesday, and
   every 30 minutes on Friday and Saturday (track time). Parsing is deliberately strict: if a
@@ -197,8 +198,8 @@ page's season stats are hidden, as before.
 
 ## Look and feel
 
-- **Timing-screen design**, dark by default. Switch between **System**, **Light** and
-  **Dark** with the three icons in the header. The choice is saved per user, and System
+- **Timing-screen design**, dark by default. Choose **Match my device**, **Light** or
+  **Dark** under **Account → Appearance**. The choice is saved per user, and "Match my device"
   follows your device. Colour never carries meaning on its own: arrows, icons or words
   always go with it, and the colours pass WCAG AA contrast (checked by the tests).
 - **Fonts**: Titillium Web for text, JetBrains Mono with tabular figures for times, gaps and
@@ -218,8 +219,6 @@ page's season stats are hidden, as before.
 - **Event page**: session timeline first, then the track card, penalties, race control,
   conditions, track updates and results. A **Qualifying** tab has the full breakdown (see
   above).
-- **Penalty watch**: power unit usage as pips (yellow at the limit, red over it) and licence
-  points as bars out of 12 (yellow from 8, red from 10), with the numbers and words too.
 - **Freshness badges** on data sections ("Synced 12m ago"), with ▲ in yellow when stale and
   ✕ in red when the last sync failed.
 - Works from 375 px wide phones up. Animations are switched off if your device asks for

@@ -56,10 +56,12 @@ def mexico(db):
 def test_theme_preference_is_per_user_and_server_rendered(client, db):
     token = _login(client)
     assert 'data-theme="dark"' in client.get("/").text  # dark by default
+    assert "/prefs/theme" not in client.get("/").text  # no theme buttons in the header
+    account = client.get("/account").text
+    assert 'action="/prefs/theme"' in account and 'value="dark" checked' in account
     client.post("/prefs/theme", data={"csrf_token": token, "theme": "light", "next": "/news"})
-    page = client.get("/news").text
-    assert 'data-theme="light"' in page
-    assert 'value="light" aria-pressed="true"' in page
+    assert 'data-theme="light"' in client.get("/news").text
+    assert 'value="light" checked' in client.get("/account").text
     client.post("/prefs/theme", data={"csrf_token": token, "theme": "neon"})
     assert load_settings(db).theme == "light"  # unknown values are ignored
     r = client.post(
@@ -100,8 +102,8 @@ def test_pwa_files_and_self_hosted_assets(client):
         "/circuits/rodriguez",
         "/standings",
         "/news",
-        "/penalties",
         "/settings",
+        "/account",
         "/login",
     ],
 )

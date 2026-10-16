@@ -6,6 +6,20 @@
 {% if user.must_change_password %}<div class="error">You're using a password someone else chose. Choose your own below to continue.</div>{% endif %}
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 <div class="grid">
+  <div class="card" id="appearance">
+    <h2>Appearance</h2>
+    <form method="post" action="/prefs/theme">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="next" value="/account#appearance">
+      <div class="seg" role="radiogroup" aria-label="Theme">
+        {% for value, label in (('system', 'Match my device'), ('light', 'Light'), ('dark', 'Dark')) %}
+        <label><input type="radio" name="theme" value="{{ value }}" {{ 'checked' if settings.theme == value else '' }}> {{ label }}</label>
+        {% endfor %}
+      </div>
+      <p><button class="secondary">Save</button></p>
+    </form>
+    <p class="muted small">Saved for your account, so it follows you to every device.</p>
+  </div>
+
   <div class="card">
     <h2>Change password</h2>
     <form method="post" action="/account/password">

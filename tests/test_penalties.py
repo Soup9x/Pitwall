@@ -367,12 +367,13 @@ def test_admin_forms_and_penalty_page(admin, db, season):
                 "awarded_on": "2025-10-26",
             },
         )
-        page = admin.get("/penalties?season=2025").text
+        page = admin.get(f"/events/{mexico.id}").text
+        assert admin.get("/penalties?season=2025").status_code == 404  # the page was removed
     assert "10-place grid penalty" in page and "Fifth ICE" in page
-    assert "▲ over" in page and '5<span class="muted">/4</span>' in page
-    assert "3</strong>/12" in page and "26 Oct 2026" in page
+    assert "Edit penalties (admin)" in page
     db.expire_all()
     assert db.scalars(select(LicencePoints)).one().points == 3
+    assert db.scalars(select(PuUsage)).one().count == 5
 
 
 def test_unparsed_documents_link_to_source(admin, db, season):
@@ -387,13 +388,13 @@ def test_unparsed_documents_link_to_source(admin, db, season):
     db.commit()
     with time_machine.travel(datetime(2025, 10, 30, tzinfo=UTC), tick=False):
         _login(admin, None)
-        page = admin.get("/penalties").text
-    assert "couldn&#39;t parse" in page or "couldn't parse" in page
+        page = admin.get("/admin/penalties").text
+    assert "Couldn&#39;t parse" in page or "Couldn't parse" in page
     assert 'href="https://www.fia.com/d/broken.pdf"' in page
     assert db.scalars(select(FiaDocument)).one().status == "failed"
 
 
-def test_penalties_page_respects_spoilers(admin, db, season):
+def test_event_penalties_respect_spoilers(admin, db, season):
     mexico = season["2025-rodriguez"]
     fia_docs.ingest(
         db,
@@ -407,9 +408,7 @@ def test_penalties_page_respects_spoilers(admin, db, season):
     db.commit()
     with time_machine.travel(datetime(2025, 10, 27, tzinfo=UTC), tick=False):
         _login(admin, None)
-        hidden = admin.get("/penalties?season=2025").text
-        shown = admin.get("/penalties?season=2025&reveal=1").text
+        shown = admin.get(f"/events/{mexico.id}?reveal=1").text
         event_page = admin.get(f"/events/{mexico.id}").text
-    assert "5-place grid penalty" not in hidden and "hidden by spoiler mode" in hidden
     assert "5-place grid penalty" in shown
     assert "5-place grid penalty" not in event_page

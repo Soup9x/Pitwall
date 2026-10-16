@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Penalty watch: edit{% endblock %}
+{% block title %}Penalties: edit{% endblock %}
 {% block content %}
 <div class="row" style="justify-content:space-between;align-items:center;">
-  <h1>Penalty watch <span class="badge muted">admin</span></h1>
-  <a href="/penalties?season={{ season }}">← Back to penalty watch</a>
+  <h1>Penalties <span class="badge muted">admin</span></h1>
+  <a href="/settings#admin-tools">← Back to settings</a>
 </div>
-<p class="sub">Manual entries always win over values parsed from FIA documents for the same event and driver.</p>
+<p class="sub">These feed the grid penalties on event pages, the dashboard's penalty alerts and the penalty alerts. Manual entries always win over values parsed from FIA documents for the same event and driver.</p>
 
 {% macro event_select(name='event_id', optional=False) -%}
 <select name="{{ name }}" {{ '' if optional else 'required' }}>

@@ -200,40 +200,6 @@ def _current_season(db: DB) -> int:
     return year if year in seasons or not seasons else seasons[0]
 
 
-@router.get("/penalties", response_class=HTMLResponse)
-def penalties_page(
-    request: Request,
-    season: int | None = None,
-    reveal: bool = False,
-    db: DB = Depends(get_db),
-    user: User = Depends(require_user),
-) -> HTMLResponse:
-    settings = load_settings(db, user.id)
-    season = season or _current_season(db)
-    cut = None if reveal else spoilers.cutoff(db, user.id, settings)
-    elements, pu_rows = penalties.pu_table(db, season, cut)
-    events = list(db.scalars(select(Event).where(Event.season == season).order_by(Event.round)))
-    grid = [(ev, rows) for ev in events if (rows := penalties.grid_penalties(db, ev, cut))]
-    nxt = current_or_next_event(db)
-    return page(
-        request,
-        "penalties.html",
-        db,
-        user,
-        season=season,
-        seasons=sorted({e.season for e in db.scalars(select(Event))}, reverse=True),
-        elements=elements,
-        pu_rows=pu_rows,
-        grid=grid,
-        next_event=nxt,
-        licence=penalties.licence_table(db, cut=cut),
-        failed=penalties.failed_documents(db),
-        held=cut[0] if cut else None,
-        ban_points=penalties.BAN_POINTS,
-        describe_grid=penalties.describe_grid,
-    )
-
-
 @router.get("/admin/penalties", response_class=HTMLResponse)
 def penalties_admin(
     request: Request,
