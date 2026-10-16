@@ -1,31 +1,46 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="{{ settings.theme if settings and settings.theme in ('light', 'dark', 'system') else 'dark' }}">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0E1014">
 <title>{% block title %}Pitwall{% endblock %} · Pitwall</title>
 <link rel="stylesheet" href="/static/style.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏁</text></svg>">
+<link rel="icon" href="/static/icons/logo.svg" type="image/svg+xml">
+<link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
 </head>
 <body>
-<header class="top"><div class="wrap">
-  <div class="brand">Pit<span>wall</span></div>
-  <nav>
-    {% for href, label in [("/", "Dashboard"), ("/events", "Calendar"), ("/standings", "Standings"), ("/head-to-head", "Head-to-head"), ("/penalties", "Penalties"), ("/news", "News"), ("/history", "Notifications"), ("/settings", "Settings")] + ([("/admin/users", "Users")] if user and user.is_admin else []) %}
-    <a href="{{ href }}" class="{{ 'active' if (path == href or (href != '/' and path.startswith(href))) else '' }}">{{ label }}</a>
+<a class="skip" href="#main">Skip to content</a>
+{% set nav_items = [("/", "Dashboard"), ("/events", "Calendar"), ("/standings", "Standings"), ("/head-to-head", "Head-to-head"), ("/penalties", "Penalties"), ("/news", "News"), ("/history", "Notifications"), ("/settings", "Settings")] + ([("/admin/users", "Users")] if user and user.is_admin else []) %}
+<header class="top"><div class="wrap bar">
+  <a class="brand" href="/" aria-label="Pitwall home">{% include "_logo.svg" %}<span>Pit<span class="w">wall</span></span></a>
+  <nav class="main" aria-label="Main">
+    {% for href, label in nav_items %}
+    <a href="{{ href }}" {% if path == href or (href != '/' and path.startswith(href)) %}aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}
   </nav>
   <div class="spacer"></div>
-  <a class="small muted" href="/account" title="Account">👤 {{ user.username }}</a>
-  <form class="inline" method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Log out</button></form>
+  <div class="user-tools">
+    <form class="inline theme-switch" method="post" action="/prefs/theme" aria-label="Theme">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="next" value="{{ path }}">
+      {% for value, label, icon in (('system', 'System', '◐'), ('light', 'Light', '☀'), ('dark', 'Dark', '☾')) %}
+      <button name="theme" value="{{ value }}" aria-pressed="{{ 'true' if settings.theme == value else 'false' }}" title="{{ label }} theme"><span aria-hidden="true">{{ icon }}</span><span class="sr-only">{{ label }} theme</span></button>
+      {% endfor %}
+    </form>
+    <a class="small muted" href="/account" title="Account"><span aria-hidden="true">👤</span> <span class="who">{{ user.username }}</span><span class="sr-only">Account</span></a>
+    <form class="inline" method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Log out</button></form>
+  </div>
 </div></header>
-<main class="wrap">
-{% if flash %}<div class="flash">{{ flash }}</div>{% endif %}
+<main class="wrap" id="main">
+{% if flash %}<div class="flash" role="status">{{ flash }}</div>{% endif %}
 {% if backfill and backfill.running %}
 <div class="card" style="margin-bottom:16px;">
   <div class="small">Historical backfill in progress — {{ backfill.done }}/{{ backfill.total }} seasons{% if backfill.current %} (now: {{ backfill.current }}){% endif %}. Track stats fill in as it runs; everything else works normally.</div>
-  <div class="progress" style="margin-top:6px;"><div style="width: {{ (100 * backfill.done / (backfill.total or 1))|round|int }}%"></div></div>
+  <div class="progress" style="margin-top:6px;" role="progressbar" aria-valuemin="0" aria-valuemax="{{ backfill.total }}" aria-valuenow="{{ backfill.done }}"><div style="width: {{ (100 * backfill.done / (backfill.total or 1))|round|int }}%"></div></div>
 </div>
 {% endif %}
 {% block content %}{% endblock %}

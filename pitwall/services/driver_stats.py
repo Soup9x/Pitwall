@@ -155,7 +155,7 @@ def trend_svg(
     def y(v: float) -> float:
         return pad_t + (height - pad_t - pad_b) * (1 - v / top)
 
-    colors = ["#e10600", "#38bdf8", "#facc15", "#a78bfa"]
+    colors = ["var(--accent)", "var(--flag-blue)", "var(--flag-yellow)", "var(--timing-purple)"]
     parts = [
         f'<svg viewBox="0 0 {width} {height}" class="chart" role="img" '
         f'aria-label="Cumulative points by round">'
@@ -178,12 +178,12 @@ def trend_svg(
         color = colors[k % len(colors)]
         pts = " ".join(f"{x(i):.1f},{y(v):.1f}" for i, v in enumerate(values))
         parts.append(
-            f'<polyline points="{pts}" fill="none" stroke="{color}" '
+            f'<polyline points="{pts}" fill="none" style="stroke:{color}" '
             'stroke-width="2.5" stroke-linejoin="round"/>'
         )
         for i, v in enumerate(values):
             parts.append(
-                f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="3" fill="{color}">'
+                f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="3" style="fill:{color}">'
                 f"<title>{escape(name)}: {v:g} pts after {escape(labels[i])}</title></circle>"
             )
     parts.append("</svg>")

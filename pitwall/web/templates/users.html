@@ -5,7 +5,7 @@
 <p class="sub">Everyone shares the F1 data; each person has their own settings, alert channels, followed drivers and calendar feed.</p>
 
 {% if new_creds %}
-<div class="card" style="margin-bottom:16px;border-color:#1e40af;">
+<div class="card notice" style="margin-bottom:16px;">
   <h2>{% if new_creds.kind == 'new' %}Account created for {{ new_creds.username }}{% else %}Temporary password for {{ new_creds.username }}{% endif %}</h2>
   <p class="small">Send these login details to the person. The password is only shown now{% if new_creds.kind == 'temp' %}; they'll be asked to choose their own when they log in{% endif %}.</p>
 <pre id="new-creds" style="white-space:pre-wrap;">Pitwall: {{ login_url }}
@@ -16,7 +16,7 @@ Password: {{ new_creds.password }}</pre>
 {% endif %}
 
 {% if new_link %}
-<div class="card" style="margin-bottom:16px;border-color:#1e40af;">
+<div class="card notice" style="margin-bottom:16px;">
   <h2>{% if new_link.kind == 'invite' %}Invite link created{% else %}Password reset link for {{ new_link.user }}{% endif %}</h2>
   <p class="small">Send this to the person (it works once, and is only shown now). {% if new_link.kind == 'invite' %}It expires in 7 days.{% else %}It expires in 48 hours.{% endif %}</p>
   <p><code id="new-link">{{ new_link.url }}</code></p>

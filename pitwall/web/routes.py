@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from pathlib import Path
 from typing import Any
 from zoneinfo import available_timezones
 
@@ -79,10 +80,11 @@ from pitwall.settings_store import (
 )
 from pitwall.units import TEMP_UNITS
 from pitwall.web import racedata
-from pitwall.web.auth import checked_form, require_admin, require_user, session_user
+from pitwall.web.auth import checked_form, require_admin, require_user, safe_next, session_user
 from pitwall.web.common import back, flash, page
 
 log = logging.getLogger(__name__)
+STATIC_DIR = Path(__file__).parent / "static"
 
 public = APIRouter()
 private = APIRouter(dependencies=[Depends(require_user)])
@@ -153,6 +155,17 @@ def health(request: Request) -> JSONResponse:
     if detailed:
         body["scheduler"] = scheduler.state()
     return JSONResponse(body, status_code=code)
+
+
+@public.get("/sw.js", include_in_schema=False)
+def service_worker() -> FileResponse:
+    """Served from the root so the service worker's scope is the whole app."""
+    return FileResponse(STATIC_DIR / "sw.js", media_type="text/javascript")
+
+
+@public.get("/manifest.webmanifest", include_in_schema=False)
+def manifest() -> FileResponse:
+    return FileResponse(STATIC_DIR / "manifest.webmanifest", media_type="application/manifest+json")
 
 
 @public.get("/calendar.ics")
@@ -541,19 +554,9 @@ def driver_page(
         seasons=seasons,
         data=data,
         chart=chart,
-        compounds=COMPOUND_COLORS,
         followed=db.get(FollowedDriver, (user.id, driver_id)) is not None,
         held_event=held if hide else None,
     )
-
-
-COMPOUND_COLORS = {
-    "SOFT": "#ef4444",
-    "MEDIUM": "#facc15",
-    "HARD": "#e5e7eb",
-    "INTERMEDIATE": "#22c55e",
-    "WET": "#3b82f6",
-}
 
 
 # ---------------------------------------------------------------------------- history
@@ -732,6 +735,21 @@ async def save_settings_route(
         reminders.reconcile(sched, db)
     flash(request, "Settings saved.")
     return back("/settings")
+
+
+THEMES = ("system", "light", "dark")
+
+
+@private.post("/prefs/theme")
+async def set_theme(
+    request: Request, db: DB = Depends(get_db), user: User = Depends(require_user)
+) -> Response:
+    form = await checked_form(request)
+    theme = str(form.get("theme", ""))
+    if theme in THEMES:
+        save_settings(db, {"theme": theme}, user.id)
+        db.commit()
+    return back(safe_next(str(form.get("next", "/"))))
 
 
 @private.post("/settings/followed")

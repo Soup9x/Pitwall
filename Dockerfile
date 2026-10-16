@@ -18,8 +18,8 @@ COPY pyproject.toml README.md ./
 COPY pitwall ./pitwall
 RUN pip install . && rm -rf /app/pitwall /app/build
 
-# Fallback copy of the curated circuit data, used if ./data/circuits.yaml is missing.
-COPY data/circuits.yaml /app/seed/circuits.yaml
+# Fallback copies of the curated data, used if ./data doesn't have them.
+COPY data/circuits.yaml data/team_colors.yaml /app/seed/
 
 RUN mkdir -p /app/data && chown pitwall:pitwall /app/data
 VOLUME ["/app/data"]

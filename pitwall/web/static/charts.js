@@ -4,9 +4,9 @@
 (function () {
   if (typeof Chart === "undefined") return;
   var css = getComputedStyle(document.documentElement);
-  var muted = css.getPropertyValue("--muted").trim() || "#9aa1b2";
-  var grid = css.getPropertyValue("--border").trim() || "#2a2f3e";
-  var accent = css.getPropertyValue("--accent").trim() || "#e8322f";
+  var muted = css.getPropertyValue("--muted").trim();
+  var grid = css.getPropertyValue("--border").trim();
+  var accent = css.getPropertyValue("--accent").trim();
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   document.querySelectorAll("canvas[data-chart='temp']").forEach(function (canvas) {

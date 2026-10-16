@@ -37,9 +37,12 @@ include = ["pitwall*"]
 [tool.setuptools.package-data]
 pitwall = [
     "web/templates/*.html",
+    "web/templates/*.svg",
     "web/templates/email/*",
     "web/static/*",
     "web/static/vendor/*",
+    "web/static/fonts/*",
+    "web/static/icons/*",
     "migrations/script.py.mako",
 ]
 

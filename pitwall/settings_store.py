@@ -91,6 +91,7 @@ class AppSettings:
     digest_time: str = "08:00"
     digest_types: list[str] = field(default_factory=lambda: list(DIGESTIBLE))
     temp_unit: str = "both"  # C / F / both
+    theme: str = "dark"  # dark / light / system
 
     @property
     def tz(self) -> ZoneInfo:

@@ -1,0 +1,30 @@
+# Team colours, per season, keyed by Jolpica/Ergast constructorId. Pitwall only uses them for
+# a 3-4px stripe next to a team's drivers, always alongside the team or driver name.
+#
+# These are approximate livery colours, not official values: change them freely. A team with
+# no entry for a season uses its most recent earlier entry; with none at all, no stripe.
+# New 2026 teams need adding once their constructorId is known (see the Standings page URLs).
+
+2024:
+  red_bull: "#3671C6"
+  mercedes: "#27F4D2"
+  ferrari: "#E8002D"
+  mclaren: "#FF8000"
+  aston_martin: "#229971"
+  alpine: "#FF87BC"
+  williams: "#64C4FF"
+  rb: "#6692FF"
+  sauber: "#52E252"
+  haas: "#B6BABD"
+
+2025:
+  red_bull: "#3671C6"
+  mercedes: "#27F4D2"
+  ferrari: "#E8002D"
+  mclaren: "#FF8000"
+  aston_martin: "#229971"
+  alpine: "#0093CC"
+  williams: "#64C4FF"
+  rb: "#6692FF"
+  sauber: "#52E252"
+  haas: "#B6BABD"

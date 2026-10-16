@@ -52,7 +52,7 @@
       {% if data.has_openf1 %}
       <td>{{ r.best_lap or '—' }}</td>
       <td class="num">{{ r.pit_count if r.pit_count is not none else '—' }}</td>
-      <td>{% for s in r.stints %}<span class="tyre" style="background: {{ compounds.get(s.compound, '#6b7280') }}" title="{{ s.compound|title }}{% if s.laps %}, {{ s.laps }} laps{% endif %}">{{ s.compound[:1] }}</span>{% endfor %}</td>
+      <td>{% for s in r.stints %}<span class="tyre {{ s.compound }}" title="{{ s.compound|title }}{% if s.laps %}, {{ s.laps }} laps{% endif %}">{{ s.compound[:1] }}</span>{% endfor %}</td>
       {% endif %}
     </tr>
     {% endfor %}
