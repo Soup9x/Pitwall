@@ -1,0 +1,38 @@
+[
+ {
+  "category": "Flag",
+  "date": "2023-10-29T20:03:00+00:00",
+  "driver_number": null,
+  "flag": "GREEN",
+  "lap_number": 1,
+  "meeting_key": 1222,
+  "message": "GREEN LIGHT - PIT EXIT OPEN",
+  "scope": "Track",
+  "sector": null,
+  "session_key": 9405
+ },
+ {
+  "category": "Flag",
+  "date": "2023-10-29T21:01:00+00:00",
+  "driver_number": null,
+  "flag": "RED",
+  "lap_number": 34,
+  "meeting_key": 1222,
+  "message": "RED FLAG",
+  "scope": "Track",
+  "sector": null,
+  "session_key": 9405
+ },
+ {
+  "category": "Flag",
+  "date": "2023-10-29T21:50:00+00:00",
+  "driver_number": null,
+  "flag": "CHEQUERED",
+  "lap_number": 71,
+  "meeting_key": 1222,
+  "message": "CHEQUERED FLAG",
+  "scope": "Track",
+  "sector": null,
+  "session_key": 9405
+ }
+]

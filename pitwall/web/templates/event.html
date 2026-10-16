@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import session_table, spoiler_notice, track_facts %}
+{% from "_macros.html" import headline_list, news_hidden, session_table, spoiler_notice, track_facts, tyre_summary %}
 {% block title %}{{ event.name }}{% endblock %}
 {% block content %}
 <h1>{{ event.name }} {% if event.is_sprint_weekend %}<span class="badge sprint">SPRINT WEEKEND</span>{% endif %}{% if event.status == 'cancelled' %} <span class="badge cancelled">CANCELLED</span>{% endif %}</h1>
@@ -11,11 +11,119 @@
     {{ session_table(sessions, weather) }}
     {% for w in rain %}<div class="odd" style="margin-top:6px;">☔ {{ w }}</div>{% endfor %}
     {% if weather %}<p class="muted small">Forecast: Open-Meteo, updated every 3 hours.</p>{% endif %}
+    {% if last_year %}{% set ly = last_year.conditions %}
+    <p class="small">Last year here <span class="muted">({{ last_year.event.season }} race)</span>: track {{ ly.track_min|temp_range(ly.track_max, settings.temp_unit) }}{% if ly.air_min is not none %}, air {{ ly.air_min|temp_range(ly.air_max, settings.temp_unit) }}{% endif %}{% if ly.rain is not none %}, {{ 'rain' if ly.rain else 'dry' }}{% endif %}</p>
+    {% endif %}
   </div>
   <div class="card">
     <h2>Track</h2>
     {{ track_facts(event.circuit, stats, map_url) }}
+    {% if sc_history %}
+    <p class="small">🚨 {{ sc_history.text }} <span class="muted">({{ sc_history.seasons|min }}–{{ sc_history.seasons|max }}{% if sc_history.with_red %}; red flag in {{ sc_history.with_red }}{% endif %}{% if sc_history.with_vsc %}; VSC in {{ sc_history.with_vsc }}{% endif %})</span></p>
+    {% endif %}
   </div>
+
+  <div class="card" id="tyres">
+    <h2>Tyres</h2>
+    {{ tyre_summary(tyres) }}
+    {% if user.is_admin %}
+    <details class="admin-edit"{% if not tyres.nomination %} open{% endif %}>
+      <summary class="small">Admin: {{ 'change' if tyres.nomination else 'enter' }} the nomination</summary>
+      <form method="post" action="/admin/events/{{ event.id }}/tyres">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <div class="row">
+          {% for role in ('hard', 'medium', 'soft') %}
+          <div><label for="tyre-{{ role }}">{{ role|title }}</label>
+            <select id="tyre-{{ role }}" name="{{ role }}" required>
+              <option value="">–</option>
+              {% for c in compounds %}<option value="{{ c }}" {{ 'selected' if tyres.nomination and tyres.nomination[role] == c else '' }}>{{ c }}</option>{% endfor %}
+            </select></div>
+          {% endfor %}
+        </div>
+        <label for="tyre-src">Source link <span class="muted">(optional)</span></label>
+        <input id="tyre-src" type="text" name="source_url" placeholder="https://press.pirelli.com/..." style="width:100%;">
+        <p class="row"><button>Save</button>
+        {% if tyres.nomination and tyres.nomination.origin == 'manual' %}<button class="secondary" name="action" value="clear" formnovalidate>Remove manual entry</button>{% endif %}</p>
+        <p class="muted small">C1 is the hardest compound. A manual entry overrides anything parsed from Pirelli.</p>
+      </form>
+      <form method="post" action="/admin/events/{{ event.id }}/tyres/import" class="row" style="margin-top:8px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input type="text" name="url" placeholder="Pirelli preview press release link" style="flex:1;min-width:200px;" required>
+        <button class="secondary">Import</button>
+      </form>
+      <p class="muted small">Import reads the release and only saves it if it names exactly one hard, medium and soft.</p>
+    </details>
+    {% endif %}
+  </div>
+
+  {% if grid_penalties %}
+  <div class="card" id="penalties">
+    <h2>Grid penalties</h2>
+    <table>
+    {% for p in grid_penalties %}
+      <tr><td>{{ p.driver.full_name }}</td><td><strong>{{ describe_grid(p) }}</strong>{% if p.reason %}<div class="muted small">{{ p.reason }}</div>{% endif %}</td>
+        <td class="small">{% if p.document %}<a href="{{ p.document.url }}" rel="noopener noreferrer" target="_blank">source</a>{% else %}admin{% endif %}</td></tr>
+    {% endfor %}
+    </table>
+    <p class="small"><a href="/penalties#grid">Penalty watch →</a></p>
+  </div>
+  {% endif %}
+
+  {% if track_news.items or track_news.hidden %}
+  <div class="card" id="track-updates">
+    <h2>Track updates</h2>
+    {{ news_hidden(track_news, "/events/" ~ event.id ~ "?reveal=1#track-updates") }}
+    {{ headline_list(track_news.items, {}, [], news_tags, settings.tz, False) }}
+  </div>
+  {% endif %}
+
+  {% if conditions %}
+  <div class="card wide" id="conditions">
+    <h2>Conditions</h2>
+    <div class="table-scroll"><table>
+      <tr><th>Session</th><th>Track</th><th>Air</th><th class="num">Humidity</th><th>Rain</th><th class="num">Max wind</th></tr>
+      {% for s in sessions if conditions.get(s.id) %}{% set c = conditions[s.id] %}
+      <tr><td>{{ s.label }}</td>
+        <td class="num">{{ c.track_min|temp_range(c.track_max, settings.temp_unit) }}{% if c.track_avg is not none %} <span class="muted small">avg {{ c.track_avg|temp(settings.temp_unit) }}</span>{% endif %}</td>
+        <td class="num">{{ c.air_min|temp_range(c.air_max, settings.temp_unit) }}</td>
+        <td class="num">{% if c.humidity_avg is not none %}{{ c.humidity_avg|round|int }}%{% endif %}</td>
+        <td>{% if c.rain is none %}<span class="muted">–</span>{% elif c.rain %}☔ yes{% else %}no{% endif %}</td>
+        <td class="num">{{ c.wind_max_ms|wind }}</td></tr>
+      {% endfor %}
+    </table></div>
+    {% if temp_chart %}
+    <div class="chart-box"><canvas data-chart="temp" data-src="temp-chart-data" aria-label="Track temperature over the session" role="img"></canvas></div>
+    <script type="application/json" id="temp-chart-data">{{ temp_chart|safe }}</script>
+    {% endif %}
+    <p class="muted small">Measured at the track (OpenF1), after each session.</p>
+  </div>
+  {% endif %}
+
+  {% if race_control or race_control_hidden %}
+  <div class="card wide" id="race-control">
+    <h2>Race control</h2>
+    {% if race_control_hidden %}<p class="spoiler-notice small">🙈 Race control from {{ race_control_hidden }} session{{ 's' if race_control_hidden != 1 }} hidden by spoiler mode. <a href="/events/{{ event.id }}?reveal=1#race-control" rel="nofollow">Show anyway</a></p>{% endif %}
+    {% if race_control %}
+    <div class="row rc-filters small" role="group" aria-label="Show messages about">
+      {% for key, label in (('flag', '🏳 Flags'), ('sc', '🚨 Safety car'), ('stewards', '⚖ Stewards'), ('limits', '⛔ Track limits'), ('drs', 'DRS'), ('other', 'Other')) %}
+      <label><input type="checkbox" data-rc-filter="{{ key }}" {{ 'checked' if key not in ('limits', 'drs', 'other') else '' }}> {{ label }}</label>
+      {% endfor %}
+    </div>
+    {% for rc in race_control %}{% set st = rc.stats %}
+    <details class="rc-session"{% if loop.last %} open{% endif %}>
+      <summary><strong>{{ rc.label }}</strong>
+        <span class="muted small">· {{ st.safety_cars }} SC{% if st.sc_laps %} ({{ st.sc_laps }} lap{{ 's' if st.sc_laps != 1 }}){% endif %} · {{ st.vscs }} VSC{% if st.vsc_laps %} ({{ st.vsc_laps }} lap{{ 's' if st.vsc_laps != 1 }}){% endif %} · {{ st.red_flags }} red flag{{ 's' if st.red_flags != 1 }} · {{ st.investigations }} investigation{{ 's' if st.investigations != 1 }} · {{ st.penalties }} penalt{{ 'ies' if st.penalties != 1 else 'y' }}</span></summary>
+      <ol class="rc-list">
+      {% for m in rc.messages %}{% set k = kind(m) %}
+        <li data-rc-kind="{{ k }}" class="rc-{{ k }}{% if m.flag %} flag-{{ m.flag|lower|replace(' ', '-') }}{% endif %}"><span class="rc-time">{% if m.lap %}L{{ m.lap }}{% else %}{{ m.at.astimezone(settings.tz).strftime('%H:%M') }}{% endif %}</span> {{ m.message }}</li>
+      {% endfor %}
+      </ol>
+    </details>
+    {% endfor %}
+    <p class="muted small">From the FIA race control feed via OpenF1, stored after each session.</p>
+    {% endif %}
+  </div>
+  {% endif %}
 
   {% if facts %}
   <div class="card wide">
@@ -73,4 +181,9 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+{% block scripts %}{% if temp_chart %}
+<script src="/static/vendor/chart.umd.min.js"></script>
+{% endif %}
+<script src="/static/charts.js"></script>
 {% endblock %}

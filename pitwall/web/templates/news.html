@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "_macros.html" import headline_list, news_hidden %}
+{% block title %}News{% endblock %}
+{% block content %}
+<h1>News</h1>
+<p class="sub">Headlines from RSS feeds{% if feeds %} ({{ feeds|selectattr('enabled')|map(attribute='name')|join(', ') }}){% endif %}. Pitwall stores only the headline, link, source and date; articles open on the publisher's site.</p>
+<div class="row tabs" role="tablist">
+  {% for key, label in (('all', 'All'), ('followed', '★ Followed drivers'), ('track', '🛠 Track changes')) %}
+  <a class="btn {{ '' if show == key else 'secondary' }}" href="/news?show={{ key }}" {{ 'aria-current=page' if show == key else '' }}>{{ label }}</a>
+  {% endfor %}
+</div>
+<div class="card" style="margin-top:12px;">
+  {{ news_hidden(news, "/news?show=" ~ show ~ "&reveal=1") }}
+  {% if news.items %}
+    {{ headline_list(news.items, news_labels, followed_tags, news_tags, settings.tz) }}
+  {% else %}
+    <p class="muted">No headlines {{ 'match this filter ' if show != 'all' else '' }}yet. Feeds are checked every 30 minutes{% if user.is_admin %}; manage them in <a href="/settings#news">Settings</a>{% endif %}.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -84,7 +84,7 @@ def build(
     )
     upcoming = []
     for sess in week:
-        wx = weather.for_event(db, sess.event).get(sess.id)
+        wx = weather.for_event(db, sess.event, settings.temp_unit).get(sess.id)
         upcoming.append((sess.event, session_view(sess, settings, now), wx))
     season = standings_svc.latest_season_with_standings(db)
     drivers = None

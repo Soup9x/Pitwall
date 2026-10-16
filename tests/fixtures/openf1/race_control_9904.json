@@ -1,0 +1,50 @@
+[
+ {
+  "category": "Flag",
+  "date": "2025-10-25T21:00:00+00:00",
+  "driver_number": null,
+  "flag": "GREEN",
+  "lap_number": null,
+  "meeting_key": 1270,
+  "message": "GREEN LIGHT - PIT EXIT OPEN",
+  "scope": "Track",
+  "sector": null,
+  "session_key": 9904
+ },
+ {
+  "category": "Flag",
+  "date": "2025-10-25T21:12:00+00:00",
+  "driver_number": null,
+  "flag": "RED",
+  "lap_number": null,
+  "meeting_key": 1270,
+  "message": "RED FLAG",
+  "scope": "Track",
+  "sector": null,
+  "session_key": 9904
+ },
+ {
+  "category": "Flag",
+  "date": "2025-10-25T21:25:00+00:00",
+  "driver_number": null,
+  "flag": "GREEN",
+  "lap_number": null,
+  "meeting_key": 1270,
+  "message": "GREEN LIGHT - PIT EXIT OPEN",
+  "scope": "Track",
+  "sector": null,
+  "session_key": 9904
+ },
+ {
+  "category": "Flag",
+  "date": "2025-10-25T21:59:00+00:00",
+  "driver_number": null,
+  "flag": "CHEQUERED",
+  "lap_number": null,
+  "meeting_key": 1270,
+  "message": "CHEQUERED FLAG",
+  "scope": "Track",
+  "sector": null,
+  "session_key": 9904
+ }
+]

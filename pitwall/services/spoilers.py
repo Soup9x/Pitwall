@@ -95,3 +95,52 @@ def held_event(
         return None
     event = latest_results_event(db)
     return event if event is not None and held(db, event.id, user_id, settings, now) else None
+
+
+# Sessions whose outcome spoiler mode protects (practice isn't held back).
+COMPETITIVE = ("SQ", "SPRINT", "Q", "RACE")
+
+
+def first_competitive_start(event: Event) -> datetime | None:
+    starts = [s.start_utc for s in event.sessions if s.type in COMPETITIVE and s.start_utc]
+    return min(starts) if starts else None
+
+
+def started_event(db: DB, now: datetime | None = None) -> Event | None:
+    """The most recent event whose first competitive session has started."""
+    now = now or utcnow()
+    return db.scalars(
+        select(Event)
+        .join(Session, Session.event_id == Event.id)
+        .where(Session.type.in_(COMPETITIVE), Session.start_utc <= now)
+        .order_by(Session.start_utc.desc())
+        .limit(1)
+    ).first()
+
+
+def cutoff(
+    db: DB, user_id: int, settings: AppSettings, now: datetime | None = None
+) -> tuple[Event, datetime] | None:
+    """(event, time) when post-session material (news, penalty decisions, race control)
+    published from `time` on must stay hidden: from the start of the held event's first
+    competitive session. Covers the gap before results arrive, e.g. news during qualifying."""
+    if not settings.spoiler_enabled:
+        return None
+    now = now or utcnow()
+    event = started_event(db, now)
+    if event is None or not held(db, event.id, user_id, settings, now):
+        return None
+    start = first_competitive_start(event)
+    return (event, start) if start is not None else None
+
+
+def hides(
+    cut: tuple[Event, datetime] | None, published: datetime | None, event_id: int | None = None
+) -> bool:
+    """Whether something published at `published` (about `event_id`, if known) is hidden."""
+    if cut is None:
+        return False
+    event, start = cut
+    if event_id is not None and event_id != event.id:
+        return False
+    return published is None or published >= start

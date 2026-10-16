@@ -14,7 +14,18 @@ from sqlalchemy.orm import Session as DB
 from pitwall.config import get_env
 from pitwall.models import OWNER_ID, Setting, UserSetting
 
-ALERT_TYPES = ("reminder", "schedule_change", "preview", "results", "standings", "digest")
+ALERT_TYPES = (
+    "reminder",
+    "schedule_change",
+    "preview",
+    "results",
+    "standings",
+    "digest",
+    "penalty",
+    "licence",
+    "pu_element",
+    "track_news",
+)
 ALERT_LABELS = {
     "reminder": "Session reminders",
     "schedule_change": "Schedule changes",
@@ -22,6 +33,10 @@ ALERT_LABELS = {
     "results": "Session results",
     "standings": "Standings updates",
     "digest": "Weekly digest",
+    "penalty": "Grid penalties",
+    "licence": "Licence points (10+)",
+    "pu_element": "New power unit parts (followed drivers)",
+    "track_news": "Track-change news (upcoming circuit)",
 }
 # Alert types that can be folded into the weekly digest instead of being sent one by one.
 DIGESTIBLE = ("schedule_change", "results", "standings")
@@ -38,6 +53,10 @@ def _default_routing() -> dict[str, list[str]]:
         "results": ["webhook"],
         "standings": ["webhook"],
         "digest": ["email"],
+        "penalty": ["webhook"],
+        "licence": ["webhook"],
+        "pu_element": [],  # off by default
+        "track_news": ["webhook"],
     }
 
 
@@ -71,6 +90,7 @@ class AppSettings:
     digest_day: str = "mon"
     digest_time: str = "08:00"
     digest_types: list[str] = field(default_factory=lambda: list(DIGESTIBLE))
+    temp_unit: str = "both"  # C / F / both
 
     @property
     def tz(self) -> ZoneInfo:

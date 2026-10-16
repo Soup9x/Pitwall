@@ -382,3 +382,229 @@ class SessionWeather(Base):
     precip_mm: Mapped[float | None] = mapped_column(Float, nullable=True)
     wind_kmh: Mapped[float | None] = mapped_column(Float, nullable=True)
     weather_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+# ---------------------------------------------------------------------------- tyres (Pirelli)
+
+COMPOUNDS = ("C1", "C2", "C3", "C4", "C5", "C6")  # C1 hardest
+
+
+class TyreNomination(Base):
+    """Pirelli's hard/medium/soft choice for an event. One row per origin ("manual" from the
+    admin form, "pirelli" parsed from a press release); a manual row always wins."""
+
+    __tablename__ = "tyre_nomination"
+    __table_args__ = (UniqueConstraint("event_id", "origin"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("event.id", ondelete="CASCADE"), index=True)
+    origin: Mapped[str] = mapped_column(String(20))  # manual / pirelli
+    hard: Mapped[str] = mapped_column(String(2))
+    medium: Mapped[str] = mapped_column(String(2))
+    soft: Mapped[str] = mapped_column(String(2))
+    source_title: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source_published_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    recorded_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    recorded_by: Mapped[int | None] = mapped_column(Integer, nullable=True)  # user id (manual)
+
+
+# ---------------------------------------------------------------------------- OpenF1 post-session
+
+
+class SessionDataFetch(Base):
+    """Bookkeeping for OpenF1 post-session data (race control + weather): which OpenF1 session
+    a session matched and when it was fetched, so completed sessions aren't fetched again."""
+
+    __tablename__ = "session_data_fetch"
+
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("session.id", ondelete="CASCADE"), primary_key=True
+    )
+    openf1_session_key: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    race_control_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    weather_samples: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class RaceControlMessage(Base):
+    """A race control message (OpenF1 /race_control), stored after the session."""
+
+    __tablename__ = "race_control_message"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("session.id", ondelete="CASCADE"), index=True
+    )
+    at: Mapped[datetime] = mapped_column(UTCDateTime)
+    lap: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    category: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    flag: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    scope: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    sector: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    driver_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    message: Mapped[str] = mapped_column(Text)
+
+
+class SessionConditions(Base):
+    """Measured conditions for a completed session (OpenF1 /weather), summarised. `series_json`
+    is a downsampled [[minutes from start, track °C], ...] list for the chart."""
+
+    __tablename__ = "session_conditions"
+
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("session.id", ondelete="CASCADE"), primary_key=True
+    )
+    samples: Mapped[int] = mapped_column(Integer, default=0)
+    track_min: Mapped[float | None] = mapped_column(Float, nullable=True)
+    track_max: Mapped[float | None] = mapped_column(Float, nullable=True)
+    track_avg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    air_min: Mapped[float | None] = mapped_column(Float, nullable=True)
+    air_max: Mapped[float | None] = mapped_column(Float, nullable=True)
+    air_avg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    humidity_min: Mapped[float | None] = mapped_column(Float, nullable=True)
+    humidity_max: Mapped[float | None] = mapped_column(Float, nullable=True)
+    humidity_avg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rain: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    wind_max_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    series_json: Mapped[str] = mapped_column(Text, default="[]")
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+# ---------------------------------------------------------------------------- penalty watch
+
+
+class FiaDocument(Base):
+    """An FIA event document seen by the poller, and what parsing it produced. Every parsed
+    record points back here, so the UI can always link to its source."""
+
+    __tablename__ = "fia_document"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    url: Mapped[str] = mapped_column(String(500), unique=True)
+    title: Mapped[str] = mapped_column(String(300))
+    event_id: Mapped[int | None] = mapped_column(
+        ForeignKey("event.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    kind: Mapped[str] = mapped_column(String(20))  # pu_usage / decision / other
+    status: Mapped[str] = mapped_column(String(20))  # parsed / failed / ignored
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)  # why it failed
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class PuAllocation(Base):
+    """How many of each power unit element a driver may use in a season without a penalty.
+    Entered by an admin (Pitwall doesn't guess regulations)."""
+
+    __tablename__ = "pu_allocation"
+
+    season: Mapped[int] = mapped_column(Integer, primary_key=True)
+    element: Mapped[str] = mapped_column(String(10), primary_key=True)
+    allowed: Mapped[int] = mapped_column(Integer)
+
+
+class PuUsage(Base):
+    """Cumulative count of one power unit element used by a driver as of an event."""
+
+    __tablename__ = "pu_usage"
+    __table_args__ = (UniqueConstraint("event_id", "driver_id", "element", "origin"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("event.id", ondelete="CASCADE"), index=True)
+    driver_id: Mapped[str] = mapped_column(ForeignKey("driver.id"), index=True)
+    element: Mapped[str] = mapped_column(String(10))
+    count: Mapped[int] = mapped_column(Integer)
+    origin: Mapped[str] = mapped_column(String(10))  # manual / fia
+    document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("fia_document.id", ondelete="SET NULL"), nullable=True
+    )
+    recorded_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    recorded_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    driver: Mapped[Driver] = relationship(lazy="joined")
+    document: Mapped[FiaDocument | None] = relationship(lazy="joined")
+
+
+class GridPenalty(Base):
+    """A grid penalty for an event: `places` and/or `back_of_grid`. A manual row for an
+    (event, driver) replaces all FIA-parsed rows for that pair; a manual row with no places and
+    no back-of-grid records "no penalty" (to overrule a wrong parse)."""
+
+    __tablename__ = "grid_penalty"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("event.id", ondelete="CASCADE"), index=True)
+    driver_id: Mapped[str] = mapped_column(ForeignKey("driver.id"), index=True)
+    places: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    back_of_grid: Mapped[bool] = mapped_column(Boolean, default=False)
+    reason: Mapped[str] = mapped_column(String(300), default="")
+    origin: Mapped[str] = mapped_column(String(10))  # manual / fia
+    document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("fia_document.id", ondelete="SET NULL"), nullable=True
+    )
+    recorded_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    recorded_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    driver: Mapped[Driver] = relationship(lazy="joined")
+    document: Mapped[FiaDocument | None] = relationship(lazy="joined")
+
+
+class LicencePoints(Base):
+    """Super licence penalty points. They count for 12 months from `awarded_on`. A manual row
+    for a (driver, event) replaces FIA-parsed rows for that pair (points 0 = "none")."""
+
+    __tablename__ = "licence_points"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    driver_id: Mapped[str] = mapped_column(ForeignKey("driver.id"), index=True)
+    event_id: Mapped[int | None] = mapped_column(
+        ForeignKey("event.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    points: Mapped[int] = mapped_column(Integer)
+    awarded_on: Mapped[date] = mapped_column(Date)
+    reason: Mapped[str] = mapped_column(String(300), default="")
+    origin: Mapped[str] = mapped_column(String(10))  # manual / fia
+    document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("fia_document.id", ondelete="SET NULL"), nullable=True
+    )
+    recorded_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    recorded_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    driver: Mapped[Driver] = relationship(lazy="joined")
+    document: Mapped[FiaDocument | None] = relationship(lazy="joined")
+
+
+# ---------------------------------------------------------------------------- news (RSS)
+
+
+class NewsFeed(Base):
+    __tablename__ = "news_feed"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    url: Mapped[str] = mapped_column(String(500), unique=True)
+    name: Mapped[str] = mapped_column(String(100))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    etag: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    modified: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    last_error_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class NewsItem(Base):
+    """A headline. Only the title, link, source, date and tags are stored; never article text."""
+
+    __tablename__ = "news_item"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    feed_id: Mapped[int | None] = mapped_column(
+        ForeignKey("news_feed.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    link: Mapped[str] = mapped_column(String(500), unique=True)
+    title: Mapped[str] = mapped_column(String(300))
+    source: Mapped[str] = mapped_column(String(100))
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True, index=True)
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, index=True)
+    # JSON list like ["driver:norris", "team:mclaren", "circuit:monza", "track"]
+    tags_json: Mapped[str] = mapped_column(Text, default="[]")

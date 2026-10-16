@@ -17,6 +17,10 @@
     </select>
     <label>"Odd hours" — flag sessions starting between</label>
     <div class="row"><input type="time" name="odd_start" value="{{ settings.odd_start }}"> and <input type="time" name="odd_end" value="{{ settings.odd_end }}"></div>
+    <label for="temp_unit">Temperatures</label>
+    <select id="temp_unit" name="temp_unit">
+      {% for value, label in (('C', '°C'), ('F', '°F'), ('both', '°C and °F')) %}<option value="{{ value }}" {{ 'selected' if settings.temp_unit == value else '' }}>{{ label }}</option>{% endfor %}
+    </select>
   </div>
 
   <div class="card">
@@ -192,6 +196,36 @@
   </div>
 
   {% if user.is_admin %}
+  <div class="card wide" id="news">
+    <h2>News feeds <span class="badge muted">admin · everyone</span></h2>
+    <p class="muted small">RSS or Atom feeds, checked every 30 minutes. Only headlines, links, sources and dates are kept (60 days).</p>
+    {% if news_feeds %}
+    <div class="table-scroll"><table>
+      <tr><th>Feed</th><th>Status</th><th></th></tr>
+      {% for f in news_feeds %}
+      <tr class="{{ '' if f.enabled else 'past' }}"><td><strong>{{ f.name }}</strong><div class="muted small">{{ f.url }}</div></td>
+        <td class="small">{% if not f.enabled %}<span class="badge muted">off</span>{% elif f.last_error %}<span class="badge fail">✕ failing</span> <span class="muted">{{ f.last_error[:120] }}</span>{% elif f.last_success_at %}<span class="badge ok">✓ ok</span> <span class="muted">{{ f.last_success_at.astimezone(settings.tz).strftime('%d %b %H:%M') }}</span>{% else %}<span class="badge muted">not checked yet</span>{% endif %}</td>
+        <td class="num" style="white-space:nowrap;">
+          <form class="inline" method="post" action="/admin/news/feeds/{{ f.id }}/toggle"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">{{ 'Turn off' if f.enabled else 'Turn on' }}</button></form>
+          <form class="inline" method="post" action="/admin/news/feeds/{{ f.id }}/delete" data-confirm="Remove the {{ f.name }} feed?"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="secondary small">Remove</button></form>
+        </td></tr>
+      {% endfor %}
+    </table></div>
+    {% else %}<p class="muted small">The default feeds are added on the first check.</p>{% endif %}
+    <form method="post" action="/admin/news/feeds" class="row" style="margin-top:8px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <input type="text" name="name" placeholder="Name" style="width:10em;">
+      <input type="text" name="url" placeholder="https://example.com/feed.xml" style="flex:1;min-width:220px;" required>
+      <button>Add feed</button>
+    </form>
+    <form method="post" action="/admin/news/keywords" style="margin-top:12px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <label for="keywords">Track-change keywords <span class="muted">(one per line; headlines with these about the next circuit raise a "Track-change news" alert)</span></label>
+      <textarea id="keywords" name="keywords" rows="5" style="width:100%;">{{ track_keywords|join('\n') }}</textarea>
+      <p><button class="secondary">Save keywords</button></p>
+    </form>
+  </div>
+
   <div class="card" id="ops">
     <h2>Data sync</h2>
     <p class="muted small">These run automatically; use the buttons to run one now.</p>

@@ -98,6 +98,33 @@ def install_recurring_jobs(sched: Any) -> None:
         name="OpenF1 detail for followed drivers (every 2h)",
     )
     sched.add_job(
+        "pitwall.jobs:session_data_job",
+        "interval",
+        minutes=30,
+        id="session_data",
+        replace_existing=True,
+        next_run_time=now + timedelta(minutes=4),
+        name="Race control + session conditions from OpenF1 (every 30 min)",
+    )
+    sched.add_job(
+        "pitwall.jobs:penalty_watch_job",
+        "interval",
+        minutes=30,
+        id="penalty_watch",
+        replace_existing=True,
+        next_run_time=now + timedelta(minutes=5),
+        name="FIA documents during race week (2h Wed-Sun, 30 min Fri/Sat)",
+    )
+    sched.add_job(
+        "pitwall.jobs:news_job",
+        "interval",
+        minutes=30,
+        id="news",
+        replace_existing=True,
+        next_run_time=now + timedelta(minutes=2),
+        name="News headlines from RSS feeds (every 30 min)",
+    )
+    sched.add_job(
         "pitwall.jobs:weather_sync_job",
         "interval",
         hours=3,

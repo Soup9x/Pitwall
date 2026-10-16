@@ -27,6 +27,7 @@ from pitwall.models import (
     StandingsSnapshot,
 )
 from pitwall.services.results_util import classified, dnf, started
+from pitwall.services.session_data import sc_history
 from pitwall.services.standings import fmt_points
 from pitwall.settings_store import get_user_kv, set_user_kv
 
@@ -77,7 +78,7 @@ NATIONALITY_COUNTRIES: dict[str, set[str]] = {
 
 @dataclass
 class Fact:
-    type: str  # milestone, streak, on_this_day, home_race, rookie_veteran
+    type: str  # milestone, streak, on_this_day, home_race, rookie_veteran, safety_car
     key: str  # stable id used to avoid repeating facts
     text: str
     score: float
@@ -539,7 +540,43 @@ def rookie_veteran(db: DB, ctx: Context) -> list[Fact]:
     return facts
 
 
-GENERATORS = (milestones, streaks, on_this_day, home_race, rookie_veteran)
+def safety_cars(db: DB, ctx: Context) -> list[Fact]:
+    """Real safety car / red flag history here, from stored race control (2023 onwards)."""
+    hist = sc_history(db, ctx.event)
+    if hist is None or hist.races < 2:
+        return []
+    circuit = ctx.event.circuit.name
+    span = f"{min(hist.seasons)}–{max(hist.seasons)}"
+    src = f"race control messages (OpenF1), races at circuit={ctx.event.circuit_id}, {span}"
+    facts = []
+    if hist.with_sc == hist.races:
+        text = f"Every one of the last {hist.races} races at {circuit} has had a safety car."
+        score = 55
+    elif hist.with_sc == 0:
+        text = f"None of the last {hist.races} races at {circuit} has needed a safety car."
+        score = 50
+    else:
+        text = (
+            f"There's been a safety car in {hist.with_sc} of the last {hist.races} races "
+            f"at {circuit}."
+        )
+        score = 40
+    facts.append(Fact("safety_car", f"sc:{ctx.event.slug}", text, score, src))
+    if hist.with_red:
+        facts.append(
+            Fact(
+                "safety_car",
+                f"red:{ctx.event.slug}",
+                f"{hist.with_red} of the last {hist.races} races at {circuit} "
+                f"{'was' if hist.with_red == 1 else 'were'} red-flagged.",
+                35 + 5 * hist.with_red,
+                src,
+            )
+        )
+    return facts
+
+
+GENERATORS = (milestones, streaks, on_this_day, home_race, rookie_veteran, safety_cars)
 
 
 def generate(db: DB, event: Event, user_id: int = OWNER_ID) -> list[Fact]:

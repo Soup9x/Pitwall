@@ -83,8 +83,49 @@ and trivia, and weather, maps, digest and CSV export.
   - race-by-race stats for your followed drivers, including OpenF1 best lap, pit stops and
     tyres.
 
+## Penalties, tyres, race control, conditions and news
+
+- **Penalty watch** (menu → Penalties):
+  - power unit elements used per driver, against the season allocation;
+  - grid penalties per event (places or back of the grid, with the reason);
+  - super licence penalty points over a rolling 12 months, with expiry dates (12 = race ban).
+
+  Admins enter values under **Penalties → Edit / sources**, and manual values always win over
+  parsed ones. Pitwall can also read the FIA's event documents (PDFs). Paste the season's FIA
+  documents page there once. During race week it's checked every 2 hours from Wednesday, and
+  every 30 minutes on Friday and Saturday (track time). Parsing is deliberately strict: if a
+  document looks wrong (an unknown car, a usage count that went down, impossible numbers),
+  nothing from it is stored and it's listed as "couldn't parse - view source". Every parsed
+  value links to its document.
+
+  Alerts: a grid penalty is announced; a driver reaches 10 or 11 licence points (or 12); and,
+  off by default, a followed driver takes a new power unit element.
+- **Tyre nominations** (hard / medium / soft, C1–C6) on event pages and in the race-week
+  preview. "Not announced yet" until known, with last year's choice at the same circuit.
+  Admins pick the three compounds on the event page, or paste a Pirelli press release link:
+  it's only saved if the release names exactly one hard, medium and soft.
+- **Race control** (2023 onwards, from OpenF1, after each session): a collapsible, filterable
+  timeline on the event page with safety cars, VSCs, red flags, laps under SC/VSC,
+  investigations and penalties per session. The track card shows real safety car history
+  ("SC in 4 of last 5 races here"), and it feeds the trivia.
+- **Measured conditions** (2023 onwards, from OpenF1): min/max/average track and air
+  temperature, humidity, rain and maximum wind per session, plus a track-temperature chart.
+  Next to the forecast: "Last year here: track 41–52 °C, dry". Choose °C, °F or both under
+  Settings → Time.
+- **News** from RSS feeds (menu → News, plus a strip on the dashboard). Pitwall stores only
+  each headline's title, link, source, date and tags, never article text. Headlines are tagged
+  with followed drivers, teams, the upcoming circuit and track-change keywords. Track-change
+  headlines about the next circuit appear as **Track updates** on its event page and in the
+  preview, and raise a "Track-change news" alert. Admins edit the feeds and keywords under
+  Settings → News feeds.
+
+Spoiler mode covers all of this. While an event is held, its race control, the penalty
+decisions and headlines published after its first competitive session started are left out
+of pages and emails. Pages show "N headlines hidden" and a **Show anyway** link.
+
 Data comes from the [Jolpica F1 API](https://github.com/jolpica/jolpica-f1) (the
-Ergast successor) plus curated circuit facts in `data/circuits.yaml`.
+Ergast successor), [OpenF1](https://openf1.org), FIA event documents, Pirelli press releases
+and the news feeds you choose, plus curated circuit facts in `data/circuits.yaml`.
 
 ---
 
@@ -230,6 +271,9 @@ event is held:
 - its results, and the standings, recent form, head-to-head, driver season pages, title maths
   and trivia (which all include the latest results) are left out of the pages entirely, not
   just collapsed, so they aren't in the page source either;
+- race control, penalty decisions and news headlines published after the event's first
+  competitive session (sprint qualifying, qualifying, sprint or race) started are left out
+  too. That includes the time before results arrive, e.g. news during qualifying;
 - the race-week preview email and weekly digest leave out standings, recent form and trivia;
 - CSV exports for that season answer "hidden by spoiler mode".
 
@@ -415,3 +459,14 @@ PITWALL_DATA_DIR=./data PITWALL_ADMIN_PASSWORD=dev python -m pitwall serve
 Other commands: `python -m pitwall migrate | sync | backfill`.
 `scripts/record_fixtures.py` records real Jolpica responses for tests (see
 `tests/fixtures/jolpica/README.md`).
+`scripts/record_step2_fixtures.py` does the same for OpenF1 race control/weather, the news
+feeds and (given the FIA documents page) FIA documents. Run it on the server, where there's
+internet access:
+
+```bash
+cd /opt/pitwall
+sudo docker compose run --rm --no-deps --user root -v "$PWD:/src" -w /src \
+    --entrypoint python pitwall scripts/record_step2_fixtures.py 2025 'https://www.fia.com/...'
+```
+
+`tests/test_recorded_step2.py` then checks that Pitwall parses everything it recorded.

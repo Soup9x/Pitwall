@@ -49,6 +49,27 @@ FOLLOWED DRIVERS (last 3)
 
 {% endfor %}
 {% endif %}
+{% if ctx.tyres %}
+
+TYRES
+{% if ctx.tyres.nomination %}{% set t = ctx.tyres.nomination %}- Hard {{ t.hard }}, medium {{ t.medium }}, soft {{ t.soft }}
+{% else %}- Not announced yet
+{% endif %}
+{% if ctx.tyres.last_year %}{% set ly = ctx.tyres.last_year[1] %}- {{ ctx.tyres.last_year[0].season }} here: hard {{ ly.hard }}, medium {{ ly.medium }}, soft {{ ly.soft }}
+{% endif %}
+{% endif %}
+{% if ctx.last_year %}{% set c = ctx.last_year.conditions %}
+
+LAST YEAR HERE ({{ ctx.last_year.event.season }} race): track {{ c.track_min|temp_range(c.track_max, ctx.temp_unit) }}{% if c.rain is not none %}, {{ 'rain' if c.rain else 'dry' }}{% endif %}
+
+{% endif %}
+{% if ctx.track_news %}
+
+TRACK UPDATES
+{% for n in ctx.track_news %}
+- {{ n.title }} ({{ n.source }}) {{ n.link }}
+{% endfor %}
+{% endif %}
 {% if ctx.rain %}
 
 WEATHER

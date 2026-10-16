@@ -17,6 +17,7 @@ from pitwall.db import session_scope, utcnow
 from pitwall.models import SESSION_LABELS, Event, Session, SessionWeather
 from pitwall.sources.http import SourceUnavailable
 from pitwall.sources.openmeteo import FORECAST_DAYS, OpenMeteoClient, describe
+from pitwall.units import fmt_temp
 
 log = logging.getLogger(__name__)
 
@@ -129,13 +130,11 @@ class WeatherView:
         return " · ".join(bits)
 
 
-def view(row: SessionWeather | None, session_type: str) -> WeatherView | None:
+def view(row: SessionWeather | None, session_type: str, unit: str = "both") -> WeatherView | None:
     if row is None:
         return None
     icon, summary = describe(row.weather_code)
-    temp = ""
-    if row.temp_c is not None:
-        temp = f"{round(row.temp_c)}°C / {round(row.temp_c * 9 / 5 + 32)}°F"
+    temp = fmt_temp(row.temp_c, unit)
     rain = f"{row.rain_chance}% rain" if row.rain_chance is not None else ""
     wind = f"{row.wind_kmh:g} km/h wind" if row.wind_kmh is not None else ""
     risk = (
@@ -146,12 +145,12 @@ def view(row: SessionWeather | None, session_type: str) -> WeatherView | None:
     return WeatherView(icon, summary, temp, rain, row.rain_chance, wind, risk)
 
 
-def for_event(db: DB, event: Event) -> dict[int, WeatherView]:
+def for_event(db: DB, event: Event, unit: str = "both") -> dict[int, WeatherView]:
     ids = {s.id: s.type for s in event.sessions}
     rows = db.scalars(select(SessionWeather).where(SessionWeather.session_id.in_(ids)))
     out = {}
     for row in rows:
-        v = view(row, ids[row.session_id])
+        v = view(row, ids[row.session_id], unit)
         if v:
             out[row.session_id] = v
     return out
