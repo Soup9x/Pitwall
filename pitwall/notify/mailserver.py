@@ -200,7 +200,24 @@ def describe(server: MailServer | None) -> dict[str, Any] | None:
     out = asdict(server)
     out.pop("password")
     out["has_password"] = bool(server.password)
+    out["spoofing_risk"] = spoofing_risk(server)
     return out
+
+
+PERSONAL_GOOGLE = ("gmail.com", "googlemail.com")
+
+
+def spoofing_risk(server: MailServer) -> bool:
+    """A personal Gmail account sending as an address on another domain. Google sends it, but
+    the domain's anti-spoofing checks (SPF/DKIM/DMARC) can't pass, so other providers often
+    reject it or file it as spam, while mail to the sending Gmail account itself arrives."""
+    login_domain = server.username.rpartition("@")[2].lower()
+    from_domain = server.from_addr.rpartition("@")[2].lower()
+    return (
+        server.host == "smtp.gmail.com"
+        and login_domain in PERSONAL_GOOGLE
+        and from_domain not in PERSONAL_GOOGLE
+    )
 
 
 def set_user_addresses(db: DB, user_id: int, addresses: list[str]) -> bool:

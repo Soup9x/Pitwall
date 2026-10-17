@@ -244,7 +244,7 @@ def test_admin_sets_up_gmail_then_a_user_just_enters_their_address(client, db, s
         "/settings/email",
         data={"csrf_token": csrf, "notify_email": "friend@example.com", "action": "test"},
     )
-    assert "Test email sent to friend@example.com" in r.text
+    assert "Test email handed to the mail server for friend@example.com" in r.text
     assert _q(sends[-1][1][0])["to"] == "friend@example.com"
     friend = db.query(User).filter_by(username="friend").one()
     db.expire_all()
@@ -313,3 +313,58 @@ def test_invitees_can_give_their_email(client, db):
     )
     newbie = db.query(User).filter_by(username="newbie").one()
     assert load_settings(db, newbie.id).notify_email == "newbie@example.com"
+
+
+# ---------------------------------------------------------------------------- delivery problems
+
+
+def test_email_only_users_dont_log_webhook_failures(db):
+    from pitwall.models import NotificationLog, Outbox
+    from pitwall.notify import outbox
+    from pitwall.notify.message import Message
+
+    friend = create_user(db, "friend", "a long password 1")
+    mailserver.save(db, GMAIL)
+    mailserver.set_user_addresses(db, friend.id, ["friend@example.com"])
+    db.flush()
+    row = outbox.enqueue(db, Message(type="results", title="Results", text="P1", user_id=friend.id))
+    assert set(row.channels.split(",")) == {"email", "webhook"}
+    calls = []
+
+    def sender(channel, msg):
+        calls.append(channel)
+        return (True, "delivered") if channel == "email" else (None, "no webhook destination")
+
+    stats = outbox.flush(db, sender=sender)
+    assert calls == ["email", "webhook"] and stats["sent"] == 1 and stats["failed"] == 0
+    assert db.get(Outbox, row.id).status == "sent"  # not retried, not marked failed
+    logs = db.query(NotificationLog).filter_by(user_id=friend.id).all()
+    assert [(log.channel, log.status) for log in logs] == [("email", "sent")]
+
+
+def test_personal_gmail_sending_as_another_domain_is_flagged(db):
+    risky = mailserver.save(db, GMAIL)  # me@gmail.com sending as pitwall@example.org
+    assert mailserver.spoofing_risk(risky)
+    assert not mailserver.spoofing_risk(mailserver.save(db, {**GMAIL, "from_addr": "me@gmail.com"}))
+    workspace = mailserver.save(
+        db, {**GMAIL, "username": "f1@example.org", "from_addr": "pitwall@example.org"}
+    )
+    assert not mailserver.spoofing_risk(workspace)  # Google Workspace on that domain
+
+
+def test_admin_sees_the_warning_and_can_test_any_address(client, db, sends):
+    csrf = _login(client, "admin", PASSWORD)
+    client.post("/admin/mail", data={**GMAIL, "csrf_token": csrf})
+    page = client.get("/settings").text
+    assert "may be rejected or land in spam" in page and "Everyone's notifications" in page
+    r = client.post(
+        "/admin/mail",
+        data={**GMAIL, "csrf_token": csrf, "action": "test", "test_to": "pal@example.net"},
+    )
+    assert _q(sends[-1][1][0])["to"] == "pal@example.net"
+    assert "bounce message" in r.text
+    bad = client.post(
+        "/admin/mail",
+        data={**GMAIL, "csrf_token": csrf, "action": "test", "test_to": "nope"},
+    )
+    assert "no test was sent" in bad.text

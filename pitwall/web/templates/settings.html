@@ -206,6 +206,18 @@
   <p class="small">Pitwall sends everyone's email alerts from this one account. Users only enter the address they want alerts sent to (Settings → Email); nobody else needs any mail server details.</p>
   {% if mail_server %}<p class="small">✅ Set up: <code>{{ mail_server.host }}:{{ mail_server.port }}</code>, sending as <strong>{{ mail_server.from_name }} &lt;{{ mail_server.from_addr }}&gt;</strong>{% if mail_server.username %} (signs in as {{ mail_server.username }}){% endif %}.</p>
   {% else %}<p class="small">Not set up yet: nobody gets email alerts until it is.</p>{% endif %}
+  {% if mail_server and mail_server.spoofing_risk %}
+  <div class="warn-box" role="note">
+    <p class="small"><strong>⚠ Mail to other people may be rejected or land in spam.</strong> A personal Gmail account ({{ mail_server.username }}) is sending as <strong>{{ mail_server.from_addr }}</strong>. Google delivers it, but {{ mail_server.from_addr.rpartition('@')[2] }}'s anti-spoofing checks (SPF/DKIM/DMARC) can't pass, so providers such as Outlook, Yahoo, iCloud and often Gmail itself refuse it or file it as spam. Mail to {{ mail_server.username }} itself still arrives, which is why it can look fine for you.</p>
+    <p class="small">Fix it with one of these:</p>
+    <ul class="small">
+      <li>Use <strong>{{ mail_server.username }}</strong> as the From address. Simplest; delivers reliably.</li>
+      <li>Send through your domain's own mail service instead: choose <em>Other SMTP server</em> and use the SMTP details from your domain's email host, or a sending service such as Brevo, Mailgun, Resend or Amazon SES set up for {{ mail_server.from_addr.rpartition('@')[2] }}.</li>
+      <li>If {{ mail_server.from_addr.rpartition('@')[2] }} is on Google Workspace, sign in with the Workspace account instead of the personal one, and turn on DKIM in the Workspace admin console.</li>
+    </ul>
+    <p class="small">To see the exact reason, look in {{ mail_server.username }}'s inbox for a "Delivery Status Notification" or "Mail delivery failed" message.</p>
+  </div>
+  {% endif %}
   {% if mf.error %}<div class="error" role="alert" id="mail-error">Couldn't save: {{ mf.error }}</div>{% endif %}
   <form method="post" action="/admin/mail" class="target-form">
     <input type="hidden" name="csrf_token" value="{{ csrf }}">
@@ -220,7 +232,7 @@
         <li>To send from an address on your own domain (e.g. <code>pitwall@yourdomain.com</code>):
           <ul>
             <li>If the domain is on <strong>Google Workspace</strong>, sign in with that address, or with any Workspace account that has it as an alias.</li>
-            <li>With a <strong>regular Gmail account</strong>, first add the address in Gmail → Settings → <em>Accounts and Import</em> → <em>Send mail as</em> and confirm it. Otherwise Gmail replaces it with your Gmail address.</li>
+            <li>With a <strong>personal Gmail account</strong>, Gmail can send as it once you add it under Gmail → Settings → <em>Accounts and Import</em> → <em>Send mail as</em>, but other providers often reject it or file it as spam, because the domain's anti-spoofing checks can't pass. For reliable delivery, use your Gmail address as the From address, or choose <em>Other SMTP server</em> with your domain's own mail host.</li>
           </ul></li>
         <li>Pitwall connects to <code>smtp.gmail.com</code>, port 587, with STARTTLS. Gmail allows about 500 emails a day (2,000 on Workspace), plenty for Pitwall.</li>
       </ol>
@@ -246,8 +258,10 @@
     <input id="mail-from" type="text" name="from_addr" placeholder="pitwall@yourdomain.com" value="{{ mf.get('from_addr') or ms.get('from_addr', '') }}">
     <label for="mail-name">From name</label>
     <input id="mail-name" type="text" name="from_name" maxlength="60" value="{{ mf.get('from_name') or ms.get('from_name', 'Pitwall') }}">
+    <label for="mail-test-to">Send the test to <span class="muted">(optional, e.g. one of your users)</span></label>
+    <input id="mail-test-to" type="text" name="test_to" autocomplete="off" inputmode="email" placeholder="{{ settings.notify_email or 'your alert address' }}">
     <div class="row" style="margin-top:10px;"><button name="action" value="save">Save</button><button class="secondary" name="action" value="test">Save and send a test</button></div>
-    <p class="muted small">The test goes to your own alert address (or the From address if you haven't set one). The password is stored in Pitwall's database and never shown again.</p>
+    <p class="muted small">Without an address above, the test goes to your own alert address (or the From address if you haven't set one). The password is stored in Pitwall's database and never shown again.</p>
   </form>
   {% if mail_server %}
   <form method="post" action="/admin/mail" data-confirm="Remove the outgoing email account? Nobody will get email alerts until it's set up again." style="margin-top:8px;">
@@ -263,6 +277,7 @@
   <ul class="small admin-links">
     <li><a href="/admin/penalties">Penalties</a>: power unit usage, grid penalties, licence points and the FIA documents source. They feed the event pages, the dashboard and penalty alerts.</li>
     <li><a href="/admin/users">Users and invites</a></li>
+    <li><a href="/history?all=1">Everyone's notifications</a>: each alert and test, per user, with the delivery result and any error.</li>
   </ul>
 </div>
 {% endif %}

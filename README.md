@@ -352,12 +352,28 @@ you haven't set one yet.
 
 **Sending from your own domain through Gmail:**
 - **Google Workspace** (your domain's mail is hosted by Google): sign in with that address, or
-  with any Workspace account that has it as an alias. Nothing else to do.
-- **Regular Gmail account:** first add the address in Gmail → Settings → **Accounts and
-  Import** → **Send mail as**, and confirm it with the code Google emails you. Without that,
-  Gmail replaces the From address with your Gmail address.
-- For best delivery, your domain's SPF record should include `include:_spf.google.com`.
+  with any Workspace account that has it as an alias, and turn on DKIM signing in the
+  Workspace admin console. This delivers reliably.
+- **A personal Gmail account** (`@gmail.com`) **sending as `you@yourdomain`:** Google will send
+  it once the address is added under Gmail → Settings → **Accounts and Import** → **Send mail
+  as**. However, your domain's anti-spoofing checks (SPF/DKIM/DMARC) can't pass. Outlook,
+  Yahoo, iCloud and often Gmail itself then reject the mail or file it as spam. Mail to the
+  sending Gmail account itself still arrives, so it can look fine for you while your users get
+  nothing. Pitwall shows a warning on the Outgoing email card when it's set up this way. Fix it
+  in one of these ways:
+  - use the Gmail address itself as the From address;
+  - send through your domain's own mail host, or a sending service (Brevo, Mailgun, Resend,
+    Amazon SES) set up for your domain, with **Other SMTP server**;
+  - use Google Workspace as above.
 - Gmail allows about 500 emails a day (2,000 on Workspace), far more than Pitwall needs.
+
+**If someone isn't getting email:**
+1. Settings → Outgoing email → **Send the test to** their address → **Save and send a test**.
+2. "Handed to the mail server" means the sending server accepted it. If it never arrives, the
+   recipient's provider refused it, and the sending account's inbox will have a bounce
+   ("Delivery Status Notification") with the reason.
+3. Settings → Admin tools → **Everyone's notifications** lists every alert per user with its
+   delivery result and any error.
 
 Already added your own Gmail or SMTP channel in an earlier version? On Settings it now shows a
 **Use for everyone** button. It turns that channel into the server's outgoing email in one

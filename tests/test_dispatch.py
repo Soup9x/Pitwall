@@ -44,8 +44,9 @@ def test_webhook_failure_reported():
 
 
 def test_no_urls_configured():
+    # None (not False): nothing set up on that channel isn't a failed delivery.
     ok, detail = notify("email", Message(type="test", title="t", text="x"), [])
-    assert not ok and "no Apprise URLs" in detail
+    assert ok is None and "no email destination" in detail
 
 
 def test_invalid_url_rejected():

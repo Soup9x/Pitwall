@@ -74,15 +74,16 @@ def _rewrite(url: str) -> tuple[str, bool]:
     return url, False
 
 
-def notify(channel: str, msg: Message, urls: list[str] | None = None) -> tuple[bool, str]:
+def notify(channel: str, msg: Message, urls: list[str] | None = None) -> tuple[bool | None, str]:
     """Deliver `msg` on `channel` ('email' or 'webhook') to `msg.user_id`'s destinations
-    (or to `urls`). Returns (ok, detail)."""
+    (or to `urls`). Returns (ok, detail); ok is None when the user has nothing set up on that
+    channel (e.g. an email-only user and a webhook alert), which isn't a delivery failure."""
     if urls is None:
         from pitwall.notify.targets import channel_urls
 
         urls = channel_urls(channel, user_id=msg.user_id)
     if not urls:
-        return False, f"no Apprise URLs configured for {channel}"
+        return None, f"no {channel} destination set up"
 
     plain = apprise.Apprise()
     custom = apprise.Apprise()
